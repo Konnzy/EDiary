@@ -1,0 +1,36 @@
+package com.ediary.backend.school.repository;
+
+import com.ediary.backend.school.entity.SchoolClass;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
+
+public interface SchoolClassRepository extends JpaRepository<SchoolClass, Long> {
+
+    @EntityGraph(attributePaths = "classTeacher")
+    List<SchoolClass> findAllByOrderByNumberAscLetterAsc();
+
+    boolean existsByNumberAndLetterIgnoreCase(Integer number, String letter);
+
+    boolean existsByNumberAndLetterIgnoreCaseAndIdNot(Integer number, String letter, Long id);
+
+    boolean existsByClassTeacherIdAndIdNot(Long teacherId, Long id);
+
+    Optional<SchoolClass> findByClassTeacherId(Long teacherId);
+
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM schedule WHERE class_id = :classId)", nativeQuery = true)
+    boolean hasSchedule(@Param("classId") Long classId);
+
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM registration_request WHERE requested_class_id = :classId)", nativeQuery = true)
+    boolean hasRegistrationRequests(@Param("classId") Long classId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "classTeacher")
+    @Query("select schoolClass from SchoolClass schoolClass where schoolClass.id = :classId")
+    Optional<SchoolClass> findByIdForUpdate(@Param("classId") Long classId);
+}

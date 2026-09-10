@@ -1,0 +1,214 @@
+# EDiary - електронний щоденник навчального закладу
+
+Клієнт-серверний вебзастосунок для ведення журналу, розкладу, домашніх завдань,
+успішності та комунікації між адміністрацією, вчителями, учнями й батьками.
+
+## Структура
+
+```text
+EDiary/
+|-- frontend/   # React, Vite, Tailwind CSS
+|-- backend/    # Java 21, Spring Boot, Hibernate, PostgreSQL
+`-- README.md
+```
+
+## Вимоги
+
+- Java 21;
+- Maven 3.9+ або Maven Wrapper;
+- PostgreSQL 16+;
+- Node.js 24 LTS та npm 11+;
+- SMTP-сервер для надсилання результатів розгляду заявок.
+
+## PostgreSQL
+
+Flyway автоматично виконує міграції з `backend/src/main/resources/db/migration`.
+Hibernate працює в режимі `validate` і не змінює схему самостійно.
+
+Перед запуском backend задайте підключення до БД:
+
+```powershell
+$env:EDIARY_DB_URL = "jdbc:postgresql://localhost:5432/ediary"
+$env:EDIARY_DB_USERNAME = "ediary"
+$env:EDIARY_DB_PASSWORD = "change-me"
+```
+
+Якщо міграція `V1__init_schema.sql` уже застосовувалась до постійної БД, її не
+можна редагувати повторно. Наступні зміни схеми потрібно оформлювати як `V2`,
+`V3` тощо.
+
+## Перший адміністратор
+
+Початковий адміністратор створюється лише за явного ввімкнення bootstrap. Пароль
+повинен містити щонайменше 12 символів, великі й малі літери, цифру та спеціальний
+символ. Код доступу складається із шести літер або цифр; дефіс необов'язковий.
+
+```powershell
+$env:EDIARY_BOOTSTRAP_ADMIN_ENABLED = "true"
+$env:EDIARY_BOOTSTRAP_ADMIN_LOGIN = "admin"
+$env:EDIARY_BOOTSTRAP_ADMIN_EMAIL = "admin@school.edu.ua"
+$env:EDIARY_BOOTSTRAP_ADMIN_PASSWORD = "replace-with-a-strong-password"
+$env:EDIARY_BOOTSTRAP_ADMIN_ACCESS_CODE = "ABC-123"
+$env:EDIARY_BOOTSTRAP_ADMIN_FIRST_NAME = "Ім'я"
+$env:EDIARY_BOOTSTRAP_ADMIN_LAST_NAME = "Прізвище"
+```
+
+Після першого успішного запуску встановіть
+`EDIARY_BOOTSTRAP_ADMIN_ENABLED=false` і видаліть секрети bootstrap із середовища.
+У БД пароль і службовий код зберігаються тільки як BCrypt-хеші.
+
+## Демонстраційні дані
+
+Після виконання Flyway-міграції локальну БД можна наповнити одним класом,
+адміністратором, учителем і учнем:
+
+```powershell
+cd backend
+psql -h localhost -U ediary -d ediary -f src/main/resources/db/seed/dev/seed_demo_data.sql
+```
+
+Скрипт можна запускати повторно: наявні записи не дублюються. Тестові дані:
+
+| Роль | Логін | Пароль | Код адміністратора |
+| --- | --- | --- | --- |
+| Адміністратор | `admin.test` | `AdminPass!234` | `ABC-123` |
+| Вчитель | `teacher.test` | `AdminPass!234` | - |
+| Учень | `student.test` | `AdminPass!234` | - |
+
+Dataset призначений виключно для локальної розробки й не повинен виконуватися
+в production.
+
+## Пошта
+
+```powershell
+$env:EDIARY_MAIL_ENABLED = "true"
+$env:EDIARY_MAIL_HOST = "smtp.example.com"
+$env:EDIARY_MAIL_PORT = "587"
+$env:EDIARY_MAIL_USERNAME = "smtp-user"
+$env:EDIARY_MAIL_PASSWORD = "smtp-password"
+$env:EDIARY_MAIL_AUTH = "true"
+$env:EDIARY_MAIL_STARTTLS = "true"
+$env:EDIARY_MAIL_STARTTLS_REQUIRED = "true"
+$env:EDIARY_MAIL_SSL = "false"
+$env:EDIARY_MAIL_TEST_CONNECTION = "true"
+$env:EDIARY_MAIL_FROM = "no-reply@example.com"
+$env:EDIARY_MAIL_FROM_NAME = "Електронний щоденник"
+```
+
+Значення потрібно додати до Environment variables конфігурації запуску в
+IntelliJ і перезапустити backend. `EDIARY_MAIL_TEST_CONNECTION=true` змушує
+застосунок перевірити SMTP під час старту: з неправильними реквізитами backend
+не запуститься, а причина буде одразу видима в консолі. Для локального SMTP без
+автентифікації використовуйте порт `1025`, `EDIARY_MAIL_AUTH=false` і
+`EDIARY_MAIL_TEST_CONNECTION=false`.
+
+## Запуск
+
+Backend:
+
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend використовує `http://127.0.0.1:8081/api`. Для іншої адреси задайте
+`VITE_API_URL` перед запуском або production-збіркою.
+
+## Реєстраційний модуль
+
+- `POST /api/registration-requests` - подання публічної заявки;
+- `GET /api/registration-requests/options` - класи та предмети для форми;
+- `GET /api/admin/registration-requests` - захищений список заявок;
+- `POST /api/admin/registration-requests/{id}/approve` - схвалення і створення акаунта; приймає `{ "login": "student.petrenko" }`, а для зайнятого логіна повертає `409 LOGIN_ALREADY_EXISTS`;
+- `POST /api/admin/registration-requests/{id}/reject` - відхилення з причиною.
+
+Адміністративні операції захищені роллю `ADMIN`, серверною сесією та CSRF.
+Для production потрібно завершувати TLS на reverse proxy та встановити
+`EDIARY_SECURE_COOKIE=true`.
+
+## Відновлення пароля
+
+`POST /api/auth/password/forgot` приймає `{ "email": "user@example.com" }`.
+Відповідь однакова для відомої та невідомої адреси. Надсилання працює через
+наявні `EDIARY_MAIL_*` налаштування SMTP у фоновій черзі.
+
+`POST /api/auth/password/reset` приймає `{ "token": "...", "newPassword": "..." }`.
+Обидва запити потребують CSRF-токена з `/api/security/csrf`.
+Посилання одноразове, діє 30 хвилин; у `password_reset_token` зберігається SHA-256 хеш.
+Після зміни пароля відкликаються інші токени та сесії користувача.
+
+Задайте `EDIARY_FRONTEND_URL` як адресу frontend без hash-маршруту
+(локальне значення: `http://127.0.0.1:5174`). Для відкриття листа з іншого
+пристрою потрібна доступна з цього пристрою адреса, у production — HTTPS.
+Зміна змінних середовища потребує перезапуску backend.
+
+Повторний лист для акаунта дозволено через 2 хвилини. На одну IP-адресу
+діє ліміт 5 запитів листа та 20 спроб скидання за 15 хвилин.
+IP-ліміти й фонова черга локальні для одного процесу; для кількох інстансів
+потрібне спільне сховище лімітів і надійна черга доставки.
+
+## Управління користувачами
+
+- `GET /api/admin/users` - список користувачів із пошуком, фільтрами та пагінацією;
+- `POST /api/admin/users` - створення учня, вчителя або батьків адміністратором;
+- `PATCH /api/admin/users/{id}/status` - блокування або розблокування;
+- `GET /api/admin/users/{id}/deletion-eligibility` - перевірка можливості видалення;
+- `DELETE /api/admin/users/{id}` - фізичне видалення акаунта без важливої історії.
+
+Під час створення генерується криптографічно випадковий тимчасовий пароль,
+який зберігається лише як BCrypt-хеш. Після commit транзакції логін і тимчасовий
+пароль надсилаються користувачу через налаштований SMTP. Створення іншого
+адміністратора в цьому endpoint заборонено.
+
+Акаунти з оцінками, відвідуванням, домашніми завданнями, класом, предметами,
+розкладом, повідомленнями або зв'язками батьків видалити не можна. Для них
+використовується блокування: дані зберігаються, а вхід до системи
+забороняється. Реєстраційна заявка, технічні сесії, reset-токени й
+налаштування сповіщень не вважаються навчальною історією та видаляються разом
+із дозволеним акаунтом.
+
+## Управління класами
+
+- `GET /api/admin/classes` - список класів із пошуком і фільтром за паралеллю;
+- `GET /api/admin/classes/options` - активні вчителі та їхні призначення;
+- `GET /api/admin/classes/{id}` - деталі класу;
+- `GET /api/admin/classes/{id}/deletion-eligibility` - перевірка можливості видалення класу;
+- `GET /api/admin/classes/{id}/students` - фактичний склад класу;
+- `GET /api/admin/classes/students/unassigned` - активні учні без класу;
+- `POST /api/admin/classes` - створення класу;
+- `PATCH /api/admin/classes/{id}` - редагування класу;
+- `POST /api/admin/classes/{id}/students/{studentId}` - додавання учня;
+- `PATCH /api/admin/classes/{id}/students/{studentId}/class` - переведення учня;
+- `DELETE /api/admin/classes/{id}/students/{studentId}` - вилучення учня зі складу класу без видалення акаунта.
+- `DELETE /api/admin/classes/{id}` - видалення щойно створеного класу без пов'язаних даних.
+
+Номер класу обмежений діапазоном від 1 до 12, літера має бути однією великою
+українською літерою. Поєднання номера та літери унікальне. Один учитель може
+бути класним керівником лише одного класу. Місткість є сталою для всіх класів
+і дорівнює 30 учням; змінити її через API або адміністративний інтерфейс не можна.
+Учень може тимчасово не належати до класу, при цьому його акаунт та навчальна
+історія зберігаються. Клас можна видалити лише за відсутності класного
+керівника, учнів, розкладу та реєстраційних заявок, що посилаються на нього.
+
+## Управління предметами
+
+- `GET /api/admin/subjects` - список предметів із пошуком за назвою;
+- `GET /api/admin/subjects/options` - список учителів для призначення;
+- `POST /api/admin/subjects` - створення предмета та призначення вчителів;
+- `PATCH /api/admin/subjects/{id}` - редагування назви та складу вчителів;
+- `GET /api/admin/subjects/{id}/deletion-eligibility` - перевірка можливості видалення;
+- `DELETE /api/admin/subjects/{id}` - видалення предмета без пов'язаних даних.
+
+Один предмет можуть викладати декілька вчителів, а один учитель може бути
+призначений до декількох предметів. Назва предмета унікальна без урахування
+регістру. Не можна зняти призначення вчителя, якщо відповідна пара
+«вчитель-предмет» використовується в розкладі. Видалення дозволене лише за
+відсутності призначених учителів, розкладу та реєстраційних заявок.
