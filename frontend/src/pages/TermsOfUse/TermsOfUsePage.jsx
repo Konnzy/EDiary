@@ -51,7 +51,7 @@ const terms = [
   },
 ];
 
-const lastUpdated = "23 травня 2026 року";
+const lastUpdated = "10 вересня 2026 року";
 
 export function TermsOfUsePage() {
   return (
