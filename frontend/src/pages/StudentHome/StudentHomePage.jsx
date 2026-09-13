@@ -12,7 +12,9 @@ import {
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { Card, CardContent, CardHeader } from "@/components/ui/card.jsx";
+import { authApi } from "@/lib/api.js";
 import { cn } from "@/lib/utils.js";
+import { formatToday, useTodaySchedule } from "@/hooks/useTodaySchedule.js";
 
 const student = {
   name: "Іван Петренко",
@@ -20,34 +22,11 @@ const student = {
 };
 
 const navigationItems = [
-  { label: "Головна", icon: Home, active: true },
-  { label: "Розклад", icon: CalendarDays },
+  { label: "Головна", icon: Home, active: true, route: "student" },
+  { label: "Розклад", icon: CalendarDays, route: "student/schedule" },
   { label: "Предмети", icon: BookOpen },
   { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
   { label: "Профіль", icon: User },
-];
-
-const lessons = [
-  {
-    time: "09:00 - 09:45",
-    subject: "Математика",
-    details: "Світлана Іваненко • Кабінет 302",
-  },
-  {
-    time: "10:00 - 10:45",
-    subject: "Українська мова",
-    details: "Олег Петренко • Кабінет 210",
-  },
-  {
-    time: "11:00 - 11:45",
-    subject: "Фізика",
-    details: "Вікторія Сидоренко • Кабінет 140",
-  },
-  {
-    time: "12:00 - 12:45",
-    subject: "Історія України",
-    details: "Олена Коваль • Кабінет 105",
-  },
 ];
 
 const grades = [
@@ -134,6 +113,8 @@ const messages = [
 const hasUnreadNotifications = false;
 
 export function StudentHomePage() {
+  const todaySchedule = useTodaySchedule("STUDENT");
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
       <TopBar />
@@ -157,7 +138,7 @@ export function StudentHomePage() {
               </header>
 
               <div className="grid gap-5 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)]">
-                <TodayScheduleCard />
+                <TodayScheduleCard schedule={todaySchedule} />
                 <RecentGradesCard />
               </div>
 
@@ -175,6 +156,15 @@ export function StudentHomePage() {
 }
 
 function TopBar() {
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // The session may already be expired.
+    }
+    window.location.hash = "login";
+  };
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white px-4 sm:px-5 lg:px-6">
       <a
@@ -201,9 +191,7 @@ function TopBar() {
 
         <button
           type="button"
-          onClick={() => {
-            window.location.hash = "login";
-          }}
+          onClick={handleLogout}
           className="inline-flex h-9 items-center gap-2 rounded-md px-2 text-[0.82rem] font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:h-10 sm:px-3"
         >
           <LogOut className="h-4 w-4" aria-hidden="true" />
@@ -228,6 +216,8 @@ function MobileNavigation() {
             <button
               key={item.label}
               type="button"
+              disabled={!item.route}
+              onClick={() => { if (item.route) window.location.hash = item.route; }}
               className={cn(
                 "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-1 text-[0.72rem] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-[480px]:gap-2 min-[480px]:px-2 min-[480px]:text-[0.78rem]",
                 item.active
@@ -258,6 +248,8 @@ function Sidebar() {
             <button
               key={item.label}
               type="button"
+              disabled={!item.route}
+              onClick={() => { if (item.route) window.location.hash = item.route; }}
               className={cn(
                 "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.9rem] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 item.active
@@ -280,28 +272,36 @@ function SectionTitle({ children }) {
   return <h2 className="text-[0.98rem] font-bold leading-tight text-slate-900">{children}</h2>;
 }
 
-function TodayScheduleCard() {
+function TodayScheduleCard({ schedule }) {
   return (
     <Card className="rounded-lg px-4 py-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] sm:px-5">
       <CardHeader className="mb-3 flex-row items-center justify-between space-y-0">
         <SectionTitle>Сьогоднішній розклад</SectionTitle>
-        <span className="text-[0.74rem] font-medium text-slate-400">15 Жовтня</span>
+        <span className="text-[0.74rem] font-medium text-slate-400">{formatToday()}</span>
       </CardHeader>
 
       <CardContent className="space-y-2">
-        {lessons.map((lesson) => (
+        {schedule.loading ? <ScheduleLoading /> : null}
+        {!schedule.loading && schedule.error ? <p className="py-8 text-center text-[0.78rem] text-red-500">{schedule.error}</p> : null}
+        {!schedule.loading && !schedule.error && !schedule.lessons.length ? <p className="py-8 text-center text-[0.78rem] text-slate-400">Сьогодні уроків немає</p> : null}
+        {!schedule.loading && !schedule.error ? schedule.lessons.map((lesson) => (
           <article
-            key={`${lesson.time}-${lesson.subject}`}
+            key={lesson.id}
             className="rounded-md border border-slate-200/80 bg-slate-50/75 px-3.5 py-2"
           >
-            <time className="text-[0.72rem] font-medium leading-none text-slate-400">{lesson.time}</time>
+            <time className="text-[0.72rem] font-medium leading-none text-slate-400">{lesson.startTime}–{lesson.endTime}</time>
             <h3 className="mt-1 text-[0.84rem] font-bold leading-4 text-slate-800">{lesson.subject}</h3>
-            <p className="mt-0.5 text-[0.72rem] leading-4 text-slate-500">{lesson.details}</p>
+            <p className="mt-0.5 text-[0.72rem] leading-4 text-slate-500">{lesson.teacher} · {lesson.room ? `Кабінет ${lesson.room}` : "Кабінет не вказано"}</p>
           </article>
-        ))}
+        )) : null}
+        <a href="#student/schedule" className="mt-3 inline-flex text-[0.76rem] font-semibold text-slate-600 hover:text-slate-900">Відкрити розклад</a>
       </CardContent>
     </Card>
   );
+}
+
+function ScheduleLoading() {
+  return <div className="flex min-h-24 items-center justify-center text-slate-400"><CalendarDays className="h-5 w-5 animate-pulse" aria-label="Завантаження розкладу" /></div>;
 }
 
 function RecentGradesCard() {

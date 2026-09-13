@@ -7,6 +7,8 @@ public record AdminSchoolClassResponse(
     Integer limit,
     Long classTeacherId,
     String classTeacherName,
-    long studentCount
+    long studentCount,
+    String academicYear,
+    boolean editable
 ) {
 }

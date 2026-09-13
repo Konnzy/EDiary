@@ -3,6 +3,7 @@ package com.ediary.backend.registration.repository;
 import com.ediary.backend.registration.entity.RegistrationRequest;
 import com.ediary.backend.registration.entity.RegistrationStatus;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +16,11 @@ import org.springframework.data.repository.query.Param;
 public interface RegistrationRequestRepository extends JpaRepository<RegistrationRequest, Long> {
 
     boolean existsByEmailIgnoreCaseAndStatus(String email, RegistrationStatus status);
+
+    long countByStatus(RegistrationStatus status);
+
+    @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass"})
+    List<RegistrationRequest> findTop4ByOrderByCreatedAtDesc();
 
     @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})
     Page<RegistrationRequest> findAllByStatus(RegistrationStatus status, Pageable pageable);

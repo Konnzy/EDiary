@@ -10,13 +10,21 @@ import static org.mockito.Mockito.when;
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.school.dto.request.SaveSchoolClassRequest;
 import com.ediary.backend.school.entity.SchoolClass;
+import com.ediary.backend.school.entity.AcademicYear;
+import com.ediary.backend.school.entity.StudentClassMembership;
+import com.ediary.backend.school.repository.AcademicYearRepository;
 import com.ediary.backend.school.repository.SchoolClassRepository;
+import com.ediary.backend.school.repository.StudentClassMembershipRepository;
 import com.ediary.backend.user.entity.AppUser;
 import com.ediary.backend.user.entity.StudentProfile;
 import com.ediary.backend.user.entity.TeacherProfile;
 import com.ediary.backend.user.repository.StudentProfileRepository;
 import com.ediary.backend.user.repository.TeacherProfileRepository;
 import java.util.Optional;
+import java.util.List;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +37,8 @@ class AdminSchoolClassServiceTest {
     @Mock private SchoolClassRepository schoolClassRepository;
     @Mock private TeacherProfileRepository teacherProfileRepository;
     @Mock private StudentProfileRepository studentProfileRepository;
+    @Mock private StudentClassMembershipRepository membershipRepository;
+    @Mock private AcademicYearRepository academicYearRepository;
 
     private AdminSchoolClassService service;
 
@@ -37,7 +47,10 @@ class AdminSchoolClassServiceTest {
         service = new AdminSchoolClassService(
             schoolClassRepository,
             teacherProfileRepository,
-            studentProfileRepository
+            studentProfileRepository,
+            membershipRepository,
+            academicYearRepository,
+            Clock.fixed(Instant.parse("2026-09-12T09:00:00Z"), ZoneOffset.UTC)
         );
     }
 
@@ -50,7 +63,10 @@ class AdminSchoolClassServiceTest {
                 return value;
             });
 
-        var response = service.create(new SaveSchoolClassRequest(7, "б", null));
+        AcademicYear year = academicYear("2026/2027");
+        when(academicYearRepository.findById("2026/2027")).thenReturn(Optional.of(year));
+
+        var response = service.create(new SaveSchoolClassRequest(7, "б", null, "2026/2027"));
 
         assertThat(response.number()).isEqualTo(7);
         assertThat(response.letter()).isEqualTo("Б");
@@ -60,19 +76,49 @@ class AdminSchoolClassServiceTest {
 
     @Test
     void rejectsDuplicateClass() {
-        when(schoolClassRepository.existsByNumberAndLetterIgnoreCase(7, "Б")).thenReturn(true);
+        when(academicYearRepository.findById("2026/2027"))
+            .thenReturn(Optional.of(academicYear("2026/2027")));
+        when(schoolClassRepository.existsByAcademicYearValueAndNumberAndLetterIgnoreCase(
+            "2026/2027", 7, "Б"
+        )).thenReturn(true);
 
-        assertThatThrownBy(() -> service.create(new SaveSchoolClassRequest(7, "Б", null)))
+        assertThatThrownBy(() -> service.create(new SaveSchoolClassRequest(7, "Б", null, "2026/2027")))
             .isInstanceOf(ApplicationException.class)
             .satisfies(error -> assertThat(((ApplicationException) error).getCode())
                 .isEqualTo("SCHOOL_CLASS_ALREADY_EXISTS"));
     }
 
     @Test
+    void listsOnlyClassesAndMembershipCountsForSelectedYear() {
+        SchoolClass archived = schoolClass(8L);
+        archived.setAcademicYear(academicYear("2025/2026"));
+        when(schoolClassRepository.findAllByAcademicYearValueOrderByNumberAscLetterAsc("2025/2026"))
+            .thenReturn(List.of(archived));
+        when(membershipRepository.countBySchoolClassIdAndActiveTrue(8L)).thenReturn(5L);
+
+        var classes = service.findAll(null, null, "2025/2026");
+
+        assertThat(classes).hasSize(1);
+        assertThat(classes.getFirst().academicYear()).isEqualTo("2025/2026");
+        assertThat(classes.getFirst().studentCount()).isEqualTo(5);
+        assertThat(classes.getFirst().editable()).isFalse();
+        verify(schoolClassRepository).findAllByAcademicYearValueOrderByNumberAscLetterAsc("2025/2026");
+    }
+
+    @Test
+    void doesNotCreateClassInPastAcademicYear() {
+        assertThatThrownBy(() -> service.create(new SaveSchoolClassRequest(9, "А", null, "2025/2026")))
+            .isInstanceOf(ApplicationException.class)
+            .satisfies(error -> assertThat(((ApplicationException) error).getCode())
+                .isEqualTo("HISTORICAL_CLASS_READ_ONLY"));
+        verify(schoolClassRepository, never()).saveAndFlush(any(SchoolClass.class));
+    }
+
+    @Test
     void rejectsStudentWhenClassHasReachedFixedCapacity() {
         SchoolClass schoolClass = schoolClass(9L);
         when(schoolClassRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(schoolClass));
-        when(studentProfileRepository.countBySchoolClassId(9L))
+        when(membershipRepository.countBySchoolClassIdAndActiveTrue(9L))
             .thenReturn((long) AdminSchoolClassService.CLASS_CAPACITY);
 
         assertThatThrownBy(() -> service.addStudent(9L, 14L))
@@ -89,6 +135,12 @@ class AdminSchoolClassServiceTest {
         student.setUser(new AppUser());
         student.setSchoolClass(schoolClass);
         when(studentProfileRepository.findByIdForUpdate(14L)).thenReturn(Optional.of(student));
+        StudentClassMembership membership = new StudentClassMembership();
+        membership.setStudent(student);
+        membership.setSchoolClass(schoolClass);
+        when(schoolClassRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(schoolClass));
+        when(membershipRepository.findByStudentIdAndSchoolClassIdAndActiveTrue(14L, 9L))
+            .thenReturn(Optional.of(membership));
         when(studentProfileRepository.saveAndFlush(student)).thenReturn(student);
 
         service.removeStudent(9L, 14L);
@@ -113,7 +165,7 @@ class AdminSchoolClassServiceTest {
         SchoolClass schoolClass = schoolClass(9L);
         schoolClass.setClassTeacher(new TeacherProfile());
         when(schoolClassRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(schoolClass));
-        when(studentProfileRepository.countBySchoolClassId(9L)).thenReturn(1L);
+        when(membershipRepository.countBySchoolClassId(9L)).thenReturn(1L);
         when(schoolClassRepository.hasSchedule(9L)).thenReturn(true);
         when(schoolClassRepository.hasRegistrationRequests(9L)).thenReturn(true);
 
@@ -134,6 +186,13 @@ class AdminSchoolClassServiceTest {
         schoolClass.setNumber(9);
         schoolClass.setLetter("А");
         schoolClass.setLimit(AdminSchoolClassService.CLASS_CAPACITY);
+        schoolClass.setAcademicYear(academicYear("2026/2027"));
         return schoolClass;
+    }
+
+    private AcademicYear academicYear(String value) {
+        AcademicYear academicYear = new AcademicYear();
+        academicYear.setValue(value);
+        return academicYear;
     }
 }

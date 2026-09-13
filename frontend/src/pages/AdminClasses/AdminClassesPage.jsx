@@ -16,7 +16,7 @@ import { Alert } from "@/components/ui/alert.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
-import { ApiError, adminClassesApi } from "@/lib/api.js";
+import { ApiError, adminClassesApi, adminScheduleApi } from "@/lib/api.js";
 import { cn } from "@/lib/utils.js";
 import { AdminLayout } from "@/pages/AdminHome/AdminLayout.jsx";
 
@@ -52,25 +52,49 @@ export function AdminClassesPage() {
   const [notice, setNotice] = useState("");
   const [editingClass, setEditingClass] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [academicYears, setAcademicYears] = useState(["2026/2027"]);
-  const [selectedYear, setSelectedYear] = useState("2026/2027");
+  const [academicYears, setAcademicYears] = useState([]);
+  const [selectedYear, setSelectedYear] = useState("");
+  const [isLoadingYears, setIsLoadingYears] = useState(true);
   const [yearDialogOpen, setYearDialogOpen] = useState(false);
 
   const loadClasses = useCallback(async () => {
     setIsLoading(true);
     setError("");
     try {
-      setClasses(await adminClassesApi.findAll({ query, number }));
+      if (!selectedYear) {
+        setClasses([]);
+        return;
+      }
+      setClasses(await adminClassesApi.findAll({ query, number, academicYear: selectedYear }));
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити класи.");
     } finally {
       setIsLoading(false);
     }
-  }, [number, query]);
+  }, [number, query, selectedYear]);
 
   useEffect(() => {
-    loadClasses();
-  }, [loadClasses]);
+    if (selectedYear) loadClasses();
+  }, [loadClasses, selectedYear]);
+
+  useEffect(() => {
+    let active = true;
+    adminScheduleApi.findAcademicYears()
+      .then((years) => {
+        if (!active) return;
+        const currentYear = getCurrentAcademicYear();
+        setAcademicYears(years);
+        setSelectedYear(years.includes(currentYear) ? currentYear : (years.at(-1) || ""));
+      })
+      .catch((requestError) => {
+        if (!active) return;
+        setAcademicYears([]);
+        setSelectedYear("");
+        setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити навчальні роки.");
+      })
+      .finally(() => active && setIsLoadingYears(false));
+    return () => { active = false; };
+  }, []);
 
   const submitSearch = (event) => {
     event.preventDefault();
@@ -97,9 +121,10 @@ export function AdminClassesPage() {
     setSelectedYear(value);
   };
 
-  const addAcademicYear = (year) => {
-    setAcademicYears((current) => [...current, year]);
-    setSelectedYear(year);
+  const addAcademicYear = async (year) => {
+    const response = await adminScheduleApi.createAcademicYear(year);
+    setAcademicYears((current) => [...current, response.academicYear].sort());
+    setSelectedYear(response.academicYear);
     setYearDialogOpen(false);
   };
 
@@ -109,7 +134,7 @@ export function AdminClassesPage() {
       title="Класи"
       subtitle="Керування класами та класними керівниками."
       actions={(
-        <Button type="button" onClick={openCreate} className="h-10 w-full rounded-md px-4 sm:w-auto">
+        <Button type="button" onClick={openCreate} disabled={!selectedYear || selectedYear !== getCurrentAcademicYear()} title={selectedYear !== getCurrentAcademicYear() ? "Архівні класи доступні лише для перегляду" : "Створити клас"} className="h-10 w-full rounded-md px-4 sm:w-auto">
           <Plus className="h-4 w-4" aria-hidden="true" />
           Створити клас
         </Button>
@@ -148,9 +173,11 @@ export function AdminClassesPage() {
               <select
                 value={selectedYear}
                 onChange={(event) => changeAcademicYear(event.target.value)}
+                disabled={isLoadingYears}
                 className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-none transition-colors hover:border-slate-400 focus:border-slate-500"
                 aria-label="Навчальний рік"
               >
+                {!selectedYear ? <option value="">{isLoadingYears ? "Завантаження..." : "Навчальний рік не налаштовано"}</option> : null}
                 {academicYears.map((year) => <option key={year} value={year}>{year} н. р.</option>)}
                 <option value="__add_year__">+ Додати навчальний рік</option>
               </select>
@@ -182,7 +209,7 @@ export function AdminClassesPage() {
         <Card className="mt-5 flex min-h-[260px] flex-col items-center justify-center rounded-lg px-5 text-center">
           <GraduationCap className="h-9 w-9 text-slate-300" aria-hidden="true" />
           <h2 className="mt-4 text-[0.95rem] font-bold text-slate-800">Класів не знайдено</h2>
-          <p className="mt-1 text-[0.8rem] text-slate-500">Змініть параметри пошуку або створіть новий клас.</p>
+          <p className="mt-1 text-[0.8rem] text-slate-500">{selectedYear === getCurrentAcademicYear() ? "Змініть параметри пошуку або створіть новий клас." : "У вибраному навчальному році класів немає."}</p>
         </Card>
       ) : null}
 
@@ -197,6 +224,7 @@ export function AdminClassesPage() {
       {dialogOpen ? (
         <ClassDialog
           schoolClass={editingClass}
+          academicYear={selectedYear}
           onClose={() => setDialogOpen(false)}
           onSaved={handleSaved}
         />
@@ -223,9 +251,9 @@ function ClassCard({ schoolClass }) {
         <span className="text-[1.45rem] font-bold text-slate-950">{schoolClass.number}-{schoolClass.letter}</span>
         <span className={cn(
           "rounded-full border px-2.5 py-1 text-[0.68rem] font-bold",
-          "border-emerald-200 bg-emerald-50 text-emerald-700",
+          schoolClass.editable ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600",
         )}>
-          Активний
+          {schoolClass.editable ? "Активний" : "Архівний"}
         </span>
       </div>
 
@@ -247,7 +275,7 @@ function ClassCard({ schoolClass }) {
   );
 }
 
-export function ClassDialog({ schoolClass, onClose, onSaved }) {
+export function ClassDialog({ schoolClass, academicYear, onClose, onSaved }) {
   const isEditing = Boolean(schoolClass);
   const [form, setForm] = useState(() => schoolClass ? {
     number: String(schoolClass.number),
@@ -262,12 +290,12 @@ export function ClassDialog({ schoolClass, onClose, onSaved }) {
 
   useEffect(() => {
     let active = true;
-    adminClassesApi.getOptions()
+    adminClassesApi.getOptions(schoolClass?.academicYear || academicYear)
       .then((value) => active && setOptions(value))
       .catch((requestError) => active && setServerError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити список учителів."))
       .finally(() => active && setIsLoadingOptions(false));
     return () => { active = false; };
-  }, []);
+  }, [academicYear, schoolClass?.academicYear]);
 
   const visibleTeachers = useMemo(() => options.teachers || [], [options.teachers]);
 
@@ -292,6 +320,7 @@ export function ClassDialog({ schoolClass, onClose, onSaved }) {
       number: Number(form.number),
       letter: form.letter,
       classTeacherId: form.classTeacherId ? Number(form.classTeacherId) : null,
+      academicYear: schoolClass?.academicYear || academicYear,
     };
 
     setIsSubmitting(true);
@@ -392,8 +421,28 @@ function DialogField({ label, error, children }) {
 }
 
 function AcademicYearDialog({ years, onClose, onCreate }) {
-  const nextStartYear = Math.max(...years.map((year) => Number(year.split("/")[0]))) + 1;
+  const today = new Date();
+  const currentAcademicYearStart = today.getMonth() >= 8
+    ? today.getFullYear()
+    : today.getFullYear() - 1;
+  const nextStartYear = years.length
+    ? Math.max(...years.map((year) => Number(year.split("/")[0]))) + 1
+    : currentAcademicYearStart;
   const nextYear = `${nextStartYear}/${nextStartYear + 1}`;
+  const hasNotStarted = nextStartYear > currentAcademicYearStart;
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const create = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await onCreate(nextYear);
+    } catch (requestError) {
+      setError(requestError instanceof ApiError ? requestError.message : "Не вдалося створити навчальний рік.");
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -413,11 +462,22 @@ function AcademicYearDialog({ years, onClose, onCreate }) {
           <p className="mt-1 text-lg font-bold text-slate-900">{nextYear}</p>
         </div>
 
+        {hasNotStarted ? (
+          <Alert className="mt-3">Навчальний рік ще не настав. Його можна створити не раніше 1 вересня {nextStartYear} року.</Alert>
+        ) : null}
+        {error ? <Alert className="mt-3">{error}</Alert> : null}
+
         <div className="mt-6 flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose} className="h-10 rounded-md border border-slate-300 bg-white px-4 text-xs">Скасувати</Button>
-          <Button type="button" onClick={() => onCreate(nextYear)} className="h-10 rounded-md px-4 text-xs"><Plus className="h-4 w-4" aria-hidden="true" />Створити</Button>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={saving} className="h-10 rounded-md border border-slate-300 bg-white px-4 text-xs">Скасувати</Button>
+          <Button type="button" onClick={create} disabled={saving || hasNotStarted} className="h-10 rounded-md px-4 text-xs"><Plus className="h-4 w-4" aria-hidden="true" />{saving ? "Створення..." : "Створити"}</Button>
         </div>
       </section>
     </div>
   );
+}
+
+function getCurrentAcademicYear() {
+  const today = new Date();
+  const startYear = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1;
+  return `${startYear}/${startYear + 1}`;
 }

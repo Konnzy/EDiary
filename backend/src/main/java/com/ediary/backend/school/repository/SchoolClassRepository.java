@@ -15,11 +15,19 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Long> 
     @EntityGraph(attributePaths = "classTeacher")
     List<SchoolClass> findAllByOrderByNumberAscLetterAsc();
 
-    boolean existsByNumberAndLetterIgnoreCase(Integer number, String letter);
+    @EntityGraph(attributePaths = {"classTeacher", "academicYear"})
+    List<SchoolClass> findAllByAcademicYearValueOrderByNumberAscLetterAsc(String academicYear);
 
-    boolean existsByNumberAndLetterIgnoreCaseAndIdNot(Integer number, String letter, Long id);
+    boolean existsByAcademicYearValueAndNumberAndLetterIgnoreCase(String academicYear, Integer number, String letter);
 
-    boolean existsByClassTeacherIdAndIdNot(Long teacherId, Long id);
+    boolean existsByAcademicYearValueAndNumberAndLetterIgnoreCaseAndIdNot(
+        String academicYear,
+        Integer number,
+        String letter,
+        Long id
+    );
+
+    boolean existsByAcademicYearValueAndClassTeacherIdAndIdNot(String academicYear, Long teacherId, Long id);
 
     Optional<SchoolClass> findByClassTeacherId(Long teacherId);
 
@@ -30,7 +38,7 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Long> 
     boolean hasRegistrationRequests(@Param("classId") Long classId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "classTeacher")
+    @EntityGraph(attributePaths = {"classTeacher", "academicYear"})
     @Query("select schoolClass from SchoolClass schoolClass where schoolClass.id = :classId")
     Optional<SchoolClass> findByIdForUpdate(@Param("classId") Long classId);
 }

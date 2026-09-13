@@ -44,11 +44,17 @@ const emptyLesson = {
   room: "",
 };
 
+function getCurrentAcademicYear() {
+  const today = new Date();
+  const startYear = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1;
+  return `${startYear}/${startYear + 1}`;
+}
+
 export function AdminSchedulePage() {
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState("");
   const [academicYears, setAcademicYears] = useState([]);
-  const [selectedYear, setSelectedYear] = useState("2026/2027");
+  const [selectedYear, setSelectedYear] = useState("");
   const [week, setWeek] = useState(1);
   const [schedule, setSchedule] = useState(createEmptySchedule);
   const [lessonDialog, setLessonDialog] = useState(null);
@@ -64,29 +70,13 @@ export function AdminSchedulePage() {
 
   useEffect(() => {
     let active = true;
-    adminClassesApi.findAll()
-      .then((items) => {
-        if (!active) return;
-        setClasses(items);
-        setSelectedClassId(items[0] ? String(items[0].id) : "");
-      })
-      .catch(() => {
-        if (!active) return;
-        setClasses([]);
-        setSelectedClassId("");
-      })
-      .finally(() => active && setLoadingClasses(false));
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
     adminScheduleApi.findAcademicYears()
       .then((years) => {
         if (!active) return;
         const availableYears = years.length ? years : ["2026/2027"];
         setAcademicYears(availableYears);
-        setSelectedYear((current) => availableYears.includes(current) ? current : availableYears[0]);
+        const currentAcademicYear = getCurrentAcademicYear();
+        setSelectedYear(availableYears.includes(currentAcademicYear) ? currentAcademicYear : availableYears.at(-1));
       })
       .catch((requestError) => {
         if (!active) return;
@@ -97,7 +87,29 @@ export function AdminSchedulePage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedClassId || !selectedYear) {
+    if (!selectedYear) return undefined;
+    let active = true;
+    setLoadingClasses(true);
+    adminClassesApi.findAll({ academicYear: selectedYear })
+      .then((items) => {
+        if (!active) return;
+        setClasses(items);
+        setSelectedClassId((current) => items.some((item) => String(item.id) === current)
+          ? current
+          : (items[0] ? String(items[0].id) : ""));
+      })
+      .catch(() => {
+        if (!active) return;
+        setClasses([]);
+        setSelectedClassId("");
+      })
+      .finally(() => active && setLoadingClasses(false));
+    return () => { active = false; };
+  }, [selectedYear]);
+
+  useEffect(() => {
+    if (!selectedClassId || !selectedYear || loadingClasses ||
+        !classes.some((schoolClass) => String(schoolClass.id) === selectedClassId && schoolClass.academicYear === selectedYear)) {
       setSchedule(createEmptySchedule());
       setDirty(false);
       return undefined;
@@ -120,7 +132,7 @@ export function AdminSchedulePage() {
       })
       .finally(() => active && setLoadingSchedule(false));
     return () => { active = false; };
-  }, [selectedClassId, selectedYear, week]);
+  }, [classes, loadingClasses, selectedClassId, selectedYear, week]);
 
   const updateSchedule = (updater) => {
     setSchedule(updater);
@@ -156,12 +168,14 @@ export function AdminSchedulePage() {
       setYearDialogOpen(true);
       return;
     }
+    setSelectedClassId("");
     setSelectedYear(value);
   };
 
   const addAcademicYear = async (year) => {
     const response = await adminScheduleApi.createAcademicYear(year);
     setAcademicYears((current) => [...current, response.academicYear].sort());
+    setSelectedClassId("");
     setSelectedYear(response.academicYear);
     setYearDialogOpen(false);
   };
@@ -500,10 +514,15 @@ function DeleteLessonDialog({ target, onClose, onConfirm }) {
 }
 
 function AcademicYearDialog({ years, onClose, onCreate }) {
+  const today = new Date();
+  const currentAcademicYearStart = today.getMonth() >= 8
+    ? today.getFullYear()
+    : today.getFullYear() - 1;
   const nextStartYear = years.length
     ? Math.max(...years.map((year) => Number(year.split("/")[0]))) + 1
-    : 2026;
+    : currentAcademicYearStart;
   const nextYear = `${nextStartYear}/${nextStartYear + 1}`;
+  const hasNotStarted = nextStartYear > currentAcademicYearStart;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const create = async () => {
@@ -523,10 +542,13 @@ function AcademicYearDialog({ years, onClose, onCreate }) {
         <p className="mt-1 text-lg font-bold text-slate-900">{nextYear}</p>
       </div>
       <p className="mt-3 text-[0.76rem] leading-5 text-slate-500">Після створення рік буде вибрано автоматично. Розклад нового року спочатку можна редагувати як окремий.</p>
+      {hasNotStarted ? (
+        <Alert className="mt-3">Навчальний рік ще не настав. Його можна створити не раніше 1 вересня {nextStartYear} року.</Alert>
+      ) : null}
       {error ? <Alert className="mt-3">{error}</Alert> : null}
       <div className="mt-6 flex justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onClose} disabled={saving} className="h-10 rounded-md border border-slate-300 bg-white px-4 text-xs">Скасувати</Button>
-        <Button type="button" onClick={create} disabled={saving} className="h-10 rounded-md px-4 text-xs"><Plus className="h-4 w-4" />{saving ? "Створення..." : "Створити"}</Button>
+        <Button type="button" onClick={create} disabled={saving || hasNotStarted} className="h-10 rounded-md px-4 text-xs"><Plus className="h-4 w-4" />{saving ? "Створення..." : "Створити"}</Button>
       </div>
     </ModalFrame>
   );

@@ -80,6 +80,7 @@ export const registrationApi = {
 };
 
 export const authApi = {
+  getSession: () => request("/auth/session"),
   forgotPassword: (email) => request("/auth/password/forgot", { method: "POST", body: { email }, csrf: true }),
   resetPassword: (token, newPassword) => request("/auth/password/reset", { method: "POST", body: { token, newPassword }, csrf: true }),
   login: (payload) => request("/auth/login", { method: "POST", body: payload, csrf: true }),
@@ -89,7 +90,23 @@ export const authApi = {
 export const parentApi = {
   findChildren: () => request("/parent/children"),
   findChild: (studentId) => request(`/parent/children/${studentId}`),
+  findSchedule: (studentId, { week }) => {
+    const params = new URLSearchParams({ week: String(week) });
+    return request(`/parent/children/${studentId}/schedule?${params}`);
+  },
   linkChild: (code) => request("/parent/children", { method: "POST", body: { code }, csrf: true }),
+};
+
+export const scheduleApi = {
+  findOptions: () => request("/schedules/options"),
+  findForStudent: ({ week }) => {
+    const params = new URLSearchParams({ week: String(week) });
+    return request(`/student/schedule?${params}`);
+  },
+  findForTeacher: ({ week }) => {
+    const params = new URLSearchParams({ week: String(week) });
+    return request(`/teacher/schedule?${params}`);
+  },
 };
 
 export const adminAuthApi = {
@@ -141,22 +158,29 @@ export const adminUsersApi = {
 };
 
 export const adminClassesApi = {
-  findAll: ({ query, number } = {}) => {
+  findAll: ({ query, number, academicYear } = {}) => {
     const params = new URLSearchParams();
     if (query) params.set("query", query);
     if (number) params.set("number", number);
+    if (academicYear) params.set("academicYear", academicYear);
     const suffix = params.size ? `?${params}` : "";
     return request(`/admin/classes${suffix}`);
   },
-  getOptions: () => request("/admin/classes/options"),
+  getOptions: (academicYear) => {
+    const suffix = academicYear ? `?${new URLSearchParams({ academicYear })}` : "";
+    return request(`/admin/classes/options${suffix}`);
+  },
   findById: (classId) => request(`/admin/classes/${classId}`),
   getDeletionEligibility: (classId) => request(`/admin/classes/${classId}/deletion-eligibility`),
   findStudents: (classId, query = "") => {
     const suffix = query ? `?${new URLSearchParams({ query })}` : "";
     return request(`/admin/classes/${classId}/students${suffix}`);
   },
-  findUnassignedStudents: (query = "") => {
-    const suffix = query ? `?${new URLSearchParams({ query })}` : "";
+  findUnassignedStudents: (query = "", academicYear = "") => {
+    const params = new URLSearchParams();
+    if (query) params.set("query", query);
+    if (academicYear) params.set("academicYear", academicYear);
+    const suffix = params.size ? `?${params}` : "";
     return request(`/admin/classes/students/unassigned${suffix}`);
   },
   create: (payload) => request("/admin/classes", {
@@ -238,4 +262,8 @@ export const adminScheduleApi = {
       csrf: true,
     });
   },
+};
+
+export const adminDashboardApi = {
+  find: () => request("/admin/dashboard"),
 };

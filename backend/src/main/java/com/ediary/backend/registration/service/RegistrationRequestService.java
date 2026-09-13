@@ -113,7 +113,7 @@ public class RegistrationRequestService {
     @Transactional(readOnly = true)
     public RegistrationOptionsResponse getOptions() {
         List<RegistrationOptionResponse> classes = schoolClassRepository
-            .findAllByOrderByNumberAscLetterAsc()
+            .findAllByAcademicYearValueOrderByNumberAscLetterAsc(currentAcademicYear())
             .stream()
             .map(item -> new RegistrationOptionResponse(item.getId(), item.getDisplayName()))
             .toList();
@@ -148,6 +148,9 @@ public class RegistrationRequestService {
     public RegistrationDecisionResponse approve(Long requestId, String reviewerLogin, String requestedLogin) {
         RegistrationRequest request = findPendingForUpdate(requestId);
         AppUser reviewer = requireActiveAdministrator(reviewerLogin);
+        if (request.getRequestedRole() == UserRole.STUDENT) {
+            ensureCurrentClass(request.getRequestedClass());
+        }
         String login = normalizeLogin(requestedLogin);
         AccountProvisioningResult account = accountCreationService.createFrom(request, login);
         LocalDateTime now = LocalDateTime.now(clock);
@@ -241,12 +244,30 @@ public class RegistrationRequestService {
         if (classId == null || subjectId != null) {
             throw invalidRoleDetails();
         }
-        return schoolClassRepository.findById(classId)
+        SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new ApplicationException(
                 HttpStatus.BAD_REQUEST,
                 "CLASS_NOT_FOUND",
                 "Обраний клас не знайдено"
             ));
+        ensureCurrentClass(schoolClass);
+        return schoolClass;
+    }
+
+    private void ensureCurrentClass(SchoolClass schoolClass) {
+        if (schoolClass == null || !currentAcademicYear().equals(schoolClass.getAcademicYear().getValue())) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "CLASS_ACADEMIC_YEAR_MISMATCH",
+                "Обраний клас не належить до поточного навчального року"
+            );
+        }
+    }
+
+    private String currentAcademicYear() {
+        LocalDate today = LocalDate.now(clock);
+        int startYear = today.getMonthValue() >= 9 ? today.getYear() : today.getYear() - 1;
+        return startYear + "/" + (startYear + 1);
     }
 
     private Subject resolveSubject(UserRole role, Long classId, Long subjectId) {

@@ -29,4 +29,26 @@ public interface ScheduleRepository extends JpaRepository<ScheduleEntry, Long> {
         @Param("academicYear") String academicYear,
         @Param("weekNumber") Integer weekNumber
     );
+
+    @EntityGraph(attributePaths = {"subject", "teacher", "schoolClass"})
+    @Query("""
+        select entry
+        from ScheduleEntry entry
+        where lower(entry.teacher.user.login) = lower(:login)
+            and entry.academicYear = :academicYear
+            and entry.weekNumber = :weekNumber
+        order by entry.weekday, entry.lessonNumber
+        """)
+    List<ScheduleEntry> findAllForTeacher(
+        @Param("login") String login,
+        @Param("academicYear") String academicYear,
+        @Param("weekNumber") Integer weekNumber
+    );
+
+    @EntityGraph(attributePaths = {"subject", "teacher", "schoolClass"})
+    List<ScheduleEntry> findAllByAcademicYearAndWeekNumberAndWeekdayOrderByLessonNumberAscSchoolClass_NumberAscSchoolClass_LetterAsc(
+        String academicYear,
+        Integer weekNumber,
+        com.ediary.backend.school.entity.Weekday weekday
+    );
 }

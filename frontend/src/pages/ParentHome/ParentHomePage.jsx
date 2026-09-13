@@ -20,20 +20,14 @@ import { Alert } from "@/components/ui/alert.jsx";
 import { Card, CardContent, CardHeader } from "@/components/ui/card.jsx";
 import { ApiError, authApi, parentApi } from "@/lib/api.js";
 import { cn } from "@/lib/utils.js";
+import { formatToday, useTodaySchedule } from "@/hooks/useTodaySchedule.js";
 
 const navigationItems = [
-  { label: "Головна", icon: Home, active: true },
-  { label: "Розклад", icon: CalendarDays },
+  { label: "Головна", icon: Home, active: true, route: "parent" },
+  { label: "Розклад", icon: CalendarDays, route: "parent/schedule" },
   { label: "Предмети", icon: BookOpen },
   { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
   { label: "Профіль", icon: User },
-];
-
-const lessons = [
-  { time: "09:00 - 09:45", subject: "Математика", details: "Світлана Іваненко · Кабінет 302" },
-  { time: "10:00 - 10:45", subject: "Українська мова", details: "Олег Петренко · Кабінет 210" },
-  { time: "11:00 - 11:45", subject: "Фізика", details: "Вікторія Сидоренко · Кабінет 140" },
-  { time: "12:00 - 12:45", subject: "Історія України", details: "Олена Коваль · Кабінет 105" },
 ];
 
 const grades = [
@@ -66,6 +60,7 @@ export function ParentHomePage() {
   const [linkCode, setLinkCode] = useState("");
   const [linkError, setLinkError] = useState("");
   const [isLinking, setIsLinking] = useState(false);
+  const todaySchedule = useTodaySchedule("PARENT", selectedStudentId);
 
   useEffect(() => {
     let active = true;
@@ -148,7 +143,7 @@ export function ParentHomePage() {
                   {selectedChild ? (
                     <>
                       <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)]">
-                        <TodayScheduleCard />
+                        <TodayScheduleCard schedule={todaySchedule} />
                         <RecentGradesCard />
                       </div>
                       <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -258,14 +253,18 @@ function SectionTitle({ children }) {
   return <h2 className="text-[0.98rem] font-bold leading-tight text-slate-900">{children}</h2>;
 }
 
-function TodayScheduleCard() {
+function TodayScheduleCard({ schedule }) {
   return (
     <Card className="rounded-lg px-4 py-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] sm:px-5">
-      <CardHeader className="mb-3 flex-row items-center justify-between space-y-0"><SectionTitle>Сьогоднішній розклад</SectionTitle><span className="text-[0.74rem] font-medium text-slate-400">15 Жовтня</span></CardHeader>
+      <CardHeader className="mb-3 flex-row items-center justify-between space-y-0"><SectionTitle>Сьогоднішній розклад</SectionTitle><span className="text-[0.74rem] font-medium text-slate-400">{formatToday()}</span></CardHeader>
       <CardContent className="space-y-2">
-        {lessons.map((lesson) => (
-          <article key={`${lesson.time}-${lesson.subject}`} className="rounded-md border border-slate-200/80 bg-slate-50/75 px-3.5 py-2"><time className="text-[0.72rem] font-medium leading-none text-slate-400">{lesson.time}</time><h3 className="mt-1 text-[0.84rem] font-bold leading-4 text-slate-800">{lesson.subject}</h3><p className="mt-0.5 text-[0.72rem] leading-4 text-slate-500">{lesson.details}</p></article>
-        ))}
+        {schedule.loading ? <div className="flex min-h-24 items-center justify-center text-slate-400"><CalendarDays className="h-5 w-5 animate-pulse" aria-label="Завантаження розкладу" /></div> : null}
+        {!schedule.loading && schedule.error ? <p className="py-8 text-center text-[0.78rem] text-red-500">{schedule.error}</p> : null}
+        {!schedule.loading && !schedule.error && !schedule.lessons.length ? <p className="py-8 text-center text-[0.78rem] text-slate-400">Сьогодні уроків немає</p> : null}
+        {!schedule.loading && !schedule.error ? schedule.lessons.map((lesson) => (
+          <article key={lesson.id} className="rounded-md border border-slate-200/80 bg-slate-50/75 px-3.5 py-2"><time className="text-[0.72rem] font-medium leading-none text-slate-400">{lesson.startTime}–{lesson.endTime}</time><h3 className="mt-1 text-[0.84rem] font-bold leading-4 text-slate-800">{lesson.subject}</h3><p className="mt-0.5 text-[0.72rem] leading-4 text-slate-500">{lesson.teacher} · {lesson.room ? `Кабінет ${lesson.room}` : "Кабінет не вказано"}</p></article>
+        )) : null}
+        <a href="#parent/schedule" className="mt-3 inline-flex text-[0.76rem] font-semibold text-slate-600 hover:text-slate-900">Відкрити розклад</a>
       </CardContent>
     </Card>
   );
@@ -331,7 +330,7 @@ function TopBar() {
 
 function NavigationItem({ item, compact = false }) {
   const Icon = item.icon;
-  return <button type="button" disabled={!item.active} className={cn(compact ? "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-1" : "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left", "text-[0.82rem] font-semibold transition-colors", item.active ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-slate-500")} aria-current={item.active ? "page" : undefined} title={!item.active ? `${item.label}: розділ у розробці` : undefined}><Icon className={compact ? "h-4 w-4" : "h-5 w-5"} aria-hidden="true" />{compact ? <span className="hidden truncate min-[480px]:inline">{item.shortLabel || item.label}</span> : item.label}</button>;
+  return <button type="button" disabled={!item.route} onClick={() => { if (item.route) window.location.hash = item.route; }} className={cn(compact ? "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-1" : "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left", "text-[0.82rem] font-semibold transition-colors", item.active ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-slate-500")} aria-current={item.active ? "page" : undefined} title={!item.route ? `${item.label}: розділ у розробці` : undefined}><Icon className={compact ? "h-4 w-4" : "h-5 w-5"} aria-hidden="true" />{compact ? <span className="hidden truncate min-[480px]:inline">{item.shortLabel || item.label}</span> : item.label}</button>;
 }
 
 function MobileNavigation() {

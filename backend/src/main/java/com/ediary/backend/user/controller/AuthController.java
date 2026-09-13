@@ -3,6 +3,7 @@ package com.ediary.backend.user.controller;
 import com.ediary.backend.user.dto.request.AdminLoginRequest;
 import com.ediary.backend.user.dto.request.LoginRequest;
 import com.ediary.backend.user.dto.response.AdminLoginResponse;
+import com.ediary.backend.user.dto.response.CurrentSessionResponse;
 import com.ediary.backend.user.dto.response.LoginResponse;
 import com.ediary.backend.user.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,6 +16,7 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -48,6 +50,11 @@ public class AuthController {
         AuthService.AdminAuthentication result = authService.authenticateAdministrator(request);
         saveAuthentication(result.authentication(), httpRequest, httpResponse);
         return result.response();
+    }
+
+    @GetMapping("/session")
+    public CurrentSessionResponse currentSession(Authentication authentication) {
+        return authService.currentSession(authentication.getName());
     }
 
     private void saveAuthentication(

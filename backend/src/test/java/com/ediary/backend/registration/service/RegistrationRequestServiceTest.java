@@ -15,6 +15,7 @@ import com.ediary.backend.registration.event.RegistrationApprovedEvent;
 import com.ediary.backend.registration.mapper.RegistrationRequestMapper;
 import com.ediary.backend.registration.repository.RegistrationRequestRepository;
 import com.ediary.backend.school.entity.SchoolClass;
+import com.ediary.backend.school.entity.AcademicYear;
 import com.ediary.backend.school.repository.SchoolClassRepository;
 import com.ediary.backend.school.repository.SubjectRepository;
 import com.ediary.backend.user.entity.AppUser;
@@ -86,6 +87,9 @@ class RegistrationRequestServiceTest {
         schoolClass.setNumber(9);
         schoolClass.setLetter("Б");
         schoolClass.setLimit(30);
+        AcademicYear academicYear = new AcademicYear();
+        academicYear.setValue("2025/2026");
+        schoolClass.setAcademicYear(academicYear);
 
         when(userRepository.existsByEmailIgnoreCase("student@example.com")).thenReturn(false);
         when(registrationRequestRepository.existsByEmailIgnoreCaseAndStatus(
@@ -199,6 +203,9 @@ class RegistrationRequestServiceTest {
     @Test
     void approvalCreatesAccountAndPublishesCredentialsOnlyAfterDecisionIsStored() {
         SchoolClass schoolClass = new SchoolClass();
+        AcademicYear academicYear = new AcademicYear();
+        academicYear.setValue("2025/2026");
+        schoolClass.setAcademicYear(academicYear);
         RegistrationRequest request = new RegistrationRequest(
             "Даніл",
             "Холоденко",

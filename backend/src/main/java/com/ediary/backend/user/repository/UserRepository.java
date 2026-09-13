@@ -22,4 +22,10 @@ public interface UserRepository extends JpaRepository<AppUser, Long>, JpaSpecifi
     boolean existsByEmailIgnoreCase(String email);
 
     long countByRoleAndStatus(UserRole role, UserStatus status);
+
+    long countByRoleAndStatusNot(UserRole role, UserStatus status);
+
+    long countByStatus(UserStatus status);
+
+    long countByStatusNot(UserStatus status);
 }

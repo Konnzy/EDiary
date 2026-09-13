@@ -149,7 +149,7 @@ function validateForm(values) {
   }
 
   if (!values.agree) {
-    errors.agree = "Потрібно погодитися з умовами користування";
+    errors.agree = "Потрібно погодитися з умовами користування та політикою конфіденційності";
   }
 
   return errors;
@@ -514,7 +514,7 @@ export function RequestRegistrationForm() {
                   checked={form.agree}
                   onCheckedChange={(checked) => updateField("agree", checked)}
                 />
-                <span className="flex items-center gap-1.5">
+                <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                   <label
                     htmlFor={agreeId}
                     className="cursor-pointer select-none text-[0.82rem] text-slate-600 transition-colors hover:text-slate-900"
@@ -528,11 +528,17 @@ export function RequestRegistrationForm() {
                     умовами користування
                   </a>
                   <label
-                      htmlFor={agreeId}
-                      className="cursor-pointer select-none text-[0.82rem] text-slate-600 transition-colors hover:text-slate-900"
+                    htmlFor={agreeId}
+                    className="cursor-pointer select-none text-[0.82rem] text-slate-600 transition-colors hover:text-slate-900"
                   >
-                    та з <b>політикою конфіденційності</b>
+                    та з
                   </label>
+                  <a
+                    href="#privacy-policy"
+                    className="text-[0.82rem] font-medium text-slate-800 underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    політикою конфіденційності
+                  </a>
                 </span>
               </div>
               {showErrors && errors.agree ? (

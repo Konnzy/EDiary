@@ -273,6 +273,9 @@ public class AdminUserService {
         if (exists("SELECT EXISTS (SELECT 1 FROM student_parents sp JOIN student s ON s.student_id = sp.student_id WHERE s.user_id = ?)", userId)) {
             return "Учень пов’язаний з обліковим записом батьків. Обліковий запис можна лише заблокувати";
         }
+        if (exists("SELECT EXISTS (SELECT 1 FROM student_class_membership scm JOIN student s ON s.student_id = scm.student_id WHERE s.user_id = ?)", userId)) {
+            return "Учень має історію навчання в класі. Обліковий запис можна лише заблокувати";
+        }
         if (exists("SELECT EXISTS (SELECT 1 FROM student WHERE user_id = ? AND class_id IS NOT NULL)", userId)) {
             return "Учень належить до класу. Обліковий запис можна лише заблокувати";
         }
@@ -353,12 +356,23 @@ public class AdminUserService {
             if (input.classId() == null || input.subjectId() != null) {
                 throw invalidRoleDetails();
             }
-            return schoolClassRepository.findById(input.classId())
+            SchoolClass schoolClass = schoolClassRepository.findById(input.classId())
                 .orElseThrow(() -> new ApplicationException(
                     HttpStatus.BAD_REQUEST,
                     "CLASS_NOT_FOUND",
                     "Обраний клас не знайдено"
                 ));
+            LocalDate today = LocalDate.now(clock);
+            int startYear = today.getMonthValue() >= 9 ? today.getYear() : today.getYear() - 1;
+            String currentAcademicYear = startYear + "/" + (startYear + 1);
+            if (!currentAcademicYear.equals(schoolClass.getAcademicYear().getValue())) {
+                throw new ApplicationException(
+                    HttpStatus.CONFLICT,
+                    "CLASS_ACADEMIC_YEAR_MISMATCH",
+                    "Обраний клас не належить до поточного навчального року"
+                );
+            }
+            return schoolClass;
         }
         if (input.classId() != null) {
             throw invalidRoleDetails();

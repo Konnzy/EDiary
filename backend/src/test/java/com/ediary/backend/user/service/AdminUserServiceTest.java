@@ -6,11 +6,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.school.entity.SchoolClass;
+import com.ediary.backend.school.entity.AcademicYear;
 import com.ediary.backend.school.repository.SchoolClassRepository;
 import com.ediary.backend.school.repository.SubjectRepository;
 import com.ediary.backend.user.dto.request.CreateAdminUserRequest;
@@ -90,6 +92,9 @@ class AdminUserServiceTest {
     void createsStudentAndPublishesCredentialsAfterPersistingAccount() {
         SchoolClass schoolClass = new SchoolClass();
         schoolClass.setId(5L);
+        AcademicYear academicYear = new AcademicYear();
+        academicYear.setValue("2025/2026");
+        schoolClass.setAcademicYear(academicYear);
         when(schoolClassRepository.findById(5L)).thenReturn(Optional.of(schoolClass));
         when(temporaryPasswordGenerator.generate()).thenReturn("Temp!Password234");
         when(parentLinkCodeService.generateUnique()).thenReturn(
@@ -178,6 +183,25 @@ class AdminUserServiceTest {
 
         assertThat(eligibility.deletable()).isFalse();
         assertThat(eligibility.reason()).contains("історію повідомлень");
+    }
+
+    @Test
+    void preventsDeletionWhenStudentHasHistoricalClassMembership() {
+        AppUser user = new AppUser();
+        user.setId(10L);
+        user.setLogin("student.old");
+        user.setRole(UserRole.STUDENT);
+        when(userRepository.findById(10L)).thenReturn(Optional.of(user));
+        lenient().when(jdbcTemplate.queryForObject(
+            contains("FROM student_class_membership"),
+            eq(Boolean.class),
+            eq(10L)
+        )).thenReturn(true);
+
+        var eligibility = service.getDeletionEligibility(10L);
+
+        assertThat(eligibility.deletable()).isFalse();
+        assertThat(eligibility.reason()).contains("історію навчання в класі");
     }
 
     @Test

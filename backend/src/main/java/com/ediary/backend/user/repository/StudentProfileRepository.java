@@ -14,6 +14,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface StudentProfileRepository extends JpaRepository<StudentProfile, Long> {
 
+    @EntityGraph(attributePaths = {"user", "schoolClass"})
+    Optional<StudentProfile> findByUser_LoginIgnoreCase(String login);
+
     long countBySchoolClassId(Long classId);
 
     boolean existsByParentLinkCodeHash(String parentLinkCodeHash);
@@ -32,6 +35,22 @@ public interface StudentProfileRepository extends JpaRepository<StudentProfile, 
     List<StudentProfile> findAllBySchoolClassIsNullAndUser_StatusAndStatusOrderBySurnameAscNameAsc(
         UserStatus userStatus,
         StudentStatus studentStatus
+    );
+
+    @EntityGraph(attributePaths = {"user", "schoolClass", "schoolClass.academicYear"})
+    @Query("""
+        select student from StudentProfile student
+        left join student.schoolClass schoolClass
+        left join schoolClass.academicYear classYear
+        where student.user.status = :userStatus
+          and student.status = :studentStatus
+          and (schoolClass is null or classYear.value <> :academicYear)
+        order by student.surname, student.name
+        """)
+    List<StudentProfile> findAssignableForAcademicYear(
+        @Param("academicYear") String academicYear,
+        @Param("userStatus") UserStatus userStatus,
+        @Param("studentStatus") StudentStatus studentStatus
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

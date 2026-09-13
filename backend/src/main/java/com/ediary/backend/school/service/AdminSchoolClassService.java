@@ -8,7 +8,11 @@ import com.ediary.backend.school.dto.response.AdminSchoolClassResponse;
 import com.ediary.backend.school.dto.response.ClassTeacherOptionResponse;
 import com.ediary.backend.school.dto.response.ClassDeletionEligibilityResponse;
 import com.ediary.backend.school.entity.SchoolClass;
+import com.ediary.backend.school.entity.AcademicYear;
+import com.ediary.backend.school.entity.StudentClassMembership;
+import com.ediary.backend.school.repository.AcademicYearRepository;
 import com.ediary.backend.school.repository.SchoolClassRepository;
+import com.ediary.backend.school.repository.StudentClassMembershipRepository;
 import com.ediary.backend.user.entity.TeacherProfile;
 import com.ediary.backend.user.entity.StudentProfile;
 import com.ediary.backend.user.entity.StudentStatus;
@@ -18,6 +22,9 @@ import com.ediary.backend.user.repository.TeacherProfileRepository;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -36,26 +43,30 @@ public class AdminSchoolClassService {
     private final SchoolClassRepository schoolClassRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final StudentProfileRepository studentProfileRepository;
+    private final StudentClassMembershipRepository membershipRepository;
+    private final AcademicYearRepository academicYearRepository;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
-    public List<AdminSchoolClassResponse> findAll(String query, Integer number) {
+    public List<AdminSchoolClassResponse> findAll(String query, Integer number, String academicYear) {
         String normalizedQuery = normalize(query);
-        Map<Long, Long> studentCounts = studentProfileRepository.countStudentsByClass().stream()
-            .collect(Collectors.toMap(
-                StudentProfileRepository.ClassStudentCount::getClassId,
-                StudentProfileRepository.ClassStudentCount::getStudentCount
-            ));
+        String resolvedYear = resolveAcademicYear(academicYear);
 
-        return schoolClassRepository.findAllByOrderByNumberAscLetterAsc().stream()
+        return schoolClassRepository.findAllByAcademicYearValueOrderByNumberAscLetterAsc(resolvedYear).stream()
             .filter(schoolClass -> number == null || schoolClass.getNumber().equals(number))
             .filter(schoolClass -> matchesQuery(schoolClass, normalizedQuery))
-            .map(schoolClass -> toResponse(schoolClass, studentCounts.getOrDefault(schoolClass.getId(), 0L)))
+            .map(schoolClass -> toResponse(
+                schoolClass,
+                membershipRepository.countBySchoolClassIdAndActiveTrue(schoolClass.getId())
+            ))
             .toList();
     }
 
     @Transactional(readOnly = true)
-    public AdminClassOptionsResponse getOptions() {
-        Map<Long, SchoolClass> assignments = schoolClassRepository.findAllByOrderByNumberAscLetterAsc().stream()
+    public AdminClassOptionsResponse getOptions(String academicYear) {
+        String resolvedYear = resolveAcademicYear(academicYear);
+        Map<Long, SchoolClass> assignments = schoolClassRepository
+            .findAllByAcademicYearValueOrderByNumberAscLetterAsc(resolvedYear).stream()
             .filter(schoolClass -> schoolClass.getClassTeacher() != null)
             .collect(Collectors.toMap(schoolClass -> schoolClass.getClassTeacher().getId(), Function.identity()));
 
@@ -78,24 +89,28 @@ public class AdminSchoolClassService {
     @Transactional(readOnly = true)
     public AdminSchoolClassResponse findById(Long classId) {
         SchoolClass schoolClass = requireClass(classId);
-        return toResponse(schoolClass, studentProfileRepository.countBySchoolClassId(classId));
+        return toResponse(schoolClass, membershipRepository.countBySchoolClassIdAndActiveTrue(classId));
     }
 
     @Transactional(readOnly = true)
     public List<AdminClassStudentResponse> findStudents(Long classId, String query) {
         requireClass(classId);
         String normalizedQuery = normalize(query);
-        return studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(classId).stream()
+        return membershipRepository.findAllBySchoolClassIdAndActiveTrueOrderByStudentSurnameAscStudentNameAsc(classId)
+            .stream()
+            .map(StudentClassMembership::getStudent)
             .filter(student -> matchesStudentQuery(student, normalizedQuery))
             .map(this::toStudentResponse)
             .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<AdminClassStudentResponse> findUnassignedStudents(String query) {
+    public List<AdminClassStudentResponse> findUnassignedStudents(String query, String academicYear) {
         String normalizedQuery = normalize(query);
+        String resolvedYear = resolveAcademicYear(academicYear);
         return studentProfileRepository
-            .findAllBySchoolClassIsNullAndUser_StatusAndStatusOrderBySurnameAscNameAsc(
+            .findAssignableForAcademicYear(
+                resolvedYear,
                 UserStatus.ACTIVE,
                 StudentStatus.STUDYING
             )
@@ -114,10 +129,12 @@ public class AdminSchoolClassService {
 
     @Transactional
     public AdminSchoolClassResponse create(SaveSchoolClassRequest input) {
+        AcademicYear academicYear = requireEditableAcademicYear(input.academicYear());
         String letter = normalizeRequiredLetter(input.letter());
-        ensureUniqueClass(input.number(), letter, null);
+        ensureUniqueClass(academicYear.getValue(), input.number(), letter, null);
 
         SchoolClass schoolClass = new SchoolClass();
+        schoolClass.setAcademicYear(academicYear);
         apply(schoolClass, input, letter);
         SchoolClass saved = schoolClassRepository.saveAndFlush(schoolClass);
         return toResponse(saved, 0L);
@@ -126,9 +143,11 @@ public class AdminSchoolClassService {
     @Transactional
     public AdminSchoolClassResponse update(Long classId, SaveSchoolClassRequest input) {
         SchoolClass schoolClass = requireClass(classId);
+        ensureEditable(schoolClass);
         String letter = normalizeRequiredLetter(input.letter());
-        ensureUniqueClass(input.number(), letter, classId);
-        long studentCount = studentProfileRepository.countBySchoolClassId(classId);
+        ensureSameAcademicYear(schoolClass, input.academicYear());
+        ensureUniqueClass(schoolClass.getAcademicYear().getValue(), input.number(), letter, classId);
+        long studentCount = membershipRepository.countBySchoolClassIdAndActiveTrue(classId);
         apply(schoolClass, input, letter);
         SchoolClass saved = schoolClassRepository.saveAndFlush(schoolClass);
         return toResponse(saved, studentCount);
@@ -137,6 +156,7 @@ public class AdminSchoolClassService {
     @Transactional
     public void delete(Long classId) {
         SchoolClass schoolClass = requireClassForUpdate(classId);
+        ensureEditable(schoolClass);
         List<String> blockers = findDeletionBlockers(schoolClass);
         if (!blockers.isEmpty()) {
             throw new ApplicationException(
@@ -152,7 +172,11 @@ public class AdminSchoolClassService {
     private void apply(SchoolClass schoolClass, SaveSchoolClassRequest input, String letter) {
         if (input.classTeacherId() != null) {
             Long currentClassId = schoolClass.getId() == null ? -1L : schoolClass.getId();
-            if (schoolClassRepository.existsByClassTeacherIdAndIdNot(input.classTeacherId(), currentClassId)) {
+            if (schoolClassRepository.existsByAcademicYearValueAndClassTeacherIdAndIdNot(
+                schoolClass.getAcademicYear().getValue(),
+                input.classTeacherId(),
+                currentClassId
+            )) {
                 throw new ApplicationException(
                     HttpStatus.CONFLICT,
                     "CLASS_TEACHER_ALREADY_ASSIGNED",
@@ -178,16 +202,21 @@ public class AdminSchoolClassService {
     @Transactional
     public AdminClassStudentResponse addStudent(Long classId, Long studentId) {
         SchoolClass targetClass = requireClassForUpdate(classId);
+        ensureEditable(targetClass);
         ensureHasCapacity(targetClass);
         StudentProfile student = requireStudentForUpdate(studentId);
-        if (student.getSchoolClass() != null) {
+        if (membershipRepository.findByStudentIdAndSchoolClassAcademicYearValueAndActiveTrue(
+            studentId,
+            targetClass.getAcademicYear().getValue()
+        ).isPresent()) {
             throw new ApplicationException(
                 HttpStatus.CONFLICT,
                 "STUDENT_ALREADY_ASSIGNED",
-                "Учень уже належить до класу"
+                "Учень уже належить до класу в цьому навчальному році"
             );
         }
         ensureStudentCanBeAssigned(student);
+        createMembership(student, targetClass);
         student.setSchoolClass(targetClass);
         return toStudentResponse(studentProfileRepository.saveAndFlush(student));
     }
@@ -202,25 +231,44 @@ public class AdminSchoolClassService {
             );
         }
         SchoolClass targetClass = requireClassForUpdate(targetClassId);
+        SchoolClass sourceClass = requireClassForUpdate(sourceClassId);
+        ensureEditable(sourceClass);
+        ensureEditable(targetClass);
+        if (!sourceClass.getAcademicYear().getValue().equals(targetClass.getAcademicYear().getValue())) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "CLASS_ACADEMIC_YEAR_MISMATCH",
+                "Переведення можливе лише між класами одного навчального року"
+            );
+        }
         ensureHasCapacity(targetClass);
         StudentProfile student = requireStudentForUpdate(studentId);
         ensureStudentBelongsToClass(student, sourceClassId);
+        closeMembership(studentId, sourceClassId);
+        createMembership(student, targetClass);
         student.setSchoolClass(targetClass);
         return toStudentResponse(studentProfileRepository.saveAndFlush(student));
     }
 
     @Transactional
     public void removeStudent(Long classId, Long studentId) {
+        SchoolClass schoolClass = requireClassForUpdate(classId);
+        ensureEditable(schoolClass);
         StudentProfile student = requireStudentForUpdate(studentId);
         ensureStudentBelongsToClass(student, classId);
+        closeMembership(studentId, classId);
         student.setSchoolClass(null);
         studentProfileRepository.saveAndFlush(student);
     }
 
-    private void ensureUniqueClass(Integer number, String letter, Long excludedId) {
+    private void ensureUniqueClass(String academicYear, Integer number, String letter, Long excludedId) {
         boolean exists = excludedId == null
-            ? schoolClassRepository.existsByNumberAndLetterIgnoreCase(number, letter)
-            : schoolClassRepository.existsByNumberAndLetterIgnoreCaseAndIdNot(number, letter, excludedId);
+            ? schoolClassRepository.existsByAcademicYearValueAndNumberAndLetterIgnoreCase(
+                academicYear, number, letter
+            )
+            : schoolClassRepository.existsByAcademicYearValueAndNumberAndLetterIgnoreCaseAndIdNot(
+                academicYear, number, letter, excludedId
+            );
         if (exists) {
             throw new ApplicationException(
                 HttpStatus.CONFLICT,
@@ -236,7 +284,7 @@ public class AdminSchoolClassService {
         if (schoolClass.getClassTeacher() != null) {
             blockers.add("призначено класного керівника");
         }
-        if (studentProfileRepository.countBySchoolClassId(classId) > 0) {
+        if (membershipRepository.countBySchoolClassId(classId) > 0) {
             blockers.add("до класу зараховано учнів");
         }
         if (schoolClassRepository.hasSchedule(classId)) {
@@ -276,7 +324,7 @@ public class AdminSchoolClassService {
     }
 
     private void ensureHasCapacity(SchoolClass schoolClass) {
-        if (studentProfileRepository.countBySchoolClassId(schoolClass.getId()) >= CLASS_CAPACITY) {
+        if (membershipRepository.countBySchoolClassIdAndActiveTrue(schoolClass.getId()) >= CLASS_CAPACITY) {
             throw new ApplicationException(
                 HttpStatus.CONFLICT,
                 "SCHOOL_CLASS_IS_FULL",
@@ -305,6 +353,78 @@ public class AdminSchoolClassService {
         }
     }
 
+    private void createMembership(StudentProfile student, SchoolClass schoolClass) {
+        StudentClassMembership membership = membershipRepository
+            .findByStudentIdAndSchoolClassId(student.getId(), schoolClass.getId())
+            .orElseGet(StudentClassMembership::new);
+        membership.setStudent(student);
+        membership.setSchoolClass(schoolClass);
+        membership.setActive(true);
+        membership.setJoinedAt(LocalDateTime.now(clock));
+        membership.setLeftAt(null);
+        membershipRepository.save(membership);
+    }
+
+    private void closeMembership(Long studentId, Long classId) {
+        StudentClassMembership membership = membershipRepository
+            .findByStudentIdAndSchoolClassIdAndActiveTrue(studentId, classId)
+            .orElseThrow(() -> new ApplicationException(
+                HttpStatus.CONFLICT,
+                "STUDENT_CLASS_HISTORY_CHANGED",
+                "Склад класу вже змінився. Оновіть сторінку"
+            ));
+        membership.setActive(false);
+        membership.setLeftAt(LocalDateTime.now(clock));
+        membershipRepository.save(membership);
+    }
+
+    private AcademicYear requireEditableAcademicYear(String value) {
+        String current = currentAcademicYear();
+        if (!current.equals(value)) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "HISTORICAL_CLASS_READ_ONLY",
+                "Створювати та змінювати класи можна лише в поточному навчальному році"
+            );
+        }
+        return academicYearRepository.findById(value)
+            .orElseThrow(() -> new ApplicationException(
+                HttpStatus.NOT_FOUND,
+                "ACADEMIC_YEAR_NOT_FOUND",
+                "Навчальний рік не знайдено"
+            ));
+    }
+
+    private void ensureEditable(SchoolClass schoolClass) {
+        if (!currentAcademicYear().equals(schoolClass.getAcademicYear().getValue())) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "HISTORICAL_CLASS_READ_ONLY",
+                "Дані класів за минулі навчальні роки доступні лише для перегляду"
+            );
+        }
+    }
+
+    private void ensureSameAcademicYear(SchoolClass schoolClass, String requestedYear) {
+        if (!schoolClass.getAcademicYear().getValue().equals(requestedYear)) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "CLASS_ACADEMIC_YEAR_IMMUTABLE",
+                "Навчальний рік існуючого класу змінити не можна"
+            );
+        }
+    }
+
+    private String resolveAcademicYear(String value) {
+        return value == null || value.isBlank() ? currentAcademicYear() : value;
+    }
+
+    private String currentAcademicYear() {
+        LocalDate today = LocalDate.now(clock);
+        int startYear = today.getMonthValue() >= 9 ? today.getYear() : today.getYear() - 1;
+        return startYear + "/" + (startYear + 1);
+    }
+
     private AdminSchoolClassResponse toResponse(SchoolClass schoolClass, long studentCount) {
         TeacherProfile teacher = schoolClass.getClassTeacher();
         return new AdminSchoolClassResponse(
@@ -314,7 +434,9 @@ public class AdminSchoolClassService {
             schoolClass.getLimit(),
             teacher == null ? null : teacher.getId(),
             teacher == null ? null : fullName(teacher),
-            studentCount
+            studentCount,
+            schoolClass.getAcademicYear().getValue(),
+            currentAcademicYear().equals(schoolClass.getAcademicYear().getValue())
         );
     }
 

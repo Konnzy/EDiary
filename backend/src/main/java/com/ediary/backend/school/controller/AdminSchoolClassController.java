@@ -34,14 +34,15 @@ public class AdminSchoolClassController {
     @GetMapping
     public List<AdminSchoolClassResponse> findAll(
         @RequestParam(required = false) String query,
-        @RequestParam(required = false) Integer number
+        @RequestParam(required = false) Integer number,
+        @RequestParam(required = false) String academicYear
     ) {
-        return service.findAll(query, number);
+        return service.findAll(query, number, academicYear);
     }
 
     @GetMapping("/options")
-    public AdminClassOptionsResponse getOptions() {
-        return service.getOptions();
+    public AdminClassOptionsResponse getOptions(@RequestParam(required = false) String academicYear) {
+        return service.getOptions(academicYear);
     }
 
     @GetMapping("/{classId}")
@@ -64,9 +65,10 @@ public class AdminSchoolClassController {
 
     @GetMapping("/students/unassigned")
     public List<AdminClassStudentResponse> findUnassignedStudents(
-        @RequestParam(required = false) String query
+        @RequestParam(required = false) String query,
+        @RequestParam(required = false) String academicYear
     ) {
-        return service.findUnassignedStudents(query);
+        return service.findUnassignedStudents(query, academicYear);
     }
 
     @PostMapping

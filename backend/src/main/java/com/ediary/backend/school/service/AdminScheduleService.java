@@ -17,6 +17,8 @@ import com.ediary.backend.school.repository.SubjectRepository;
 import com.ediary.backend.user.entity.TeacherProfile;
 import com.ediary.backend.user.entity.UserStatus;
 import com.ediary.backend.user.repository.TeacherProfileRepository;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -53,6 +55,7 @@ public class AdminScheduleService {
     private final SubjectRepository subjectRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final AcademicYearRepository academicYearRepository;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public List<String> findAcademicYears() {
@@ -64,6 +67,16 @@ public class AdminScheduleService {
     @Transactional
     public String createAcademicYear(String value) {
         validateAcademicYear(value);
+        int requestedStartYear = Integer.parseInt(value.substring(0, 4));
+        int currentStartYear = currentAcademicYearStart(LocalDate.now(clock));
+        if (requestedStartYear > currentStartYear) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "ACADEMIC_YEAR_NOT_STARTED",
+                "Навчальний рік ще не настав. Його можна створити не раніше 1 вересня "
+                    + requestedStartYear + " року"
+            );
+        }
         if (academicYearRepository.existsById(value)) {
             throw new ApplicationException(
                 HttpStatus.CONFLICT,
@@ -169,17 +182,29 @@ public class AdminScheduleService {
         if (!academicYearRepository.existsById(academicYear)) {
             throw academicYearNotFound();
         }
-        return schoolClassRepository.findByIdForUpdate(classId)
+        SchoolClass schoolClass = schoolClassRepository.findByIdForUpdate(classId)
             .orElseThrow(this::schoolClassNotFound);
+        ensureClassBelongsToAcademicYear(schoolClass, academicYear);
+        return schoolClass;
     }
 
     private void requirePeriod(Long classId, String academicYear, Integer week) {
         validatePeriod(academicYear, week);
-        if (!schoolClassRepository.existsById(classId)) {
-            throw schoolClassNotFound();
-        }
         if (!academicYearRepository.existsById(academicYear)) {
             throw academicYearNotFound();
+        }
+        SchoolClass schoolClass = schoolClassRepository.findById(classId)
+            .orElseThrow(this::schoolClassNotFound);
+        ensureClassBelongsToAcademicYear(schoolClass, academicYear);
+    }
+
+    private void ensureClassBelongsToAcademicYear(SchoolClass schoolClass, String academicYear) {
+        if (!schoolClass.getAcademicYear().getValue().equals(academicYear)) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "CLASS_ACADEMIC_YEAR_MISMATCH",
+                "Обраний клас не належить до цього навчального року"
+            );
         }
     }
 
@@ -341,6 +366,10 @@ public class AdminScheduleService {
 
     private static LocalTime[] times(String start, String end) {
         return new LocalTime[]{LocalTime.parse(start), LocalTime.parse(end)};
+    }
+
+    private int currentAcademicYearStart(LocalDate date) {
+        return date.getMonthValue() >= 9 ? date.getYear() : date.getYear() - 1;
     }
 
     private record Slot(Weekday weekday, Integer lessonNumber) {

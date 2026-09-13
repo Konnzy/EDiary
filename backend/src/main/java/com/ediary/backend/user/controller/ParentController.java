@@ -2,6 +2,8 @@ package com.ediary.backend.user.controller;
 
 import com.ediary.backend.user.dto.request.LinkChildRequest;
 import com.ediary.backend.user.dto.response.ParentChildResponse;
+import com.ediary.backend.school.dto.response.UserScheduleResponse;
+import com.ediary.backend.school.service.UserScheduleService;
 import com.ediary.backend.user.service.ParentAccessService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ParentController {
 
     private final ParentAccessService parentAccessService;
+    private final UserScheduleService userScheduleService;
 
     @GetMapping
     public List<ParentChildResponse> findChildren(Authentication authentication) {
@@ -42,5 +46,18 @@ public class ParentController {
         Authentication authentication
     ) {
         return parentAccessService.findChild(authentication.getName(), studentId);
+    }
+
+    @GetMapping("/{studentId}/schedule")
+    public UserScheduleResponse findSchedule(
+        @PathVariable Long studentId,
+        @RequestParam Integer week,
+        Authentication authentication
+    ) {
+        return userScheduleService.findForParent(
+            authentication.getName(),
+            studentId,
+            week
+        );
     }
 }

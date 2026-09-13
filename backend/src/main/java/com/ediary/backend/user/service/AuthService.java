@@ -4,6 +4,7 @@ import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.user.dto.request.AdminLoginRequest;
 import com.ediary.backend.user.dto.request.LoginRequest;
 import com.ediary.backend.user.dto.response.AdminLoginResponse;
+import com.ediary.backend.user.dto.response.CurrentSessionResponse;
 import com.ediary.backend.user.dto.response.LoginResponse;
 import com.ediary.backend.user.entity.AdministratorProfile;
 import com.ediary.backend.user.entity.AppUser;
@@ -94,6 +95,31 @@ public class AuthService {
             administrator.getName() + " " + administrator.getSurname()
         );
         return new AdminAuthentication(authentication, response);
+    }
+
+    public CurrentSessionResponse currentSession(String login) {
+        AppUser user = userRepository.findByLoginIgnoreCase(login).orElseThrow(() ->
+            new ApplicationException(
+                HttpStatus.UNAUTHORIZED,
+                "SESSION_INVALID",
+                "Сесію не знайдено. Увійдіть до системи ще раз"
+            )
+        );
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new ApplicationException(
+                HttpStatus.FORBIDDEN,
+                "ACCOUNT_UNAVAILABLE",
+                "Обліковий запис недоступний"
+            );
+        }
+
+        return new CurrentSessionResponse(
+            user.getId(),
+            user.getLogin(),
+            user.getRole(),
+            user.isMustChangePassword()
+        );
     }
 
     private String normalizeAccessCode(String value) {

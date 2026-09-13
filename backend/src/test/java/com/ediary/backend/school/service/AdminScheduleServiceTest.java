@@ -9,6 +9,7 @@ import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.school.dto.request.SaveScheduleLessonRequest;
 import com.ediary.backend.school.dto.request.SaveScheduleRequest;
 import com.ediary.backend.school.entity.ScheduleEntry;
+import com.ediary.backend.school.entity.AcademicYear;
 import com.ediary.backend.school.entity.SchoolClass;
 import com.ediary.backend.school.entity.Subject;
 import com.ediary.backend.school.entity.Weekday;
@@ -20,7 +21,10 @@ import com.ediary.backend.user.entity.AppUser;
 import com.ediary.backend.user.entity.TeacherProfile;
 import com.ediary.backend.user.entity.UserStatus;
 import com.ediary.backend.user.repository.TeacherProfileRepository;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -48,14 +52,24 @@ class AdminScheduleServiceTest {
             schoolClassRepository,
             subjectRepository,
             teacherProfileRepository,
-            academicYearRepository
+            academicYearRepository,
+            Clock.fixed(Instant.parse("2026-09-12T09:00:00Z"), ZoneOffset.UTC)
         );
+    }
+
+    @Test
+    void rejectsAcademicYearThatHasNotStarted() {
+        assertThatThrownBy(() -> service.createAcademicYear("2027/2028"))
+            .isInstanceOf(ApplicationException.class)
+            .satisfies(error -> assertThat(((ApplicationException) error).getCode())
+                .isEqualTo("ACADEMIC_YEAR_NOT_STARTED"));
     }
 
     @Test
     void savesLessonUsingFixedBellTimes() {
         SchoolClass schoolClass = new SchoolClass();
         schoolClass.setId(1L);
+        schoolClass.setAcademicYear(academicYear("2026/2027"));
         Subject subject = new Subject();
         subject.setId(2L);
         subject.setTitle("Математика");
@@ -94,6 +108,7 @@ class AdminScheduleServiceTest {
     void rejectsTeacherOccupiedInAnotherClass() {
         SchoolClass schoolClass = new SchoolClass();
         schoolClass.setId(1L);
+        schoolClass.setAcademicYear(academicYear("2026/2027"));
         Subject subject = new Subject();
         subject.setId(2L);
         TeacherProfile teacher = activeTeacher(3L, subject);
@@ -131,5 +146,11 @@ class AdminScheduleServiceTest {
         teacher.setUser(user);
         teacher.getSubjects().add(subject);
         return teacher;
+    }
+
+    private AcademicYear academicYear(String value) {
+        AcademicYear academicYear = new AcademicYear();
+        academicYear.setValue(value);
+        return academicYear;
     }
 }

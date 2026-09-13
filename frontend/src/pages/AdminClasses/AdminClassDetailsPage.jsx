@@ -47,9 +47,9 @@ export function AdminClassDetailsPage({ classId, scheduleView }) {
     setLoading(true);
     setError("");
     try {
-      const [classData, allClasses, classStudents] = await Promise.all([
-        adminClassesApi.findById(classId),
-        adminClassesApi.findAll(),
+      const classData = await adminClassesApi.findById(classId);
+      const [allClasses, classStudents] = await Promise.all([
+        adminClassesApi.findAll({ academicYear: classData.academicYear }),
         adminClassesApi.findStudents(classId),
       ]);
       setSchoolClass(classData);
@@ -102,7 +102,7 @@ export function AdminClassDetailsPage({ classId, scheduleView }) {
       title={scheduleView ? `Розклад ${className}` : className}
       subtitle={scheduleView ? "Перегляд занять обраного класу." : "Керування класом і складом учнів."}
       breadcrumb={<ClassBreadcrumb classId={classId} className={className} scheduleView={scheduleView} />}
-      actions={!loading && schoolClass && !scheduleView ? (
+      actions={!loading && schoolClass?.editable && !scheduleView ? (
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={requestDeletion} disabled={checkingDeletion} className="h-10 rounded-md border border-red-600 bg-red-600 px-4 text-white hover:bg-red-500 hover:text-white">
             {checkingDeletion ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
@@ -130,6 +130,7 @@ export function AdminClassDetailsPage({ classId, scheduleView }) {
               onAdd={() => setDialog({ type: "add" })}
               onTransfer={(student) => setDialog({ type: "transfer", student })}
               onRemove={(student) => setDialog({ type: "remove", student })}
+              editable={schoolClass.editable}
             />
           </>
         )
@@ -163,7 +164,7 @@ function SchedulePlaceholder({ classId }) {
 }
 
 function ClassSummary({ schoolClass, studentCount }) {
-  return <section aria-label="Інформація про клас" className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6"><dl className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4"><Info label="Класний керівник" value={schoolClass.classTeacherName || "Не призначено"} /><Info label="Кількість учнів" value={`${studentCount} / ${CLASS_CAPACITY}`} /><Info label="Максимальна місткість" value={`${CLASS_CAPACITY} учнів`} /><Info label="Статус класу" value={<span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs text-emerald-700">Активний</span>} /></dl><a href={`#admin/classes/${schoolClass.id}/schedule`} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950"><CalendarDays className="h-4 w-4" />Переглянути розклад класу<ChevronRight className="h-4 w-4" /></a></section>;
+  return <section aria-label="Інформація про клас" className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6"><dl className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4"><Info label="Класний керівник" value={schoolClass.classTeacherName || "Не призначено"} /><Info label="Кількість учнів" value={`${studentCount} / ${CLASS_CAPACITY}`} /><Info label="Максимальна місткість" value={`${CLASS_CAPACITY} учнів`} /><Info label="Статус класу" value={<span className={`inline-flex rounded-full border px-3 py-1 text-xs ${schoolClass.editable ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>{schoolClass.editable ? "Активний" : "Архівний"}</span>} /></dl><a href={`#admin/classes/${schoolClass.id}/schedule`} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950"><CalendarDays className="h-4 w-4" />Переглянути розклад класу<ChevronRight className="h-4 w-4" /></a></section>;
 }
 
 function Info({ label, value }) {
@@ -174,13 +175,13 @@ function SuccessNotice({ children }) {
   return <div role="status" className="mt-5 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4 shrink-0" />{children}</div>;
 }
 
-function StudentsSection({ students, visibleStudents, query, onQueryChange, onAdd, onTransfer, onRemove }) {
+function StudentsSection({ students, visibleStudents, query, onQueryChange, onAdd, onTransfer, onRemove, editable }) {
   const full = students.length >= CLASS_CAPACITY;
-  return <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5"><h2 className="text-base font-bold">Учні класу <span className="ml-2 font-normal text-slate-400">{students.length}</span></h2><Button onClick={onAdd} disabled={full} title={full ? "У класі немає вільних місць" : "Додати учня"} className="h-10 rounded-md"><Plus className="h-4 w-4" />Додати учня</Button></div><div className="border-b border-slate-100 p-5"><div className="relative max-w-lg"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><Input aria-label="Пошук учнів за ПІБ або логіном" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Пошук за ПІБ або логіном" className="pl-10" /></div>{full ? <p className="mt-3 text-xs text-amber-700">У класі немає вільних місць.</p> : null}</div>{visibleStudents.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500"><tr><th className="px-5 py-3 font-medium">Учень</th><th className="px-5 py-3 font-medium">Статус учня</th><th className="px-5 py-3 text-right font-medium">Дії</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleStudents.map((student) => <StudentRow key={student.id} student={student} onTransfer={() => onTransfer(student)} onRemove={() => onRemove(student)} />)}</tbody></table></div> : <div className="py-12 text-center text-sm text-slate-500"><Users className="mx-auto mb-3 h-7 w-7 text-slate-300" />{query ? "Учнів за цим запитом не знайдено." : "У класі поки немає учнів."}</div>}</section>;
+  return <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5"><h2 className="text-base font-bold">Учні класу <span className="ml-2 font-normal text-slate-400">{students.length}</span></h2>{editable ? <Button onClick={onAdd} disabled={full} title={full ? "У класі немає вільних місць" : "Додати учня"} className="h-10 rounded-md"><Plus className="h-4 w-4" />Додати учня</Button> : <span className="text-xs text-slate-500">Архівний склад, лише перегляд</span>}</div><div className="border-b border-slate-100 p-5"><div className="relative max-w-lg"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><Input aria-label="Пошук учнів за ПІБ або логіном" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Пошук за ПІБ або логіном" className="pl-10" /></div>{full ? <p className="mt-3 text-xs text-amber-700">У класі немає вільних місць.</p> : null}</div>{visibleStudents.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500"><tr><th className="px-5 py-3 font-medium">Учень</th><th className="px-5 py-3 font-medium">Статус учня</th>{editable ? <th className="px-5 py-3 text-right font-medium">Дії</th> : null}</tr></thead><tbody className="divide-y divide-slate-100">{visibleStudents.map((student) => <StudentRow key={student.id} student={student} editable={editable} onTransfer={() => onTransfer(student)} onRemove={() => onRemove(student)} />)}</tbody></table></div> : <div className="py-12 text-center text-sm text-slate-500"><Users className="mx-auto mb-3 h-7 w-7 text-slate-300" />{query ? "Учнів за цим запитом не знайдено." : "У класі поки немає учнів."}</div>}</section>;
 }
 
-function StudentRow({ student, onTransfer, onRemove }) {
-  return <tr className="hover:bg-slate-50/60"><td className="px-5 py-4"><div className="font-semibold text-slate-800">{student.fullName}</div><div className="mt-1 text-xs text-slate-500">{student.login}</div><div className="mt-1 break-all text-xs text-slate-400">{student.email}</div></td><td className="px-5 py-4"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${statusStyles[student.status] || statusStyles.STUDYING}`}>{statusLabels[student.status] || student.status}</span></td><td className="px-5 py-4"><div className="flex flex-wrap justify-end gap-2"><Button className="h-9 rounded-md border border-slate-800 bg-slate-800 px-3 text-xs text-white hover:bg-slate-700" onClick={onTransfer} title="Перевести до іншого класу"><ArrowRightLeft className="h-4 w-4" /><span className="hidden 2xl:inline">Перевести до іншого класу</span><span className="sr-only 2xl:hidden">Перевести до іншого класу</span></Button><Button className="h-9 rounded-md border border-red-600 bg-red-600 px-3 text-xs text-white hover:bg-red-500" onClick={onRemove} title="Вилучити з класу"><UserMinus className="h-4 w-4" /><span className="hidden 2xl:inline">Вилучити з класу</span><span className="sr-only 2xl:hidden">Вилучити з класу</span></Button></div></td></tr>;
+function StudentRow({ student, onTransfer, onRemove, editable }) {
+  return <tr className="hover:bg-slate-50/60"><td className="px-5 py-4"><div className="font-semibold text-slate-800">{student.fullName}</div><div className="mt-1 text-xs text-slate-500">{student.login}</div><div className="mt-1 break-all text-xs text-slate-400">{student.email}</div></td><td className="px-5 py-4"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${statusStyles[student.status] || statusStyles.STUDYING}`}>{statusLabels[student.status] || student.status}</span></td>{editable ? <td className="px-5 py-4"><div className="flex flex-wrap justify-end gap-2"><Button className="h-9 rounded-md border border-slate-800 bg-slate-800 px-3 text-xs text-white hover:bg-slate-700" onClick={onTransfer} title="Перевести до іншого класу"><ArrowRightLeft className="h-4 w-4" /><span className="hidden 2xl:inline">Перевести до іншого класу</span><span className="sr-only 2xl:hidden">Перевести до іншого класу</span></Button><Button className="h-9 rounded-md border border-red-600 bg-red-600 px-3 text-xs text-white hover:bg-red-500" onClick={onRemove} title="Вилучити з класу"><UserMinus className="h-4 w-4" /><span className="hidden 2xl:inline">Вилучити з класу</span><span className="sr-only 2xl:hidden">Вилучити з класу</span></Button></div></td> : null}</tr>;
 }
 
 function MembershipDialog({ dialog, schoolClass, classes, onClose, onConfirm }) {
@@ -208,13 +209,13 @@ function MembershipDialog({ dialog, schoolClass, classes, onClose, onConfirm }) 
     const timeout = window.setTimeout(() => {
       setLoadingCandidates(true);
       setError("");
-      adminClassesApi.findUnassignedStudents(query.trim())
+      adminClassesApi.findUnassignedStudents(query.trim(), schoolClass.academicYear)
         .then((result) => active && setCandidates(result))
         .catch((requestError) => active && setError(requestMessage(requestError, "Не вдалося завантажити учнів без класу.")))
         .finally(() => active && setLoadingCandidates(false));
     }, query ? 250 : 0);
     return () => { active = false; window.clearTimeout(timeout); };
-  }, [adding, query]);
+  }, [adding, query, schoolClass.academicYear]);
 
   const submit = async (event) => {
     event.preventDefault();
