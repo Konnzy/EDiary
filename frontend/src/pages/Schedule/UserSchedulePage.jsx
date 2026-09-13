@@ -167,6 +167,12 @@ export function UserSchedulePage({ role }) {
 
   const selectedChild = children.find((child) => String(child.studentId) === studentId);
   const hasNoClass = schedule && role !== "TEACHER" && !schedule.className;
+  const title = role !== "TEACHER" && schedule?.className
+    ? `Розклад ${schedule.className} класу`
+    : "Розклад";
+  const subtitle = role === "PARENT" && selectedChild
+    ? `Розклад занять: ${selectedChild.firstName} ${selectedChild.lastName}`
+    : config.subtitle;
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
@@ -178,8 +184,8 @@ export function UserSchedulePage({ role }) {
           <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
             <div className="mx-auto w-full max-w-[1500px]">
               <header className="mb-6">
-                <h1 className="text-[1.55rem] font-bold leading-tight text-slate-950 sm:text-[1.85rem]">Розклад</h1>
-                <p className="mt-2 text-[0.9rem] text-slate-500">{config.subtitle}</p>
+                <h1 className="text-[1.55rem] font-bold leading-tight text-slate-950 sm:text-[1.85rem]">{title}</h1>
+                <p className="mt-2 text-[0.9rem] text-slate-500">{subtitle}</p>
               </header>
 
               <ScheduleFilters
@@ -194,19 +200,10 @@ export function UserSchedulePage({ role }) {
                     window.location.hash = "parent";
                     return;
                   }
+                  setSchedule(null);
                   setStudentId(value);
                 }}
               />
-
-              {role === "PARENT" && selectedChild ? (
-                <p className="mt-3 text-[0.78rem] text-slate-500">
-                  Розклад: <span className="font-semibold text-slate-700">{selectedChild.firstName} {selectedChild.lastName}</span>
-                  {schedule?.className ? ` · ${schedule.className}` : ""}
-                </p>
-              ) : null}
-              {role === "STUDENT" && schedule?.className ? (
-                <p className="mt-3 text-[0.78rem] text-slate-500">Клас: <span className="font-semibold text-slate-700">{schedule.className}</span></p>
-              ) : null}
 
               {error ? <div className="mt-5"><Alert>{error}</Alert></div> : null}
               {loading ? <LoadingState /> : null}
@@ -315,10 +312,16 @@ function ScheduleGrid({ groupedLessons, role, academicYear, week, options, now }
     <section className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-5" aria-label="Розклад на тиждень">
       {weekdays.map((day) => {
         const lessons = groupedLessons[day.value];
+        const isToday = academicYear === options?.currentAcademicYear
+          && week === options?.currentWeek
+          && weekdays[now.getDay() - 1]?.value === day.value;
         return (
           <div key={day.value} className="min-w-0">
-            <div className="mb-3 flex items-center justify-between border-b-2 border-slate-800 px-1 pb-3">
-              <h2 className="text-[0.88rem] font-bold text-slate-900">{day.label}</h2>
+            <div className={cn("mb-3 flex items-center justify-between border-b-2 px-1 pb-3", isToday ? "border-emerald-500" : "border-slate-800")}>
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="text-[0.88rem] font-bold text-slate-900">{day.label}</h2>
+                {isToday ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[0.65rem] font-bold text-emerald-700">Сьогодні</span> : null}
+              </div>
               <span className="text-[0.7rem] font-medium text-slate-400">{lessonCount(lessons.length)}</span>
             </div>
             <div className="space-y-3">
@@ -327,7 +330,7 @@ function ScheduleGrid({ groupedLessons, role, academicYear, week, options, now }
                   key={lesson.id}
                   lesson={lesson}
                   role={role}
-                  current={isCurrentLesson(lesson, academicYear, week, options, now)}
+                  current={isToday && isCurrentLesson(lesson, now)}
                 />
               )) : (
                 <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed border-slate-300 px-4 text-center text-[0.78rem] text-slate-400">
@@ -427,12 +430,9 @@ function EmptyState({ title, description }) {
   return <section className="mt-6 rounded-lg border border-slate-200 bg-white px-5 py-12 text-center"><CalendarDays className="mx-auto h-8 w-8 text-slate-300" aria-hidden="true" /><h2 className="mt-4 text-base font-bold text-slate-900">{title}</h2><p className="mt-2 text-[0.8rem] text-slate-500">{description}</p></section>;
 }
 
-function isCurrentLesson(lesson, academicYear, week, options, now) {
-  const currentDay = weekdays[now.getDay() - 1]?.value;
-  if (!currentDay || lesson.weekday !== currentDay) return false;
-  if (academicYear !== options?.currentAcademicYear || week !== options?.currentWeek) return false;
+function isCurrentLesson(lesson, now) {
   const minutes = now.getHours() * 60 + now.getMinutes();
-  return minutes >= timeToMinutes(lesson.startTime) && minutes <= timeToMinutes(lesson.endTime);
+  return minutes >= timeToMinutes(lesson.startTime) && minutes < timeToMinutes(lesson.endTime);
 }
 
 function timeToMinutes(value) {

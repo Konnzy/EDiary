@@ -1,6 +1,7 @@
 package com.ediary.backend.common.dashboard;
 
 import com.ediary.backend.common.dashboard.dto.AdminDashboardLessonResponse;
+import com.ediary.backend.common.dashboard.dto.AdminActivityResponse;
 import com.ediary.backend.common.dashboard.dto.AdminDashboardRequestResponse;
 import com.ediary.backend.common.dashboard.dto.AdminDashboardResponse;
 import com.ediary.backend.common.dashboard.dto.AdminDashboardStatsResponse;
@@ -32,6 +33,7 @@ public class AdminDashboardService {
 
     private final UserRepository userRepository;
     private final RegistrationRequestRepository registrationRequestRepository;
+    private final AdminActivityRepository adminActivityRepository;
     private final ScheduleRepository scheduleRepository;
     private final UserScheduleService userScheduleService;
     private final Clock clock;
@@ -51,6 +53,12 @@ public class AdminDashboardService {
             findStats(),
             registrationRequestRepository.findTop4ByOrderByCreatedAtDesc().stream()
                 .map(this::toRequestResponse)
+                .toList(),
+            adminActivityRepository.findTop4ByOrderByOccurredAtDescIdDesc().stream()
+                .map(activity -> new AdminActivityResponse(
+                    activity.getId(), activity.getActorLogin(), activity.getTitle(),
+                    activity.getTarget(), activity.getOccurredAt()
+                ))
                 .toList(),
             lessons,
             today,

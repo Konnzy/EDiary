@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  CheckCircle2,
   Clock3,
   GraduationCap,
+  History,
   Loader2,
   Mail,
   ShieldCheck,
   UserRound,
   Users,
-  XCircle,
 } from "lucide-react";
 import { Alert } from "@/components/ui/alert.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -50,11 +49,6 @@ export function AdminHomePage() {
     return () => { active = false; };
   }, []);
 
-  const activityItems = useMemo(
-    () => (dashboard?.recentRequests || []).map(toActivityItem),
-    [dashboard],
-  );
-
   return (
     <AdminLayout
       activeItem="Головна"
@@ -74,7 +68,7 @@ export function AdminHomePage() {
               week={dashboard.currentWeek}
             />
           </div>
-          <div className="mt-6"><SystemActivityCard items={activityItems} /></div>
+          <div className="mt-6"><AdminActivityCard items={dashboard.recentAdminActions || []} /></div>
         </>
       ) : null}
     </AdminLayout>
@@ -177,23 +171,22 @@ function TodayLessonsCard({ lessons, academicYear, week }) {
   );
 }
 
-function SystemActivityCard({ items }) {
+function AdminActivityCard({ items }) {
   return (
     <Card className="rounded-lg px-4 py-4 sm:px-5 sm:py-5">
-      <CardHeading title="Остання активність заявок" subtitle="Фактичні подання та рішення щодо реєстрації." />
+      <CardHeading title="Останні дії адміністратора" subtitle="Зміни користувачів, класів, предметів, заявок і розкладу." />
       {items.length ? (
         <div className="grid gap-3 lg:grid-cols-4">
           {items.map((item) => {
-            const Icon = item.icon;
             return (
               <article key={item.id} className="rounded-lg border border-slate-200 bg-white px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-[0_14px_34px_-28px_rgba(15,23,42,0.7)]">
-                <div className="mb-3 flex items-center justify-between gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-[#17233a]"><Icon className="h-4 w-4" aria-hidden="true" /></span><span className="text-[0.72rem] font-bold text-slate-400">{formatDateTime(item.occurredAt)}</span></div>
-                <h3 className="text-[0.86rem] font-bold leading-snug text-slate-900">{item.title}</h3><p className="mt-1 text-[0.74rem] leading-5 text-slate-500">{item.meta}</p>
+                <div className="mb-3 flex items-center justify-between gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-[#17233a]"><History className="h-4 w-4" aria-hidden="true" /></span><span className="text-[0.72rem] font-bold text-slate-400">{formatDateTime(item.occurredAt)}</span></div>
+                <h3 className="text-[0.86rem] font-bold leading-snug text-slate-900">{item.title}</h3><p className="mt-1 text-[0.74rem] leading-5 text-slate-500">{item.target} · {item.actorLogin}</p>
               </article>
             );
           })}
         </div>
-      ) : <EmptyMessage>Активності заявок ще немає.</EmptyMessage>}
+      ) : <EmptyMessage>Дій адміністратора ще немає.</EmptyMessage>}
     </Card>
   );
 }
@@ -204,21 +197,6 @@ function LoadingState() {
 
 function EmptyMessage({ children }) {
   return <div className="flex min-h-28 items-center justify-center rounded-lg border border-dashed border-slate-200 px-4 text-center text-[0.78rem] text-slate-400">{children}</div>;
-}
-
-function toActivityItem(request) {
-  const config = {
-    PENDING: { title: "Нова заявка на реєстрацію", icon: Mail },
-    APPROVED: { title: "Схвалено заявку на реєстрацію", icon: CheckCircle2 },
-    REJECTED: { title: "Відхилено заявку на реєстрацію", icon: XCircle },
-  }[request.status];
-  return {
-    id: request.id,
-    title: config.title,
-    icon: config.icon,
-    meta: `${request.fullName} · ${roleLabels[request.role]}`,
-    occurredAt: request.reviewedAt || request.createdAt,
-  };
 }
 
 function formatNumber(value) {

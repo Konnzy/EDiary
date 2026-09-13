@@ -34,6 +34,7 @@ class AdminDashboardServiceTest {
 
     @Mock private UserRepository userRepository;
     @Mock private RegistrationRequestRepository registrationRequestRepository;
+    @Mock private AdminActivityRepository adminActivityRepository;
     @Mock private ScheduleRepository scheduleRepository;
     @Mock private UserScheduleService userScheduleService;
 
@@ -44,6 +45,7 @@ class AdminDashboardServiceTest {
         service = new AdminDashboardService(
             userRepository,
             registrationRequestRepository,
+            adminActivityRepository,
             scheduleRepository,
             userScheduleService,
             Clock.fixed(Instant.parse("2026-09-14T09:00:00Z"), ZoneOffset.UTC)
@@ -68,6 +70,10 @@ class AdminDashboardServiceTest {
                 java.time.LocalDateTime.of(2026, 9, 14, 8, 30)
             )
         ));
+        when(adminActivityRepository.findTop4ByOrderByOccurredAtDescIdDesc()).thenReturn(List.of(
+            new AdminActivity("admin", "Збережено розклад", "Клас #2",
+                java.time.LocalDateTime.of(2026, 9, 14, 8, 40))
+        ));
         when(userScheduleService.findOptions()).thenReturn(
             new ScheduleOptionsResponse(List.of("2026/2027"), "2026/2027", 1)
         );
@@ -82,6 +88,11 @@ class AdminDashboardServiceTest {
         assertThat(result.stats().pendingRequests()).isEqualTo(2L);
         assertThat(result.recentRequests()).singleElement()
             .satisfies(request -> assertThat(request.fullName()).isEqualTo("Мельник Олена"));
+        assertThat(result.recentAdminActions()).singleElement()
+            .satisfies(action -> {
+                assertThat(action.actorLogin()).isEqualTo("admin");
+                assertThat(action.title()).isEqualTo("Збережено розклад");
+            });
         assertThat(result.todayLessons()).singleElement()
             .satisfies(lesson -> {
                 assertThat(lesson.subject()).isEqualTo("Математика");
