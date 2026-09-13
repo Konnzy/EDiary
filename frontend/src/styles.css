@@ -24,6 +24,31 @@
     --radius: 0.875rem;
   }
 
+  html.dark {
+    --background: 220 12% 9%;
+    --foreground: 210 30% 94%;
+    --card: 216 15% 17%;
+    --card-foreground: 210 30% 94%;
+    --primary: 210 80% 72%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 216 13% 22%;
+    --secondary-foreground: 210 30% 94%;
+    --muted: 216 13% 22%;
+    --muted-foreground: 213 17% 67%;
+    --accent: 210 22% 25%;
+    --accent-foreground: 210 30% 94%;
+    --destructive: 0 74% 65%;
+    --destructive-foreground: 220 30% 9%;
+    --border: 214 14% 29%;
+    --input: 214 15% 34%;
+    --ring: 210 80% 72%;
+    color-scheme: dark;
+  }
+
+  html.dark * {
+    --tw-ring-offset-color: #15191f;
+  }
+
   * {
     @apply border-border;
   }
@@ -43,5 +68,109 @@
 
   ::selection {
     @apply bg-primary/15 text-primary;
+  }
+}
+
+@layer utilities {
+  /* Dark equivalents for the existing light-only Tailwind utilities. */
+  html.dark :is([class~="bg-white"], [class~="focus:bg-white"]:focus, [class~="focus-visible:bg-white"]:focus-visible) {
+    background-color: #242c35;
+  }
+
+  html.dark :is([class~="bg-slate-50"], [class~="bg-slate-50/40"], [class~="bg-slate-50/50"], [class~="bg-slate-50/60"], [class~="bg-slate-50/70"], [class~="bg-slate-50/75"], [class~="disabled:bg-slate-50"]:disabled) {
+    background-color: #1c242d;
+  }
+
+  html.dark :is([class~="bg-slate-100"], [class~="bg-slate-100/75"]) {
+    background-color: #303b46;
+  }
+
+  html.dark :is([class~="bg-slate-800"], [class~="bg-slate-900"]) {
+    background-color: #354c6b;
+  }
+
+  html.dark :is([class~="hover:bg-white"], [class~="hover:bg-slate-50"], [class~="hover:bg-slate-50/60"], [class~="hover:bg-slate-50/70"], [class~="hover:bg-slate-50/80"]):hover {
+    background-color: #35434f;
+  }
+
+  html.dark :is([class~="hover:bg-slate-100"], [class~="hover:bg-slate-200"]):hover {
+    background-color: #3b4a58;
+  }
+
+  html.dark [class~="hover:bg-slate-700"]:hover {
+    background-color: #456080;
+  }
+
+  html.dark :is([class~="text-slate-950"], [class~="text-slate-900"], [class~="text-[#17233a]"], [class~="hover:text-slate-950"]:hover, [class~="hover:text-slate-900"]:hover) {
+    color: #f2f6fb;
+  }
+
+  html.dark :is([class~="text-slate-800"], [class~="hover:text-slate-800"]:hover) {
+    color: #dce6f1;
+  }
+
+  html.dark :is([class~="text-slate-700"], [class~="hover:text-slate-700"]:hover, [class~="group-hover:text-slate-700"]:hover) {
+    color: #c6d3e1;
+  }
+
+  html.dark .group:hover [class~="group-hover:text-slate-700"] { color: #c6d3e1; }
+
+  html.dark [class~="text-slate-600"] { color: #b1c0d0; }
+  html.dark :is([class~="text-slate-500"], [class~="hover:text-slate-500"]:hover, [class~="disabled:hover:text-slate-500"]:disabled:hover) { color: #9bafc2; }
+  html.dark :is([class~="text-slate-400"], [class~="disabled:text-slate-400"]:disabled) { color: #8ca1b5; }
+  html.dark [class~="text-slate-300"] { color: #73879c; }
+  html.dark [class~="placeholder:text-slate-500"]::placeholder { color: #8398ad; }
+  html.dark :is([class~="stroke-slate-900"], [class~="stroke-slate-600"]) { stroke: #b1c0d0; }
+  html.dark :is([class~="fill-slate-600"], [class~="fill-slate-500"]) { fill: #617a94; }
+
+  html.dark :is([class~="border-slate-100"], [class~="divide-slate-100"] > :not([hidden]) ~ :not([hidden])) {
+    border-color: #34414d;
+  }
+
+  html.dark :is([class~="border-slate-200"], [class~="border-slate-200/80"], [class~="border-slate-200/85"], [class~="border-slate-200/90"], [class~="lg:border-slate-200/80"]) {
+    border-color: #46535f;
+  }
+
+  html.dark :is([class~="border-slate-300"], [class~="border-slate-300/85"], [class~="hover:border-slate-300"]:hover) {
+    border-color: #5e6d7b;
+  }
+
+  html.dark :is([class~="border-slate-400"], [class~="hover:border-slate-400"]:hover, [class~="hover:border-slate-400/70"]:hover, [class~="focus:border-slate-500"]:focus) {
+    border-color: #718395;
+  }
+
+  html.dark :is([class~="border-slate-800"], [class~="hover:border-slate-700"]:hover, [class~="hover:border-slate-500"]:hover) {
+    border-color: #6a84a1;
+  }
+
+  html.dark :is([class~="bg-sky-100"], [class~="bg-sky-50/40"]) { background-color: #15354d; }
+  html.dark [class~="text-sky-700"] { color: #a6d9fb; }
+  html.dark [class~="border-sky-300"] { border-color: #4681aa; }
+
+  html.dark :is([class~="bg-emerald-50"], [class~="bg-emerald-100"], [class~="hover:bg-emerald-100"]:hover) { background-color: #173b32; }
+  html.dark :is([class~="text-emerald-600"], [class~="text-emerald-700"], [class~="text-emerald-800"]) { color: #9be2bc; }
+  html.dark :is([class~="border-emerald-100"], [class~="border-emerald-200"], [class~="border-emerald-300"], [class~="border-emerald-400"], [class~="border-emerald-500"], [class~="hover:border-emerald-300"]:hover) { border-color: #43866c; }
+
+  html.dark [class~="bg-amber-50"] { background-color: #3c301b; }
+  html.dark :is([class~="text-amber-600"], [class~="text-amber-700"], [class~="text-amber-800"]) { color: #f4d08c; }
+  html.dark :is([class~="border-amber-200"], [class~="border-amber-300"]) { border-color: #8b6b38; }
+
+  html.dark :is([class~="bg-red-50"], [class~="bg-red-50/30"], [class~="hover:bg-red-50"]:hover) { background-color: #41262c; }
+  html.dark :is([class~="text-red-500"], [class~="text-red-600"], [class~="text-red-700"]) { color: #f7aaaa; }
+  html.dark :is([class~="border-red-200"], [class~="border-red-300"], [class~="border-red-400"]) { border-color: #a05a65; }
+
+  html.dark [class~="bg-rose-50"] { background-color: #442731; }
+  html.dark :is([class~="text-rose-700"], [class~="text-rose-800"]) { color: #f6b2c3; }
+  html.dark :is([class~="border-rose-200"], [class~="border-rose-300"], [class~="hover:border-rose-300"]:hover) { border-color: #9f6275; }
+  html.dark [class~="hover:bg-rose-100"]:hover { background-color: #52303d; }
+
+  html.dark :is([class~="ring-slate-900/[0.015]"], [class~="ring-sky-100"], [class~="ring-emerald-100"], [class~="ring-emerald-200"], [class~="ring-amber-200"], [class~="ring-rose-200"]) {
+    --tw-ring-color: #5e6d7b;
+  }
+
+  @media (min-width: 1024px) {
+    html.dark [class~="lg:bg-[linear-gradient(90deg,#f2f4f7_0%,#f2f4f7_49.9%,#f8fafc_50%,#f8fafc_100%)]"] {
+      background-image: linear-gradient(90deg, #1e252b 0%, #1e252b 49.9%, #15191f 50%, #15191f 100%);
+    }
   }
 }

@@ -19,6 +19,7 @@ import { TermsOfUsePage } from "@/pages/TermsOfUse/TermsOfUsePage.jsx";
 import { PrivacyPolicyPage } from "@/pages/PrivacyPolicy/PrivacyPolicyPage.jsx";
 import { UserSchedulePage } from "@/pages/Schedule/UserSchedulePage.jsx";
 import { authApi } from "@/lib/api.js";
+import { ThemeToggle } from "@/components/ThemeToggle.jsx";
 
 function getRouteFromHash() {
   return window.location.hash.replace("#", "") || "login";
@@ -70,7 +71,7 @@ function ProtectedRoute({ allowedRole, loginRoute, children }) {
   return children;
 }
 
-export default function App() {
+function AppContent() {
   const [route, setRoute] = useState(getRouteFromHash);
 
   useEffect(() => {
@@ -162,4 +163,8 @@ export default function App() {
   }
 
   return <LoginPage />;
+}
+
+export default function App() {
+  return <><AppContent /><ThemeToggle /></>;
 }
