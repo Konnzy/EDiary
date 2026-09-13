@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -97,7 +98,7 @@ public class AdminScheduleService {
             academicYear,
             week,
             scheduleRepository
-                .findAllBySchoolClass_IdAndAcademicYearAndWeekNumberOrderByWeekdayAscLessonNumberAsc(
+                .findAllBySchoolClass_IdAndAcademicYearAndWeekNumberAndActiveTrueOrderByWeekdayAscLessonNumberAsc(
                     classId,
                     academicYear,
                     week
@@ -133,19 +134,24 @@ public class AdminScheduleService {
         validateAssignments(request.lessons(), subjects, teachers);
         validateTeacherConflicts(classId, academicYear, week, request.lessons());
 
-        List<ScheduleEntry> currentEntries = scheduleRepository
-            .findAllBySchoolClass_IdAndAcademicYearAndWeekNumberOrderByWeekdayAscLessonNumberAsc(
-                classId,
-                academicYear,
-                week
-            );
+        List<ScheduleEntry> currentEntries = scheduleRepository.findActiveForUpdate(classId, academicYear, week);
+        Set<Long> referencedIds = currentEntries.isEmpty()
+            ? Set.of()
+            : new HashSet<>(scheduleRepository.findIdsReferencedByLessons(
+                currentEntries.stream().map(ScheduleEntry::getId).toList()
+            ));
         Map<Slot, ScheduleEntry> currentBySlot = currentEntries.stream()
             .collect(Collectors.toMap(this::slot, Function.identity()));
         List<ScheduleEntry> savedEntries = new ArrayList<>();
+        List<ScheduleEntry> archivedEntries = new ArrayList<>();
 
         for (Map.Entry<Slot, SaveScheduleLessonRequest> requested : requestedBySlot.entrySet()) {
             SaveScheduleLessonRequest lesson = requested.getValue();
             ScheduleEntry entry = currentBySlot.remove(requested.getKey());
+            if (entry != null && referencedIds.contains(entry.getId()) && !sameDefinition(entry, lesson)) {
+                archive(entry, archivedEntries);
+                entry = null;
+            }
             if (entry == null) {
                 entry = new ScheduleEntry();
                 entry.setSchoolClass(schoolClass);
@@ -154,17 +160,30 @@ public class AdminScheduleService {
                 entry.setWeekday(lesson.weekday());
                 entry.setLessonNumber(lesson.lessonNumber());
             }
-            entry.setSubject(subjects.get(lesson.subjectId()));
-            entry.setTeacher(teachers.get(lesson.teacherId()));
-            entry.setRoom(lesson.room().strip());
-            LocalTime[] times = LESSON_TIMES.get(lesson.lessonNumber() - 1);
-            entry.setStartTime(times[0]);
-            entry.setEndTime(times[1]);
+            if (entry.getId() == null || !referencedIds.contains(entry.getId())) {
+                entry.setSubject(subjects.get(lesson.subjectId()));
+                entry.setTeacher(teachers.get(lesson.teacherId()));
+                entry.setRoom(lesson.room().strip());
+                LocalTime[] times = LESSON_TIMES.get(lesson.lessonNumber() - 1);
+                entry.setStartTime(times[0]);
+                entry.setEndTime(times[1]);
+            }
             savedEntries.add(entry);
         }
 
-        if (!currentBySlot.isEmpty()) {
-            scheduleRepository.deleteAll(currentBySlot.values());
+        List<ScheduleEntry> entriesToDelete = new ArrayList<>();
+        for (ScheduleEntry entry : currentBySlot.values()) {
+            if (referencedIds.contains(entry.getId())) {
+                archive(entry, archivedEntries);
+            } else {
+                entriesToDelete.add(entry);
+            }
+        }
+        if (!archivedEntries.isEmpty()) {
+            scheduleRepository.saveAllAndFlush(archivedEntries);
+        }
+        if (!entriesToDelete.isEmpty()) {
+            scheduleRepository.deleteAll(entriesToDelete);
             scheduleRepository.flush();
         }
         savedEntries = scheduleRepository.saveAllAndFlush(savedEntries);
@@ -175,6 +194,21 @@ public class AdminScheduleService {
                 : left.getLessonNumber().compareTo(right.getLessonNumber());
         });
         return toResponse(classId, academicYear, week, savedEntries);
+    }
+
+    private boolean sameDefinition(ScheduleEntry entry, SaveScheduleLessonRequest lesson) {
+        LocalTime[] times = LESSON_TIMES.get(lesson.lessonNumber() - 1);
+        return entry.getSubject().getId().equals(lesson.subjectId())
+            && entry.getTeacher().getId().equals(lesson.teacherId())
+            && Objects.equals(entry.getRoom(), lesson.room().strip())
+            && entry.getStartTime().equals(times[0])
+            && entry.getEndTime().equals(times[1]);
+    }
+
+    private void archive(ScheduleEntry entry, List<ScheduleEntry> archivedEntries) {
+        entry.setActive(false);
+        entry.setArchivedAt(java.time.LocalDateTime.now(clock));
+        archivedEntries.add(entry);
     }
 
     private SchoolClass requirePeriodForUpdate(Long classId, String academicYear, Integer week) {

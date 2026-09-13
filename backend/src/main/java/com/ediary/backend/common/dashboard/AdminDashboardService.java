@@ -91,7 +91,7 @@ public class AdminDashboardService {
             return List.of();
         }
         return scheduleRepository
-            .findAllByAcademicYearAndWeekNumberAndWeekdayOrderByLessonNumberAscSchoolClass_NumberAscSchoolClass_LetterAsc(
+            .findAllByAcademicYearAndWeekNumberAndWeekdayAndActiveTrueOrderByLessonNumberAscSchoolClass_NumberAscSchoolClass_LetterAsc(
                 academicYear,
                 week,
                 Weekday.valueOf(dayOfWeek.name())

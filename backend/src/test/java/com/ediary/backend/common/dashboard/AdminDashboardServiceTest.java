@@ -78,7 +78,7 @@ class AdminDashboardServiceTest {
             new ScheduleOptionsResponse(List.of("2026/2027"), "2026/2027", 1)
         );
         when(scheduleRepository
-            .findAllByAcademicYearAndWeekNumberAndWeekdayOrderByLessonNumberAscSchoolClass_NumberAscSchoolClass_LetterAsc(
+            .findAllByAcademicYearAndWeekNumberAndWeekdayAndActiveTrueOrderByLessonNumberAscSchoolClass_NumberAscSchoolClass_LetterAsc(
                 "2026/2027", 1, Weekday.MONDAY
             )).thenReturn(List.of(lesson()));
 

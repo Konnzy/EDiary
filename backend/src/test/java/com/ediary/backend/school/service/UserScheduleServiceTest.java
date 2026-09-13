@@ -58,7 +58,7 @@ class UserScheduleServiceTest {
         when(studentProfileRepository.findByUser_LoginIgnoreCase("student.one"))
             .thenReturn(Optional.of(student));
         when(scheduleRepository
-            .findAllBySchoolClass_IdAndAcademicYearAndWeekNumberOrderByWeekdayAscLessonNumberAsc(
+            .findAllBySchoolClass_IdAndAcademicYearAndWeekNumberAndActiveTrueOrderByWeekdayAscLessonNumberAsc(
                 9L, "2026/2027", 1
             ))
             .thenReturn(List.of());
@@ -68,7 +68,7 @@ class UserScheduleServiceTest {
         assertThat(response.className()).isEqualTo("9-А");
         assertThat(response.lessons()).isEmpty();
         verify(scheduleRepository)
-            .findAllBySchoolClass_IdAndAcademicYearAndWeekNumberOrderByWeekdayAscLessonNumberAsc(
+            .findAllBySchoolClass_IdAndAcademicYearAndWeekNumberAndActiveTrueOrderByWeekdayAscLessonNumberAsc(
                 9L, "2026/2027", 1
             );
     }

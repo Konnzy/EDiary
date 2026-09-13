@@ -1,20 +1,41 @@
 package com.ediary.backend.school.repository;
 
 import com.ediary.backend.school.entity.ScheduleEntry;
+import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ScheduleRepository extends JpaRepository<ScheduleEntry, Long> {
 
     @EntityGraph(attributePaths = {"subject", "teacher"})
-    List<ScheduleEntry> findAllBySchoolClass_IdAndAcademicYearAndWeekNumberOrderByWeekdayAscLessonNumberAsc(
+    List<ScheduleEntry> findAllBySchoolClass_IdAndAcademicYearAndWeekNumberAndActiveTrueOrderByWeekdayAscLessonNumberAsc(
         Long classId,
         String academicYear,
         Integer weekNumber
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select entry from ScheduleEntry entry
+        where entry.schoolClass.id = :classId
+            and entry.academicYear = :academicYear
+            and entry.weekNumber = :weekNumber
+            and entry.active = true
+        order by entry.weekday, entry.lessonNumber
+        """)
+    List<ScheduleEntry> findActiveForUpdate(
+        @Param("classId") Long classId,
+        @Param("academicYear") String academicYear,
+        @Param("weekNumber") Integer weekNumber
+    );
+
+    @Query(value = "SELECT DISTINCT schedule_id FROM lesson WHERE schedule_id IN (:scheduleIds)", nativeQuery = true)
+    List<Long> findIdsReferencedByLessons(@Param("scheduleIds") Collection<Long> scheduleIds);
 
     @EntityGraph(attributePaths = {"schoolClass", "teacher"})
     @Query("""
@@ -23,6 +44,7 @@ public interface ScheduleRepository extends JpaRepository<ScheduleEntry, Long> {
         where entry.academicYear = :academicYear
             and entry.weekNumber = :weekNumber
             and entry.schoolClass.id <> :classId
+            and entry.active = true
         """)
     List<ScheduleEntry> findTeacherConflicts(
         @Param("classId") Long classId,
@@ -37,6 +59,7 @@ public interface ScheduleRepository extends JpaRepository<ScheduleEntry, Long> {
         where lower(entry.teacher.user.login) = lower(:login)
             and entry.academicYear = :academicYear
             and entry.weekNumber = :weekNumber
+            and entry.active = true
         order by entry.weekday, entry.lessonNumber
         """)
     List<ScheduleEntry> findAllForTeacher(
@@ -46,7 +69,7 @@ public interface ScheduleRepository extends JpaRepository<ScheduleEntry, Long> {
     );
 
     @EntityGraph(attributePaths = {"subject", "teacher", "schoolClass"})
-    List<ScheduleEntry> findAllByAcademicYearAndWeekNumberAndWeekdayOrderByLessonNumberAscSchoolClass_NumberAscSchoolClass_LetterAsc(
+    List<ScheduleEntry> findAllByAcademicYearAndWeekNumberAndWeekdayAndActiveTrueOrderByLessonNumberAscSchoolClass_NumberAscSchoolClass_LetterAsc(
         String academicYear,
         Integer weekNumber,
         com.ediary.backend.school.entity.Weekday weekday

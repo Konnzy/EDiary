@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -65,4 +66,10 @@ public class ScheduleEntry {
 
     @Column(name = "schedule_week_number", nullable = false)
     private Integer weekNumber;
+
+    @Column(name = "schedule_active", nullable = false)
+    private boolean active = true;
+
+    @Column(name = "schedule_archived_at")
+    private LocalDateTime archivedAt;
 }

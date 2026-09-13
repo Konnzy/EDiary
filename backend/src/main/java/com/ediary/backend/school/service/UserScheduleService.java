@@ -103,7 +103,7 @@ public class UserScheduleService {
             return new UserScheduleResponse(academicYear, week, null, List.of());
         }
         List<ScheduleEntry> entries = scheduleRepository
-            .findAllBySchoolClass_IdAndAcademicYearAndWeekNumberOrderByWeekdayAscLessonNumberAsc(
+            .findAllBySchoolClass_IdAndAcademicYearAndWeekNumberAndActiveTrueOrderByWeekdayAscLessonNumberAsc(
                 schoolClass.getId(),
                 academicYear,
                 week

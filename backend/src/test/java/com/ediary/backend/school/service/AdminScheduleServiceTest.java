@@ -3,6 +3,9 @@ package com.ediary.backend.school.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ediary.backend.common.error.ApplicationException;
@@ -23,6 +26,7 @@ import com.ediary.backend.user.entity.UserStatus;
 import com.ediary.backend.user.repository.TeacherProfileRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -32,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -80,7 +85,7 @@ class AdminScheduleServiceTest {
         when(subjectRepository.findAllById(Set.of(2L))).thenReturn(List.of(subject));
         when(teacherProfileRepository.findAllForSchedule(Set.of(3L))).thenReturn(List.of(teacher));
         when(scheduleRepository.findTeacherConflicts(1L, "2026/2027", 1)).thenReturn(List.of());
-        when(scheduleRepository.findAllBySchoolClass_IdAndAcademicYearAndWeekNumberOrderByWeekdayAscLessonNumberAsc(
+        when(scheduleRepository.findActiveForUpdate(
             1L, "2026/2027", 1
         )).thenReturn(List.of());
         when(scheduleRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> {
@@ -134,6 +139,113 @@ class AdminScheduleServiceTest {
             .isInstanceOf(ApplicationException.class)
             .satisfies(error -> assertThat(((ApplicationException) error).getCode())
                 .isEqualTo("TEACHER_SCHEDULE_CONFLICT"));
+    }
+
+    @Test
+    void archivesReferencedSlotBeforeReplacingIt() {
+        Subject subject = subject(2L);
+        TeacherProfile teacher = activeTeacher(3L, subject);
+        ScheduleEntry recorded = existingEntry(subject, teacher);
+        prepareSave(recorded, subject, teacher);
+        when(scheduleRepository.findIdsReferencedByLessons(List.of(11L))).thenReturn(List.of(11L));
+        when(scheduleRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.save(1L, "2026/2027", 1, new SaveScheduleRequest(List.of(
+            new SaveScheduleLessonRequest(Weekday.MONDAY, 1, 2L, 3L, "202")
+        )));
+
+        assertThat(recorded.isActive()).isFalse();
+        assertThat(recorded.getArchivedAt()).isEqualTo(LocalDateTime.of(2026, 9, 12, 9, 0));
+        assertThat(recorded.getRoom()).isEqualTo("101");
+        assertThat(response.lessons()).singleElement()
+            .satisfies(lesson -> assertThat(lesson.room()).isEqualTo("202"));
+        ArgumentCaptor<List<ScheduleEntry>> saved = scheduleEntriesCaptor();
+        verify(scheduleRepository, times(2)).saveAllAndFlush(saved.capture());
+        assertThat(saved.getAllValues().get(0)).containsExactly(recorded);
+        assertThat(saved.getAllValues().get(1)).singleElement()
+            .satisfies(entry -> {
+                assertThat(entry).isNotSameAs(recorded);
+                assertThat(entry.isActive()).isTrue();
+            });
+        verify(scheduleRepository, never()).deleteAll(anyList());
+    }
+
+    @Test
+    void keepsReferencedSlotWhenDefinitionIsUnchanged() {
+        Subject subject = subject(2L);
+        TeacherProfile teacher = activeTeacher(3L, subject);
+        ScheduleEntry recorded = existingEntry(subject, teacher);
+        prepareSave(recorded, subject, teacher);
+        when(scheduleRepository.findIdsReferencedByLessons(List.of(11L))).thenReturn(List.of(11L));
+        when(scheduleRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.save(1L, "2026/2027", 1, new SaveScheduleRequest(List.of(
+            new SaveScheduleLessonRequest(Weekday.MONDAY, 1, 2L, 3L, "101")
+        )));
+
+        assertThat(recorded.isActive()).isTrue();
+        assertThat(recorded.getArchivedAt()).isNull();
+        assertThat(response.lessons()).singleElement()
+            .satisfies(lesson -> assertThat(lesson.id()).isEqualTo(11L));
+        verify(scheduleRepository, times(1)).saveAllAndFlush(anyList());
+        verify(scheduleRepository, never()).deleteAll(anyList());
+    }
+
+    @Test
+    void archivesReferencedSlotWhenRemoved() {
+        Subject subject = subject(2L);
+        TeacherProfile teacher = activeTeacher(3L, subject);
+        ScheduleEntry recorded = existingEntry(subject, teacher);
+        when(academicYearRepository.existsById("2026/2027")).thenReturn(true);
+        when(schoolClassRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(recorded.getSchoolClass()));
+        when(scheduleRepository.findActiveForUpdate(1L, "2026/2027", 1)).thenReturn(List.of(recorded));
+        when(scheduleRepository.findIdsReferencedByLessons(List.of(11L))).thenReturn(List.of(11L));
+        when(scheduleRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.save(1L, "2026/2027", 1, new SaveScheduleRequest(List.of()));
+
+        assertThat(response.lessons()).isEmpty();
+        assertThat(recorded.isActive()).isFalse();
+        verify(scheduleRepository, never()).deleteAll(anyList());
+    }
+
+    private void prepareSave(ScheduleEntry existing, Subject subject, TeacherProfile teacher) {
+        when(academicYearRepository.existsById("2026/2027")).thenReturn(true);
+        when(schoolClassRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(existing.getSchoolClass()));
+        when(subjectRepository.findAllById(Set.of(2L))).thenReturn(List.of(subject));
+        when(teacherProfileRepository.findAllForSchedule(Set.of(3L))).thenReturn(List.of(teacher));
+        when(scheduleRepository.findActiveForUpdate(1L, "2026/2027", 1)).thenReturn(List.of(existing));
+    }
+
+    private ScheduleEntry existingEntry(Subject subject, TeacherProfile teacher) {
+        SchoolClass schoolClass = new SchoolClass();
+        schoolClass.setId(1L);
+        schoolClass.setAcademicYear(academicYear("2026/2027"));
+        ScheduleEntry entry = new ScheduleEntry();
+        entry.setId(11L);
+        entry.setSchoolClass(schoolClass);
+        entry.setSubject(subject);
+        entry.setTeacher(teacher);
+        entry.setAcademicYear("2026/2027");
+        entry.setWeekNumber(1);
+        entry.setWeekday(Weekday.MONDAY);
+        entry.setLessonNumber(1);
+        entry.setRoom("101");
+        entry.setStartTime(LocalTime.of(8, 0));
+        entry.setEndTime(LocalTime.of(8, 45));
+        return entry;
+    }
+
+    private Subject subject(Long id) {
+        Subject subject = new Subject();
+        subject.setId(id);
+        subject.setTitle("Математика");
+        return subject;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ArgumentCaptor<List<ScheduleEntry>> scheduleEntriesCaptor() {
+        return ArgumentCaptor.forClass((Class) List.class);
     }
 
     private TeacherProfile activeTeacher(Long id, Subject subject) {
