@@ -20,6 +20,7 @@ import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { Alert } from "@/components/ui/alert.jsx";
 import { ApiError, authApi, parentApi, scheduleApi } from "@/lib/api.js";
 import { cn } from "@/lib/utils.js";
+import { findNextLesson, timeToMinutes } from "@/pages/Schedule/nextLesson.js";
 
 const weekdays = [
   { value: "MONDAY", label: "Понеділок" },
@@ -27,6 +28,17 @@ const weekdays = [
   { value: "WEDNESDAY", label: "Середа" },
   { value: "THURSDAY", label: "Четвер" },
   { value: "FRIDAY", label: "П’ятниця" },
+];
+
+const lessonTimes = [
+  ["08:00", "08:45"],
+  ["08:55", "09:40"],
+  ["09:50", "10:35"],
+  ["10:45", "11:30"],
+  ["12:00", "12:45"],
+  ["12:55", "13:40"],
+  ["13:50", "14:35"],
+  ["14:45", "15:30"],
 ];
 
 const roleConfig = {
@@ -83,6 +95,7 @@ export function UserSchedulePage({ role }) {
   const [children, setChildren] = useState([]);
   const [studentId, setStudentId] = useState("");
   const [schedule, setSchedule] = useState(null);
+  const [otherWeekSchedule, setOtherWeekSchedule] = useState(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => new Date());
@@ -156,6 +169,29 @@ export function UserSchedulePage({ role }) {
     };
   }, [academicYear, role, studentId, week]);
 
+  useEffect(() => {
+    if (!academicYear || (role === "PARENT" && !studentId)) return undefined;
+
+    let active = true;
+    setOtherWeekSchedule(undefined);
+    const period = { week: 3 - week };
+    const request = role === "STUDENT"
+      ? scheduleApi.findForStudent(period)
+      : role === "TEACHER"
+        ? scheduleApi.findForTeacher(period)
+        : parentApi.findSchedule(Number(studentId), period);
+
+    request
+      .then((data) => {
+        if (active) setOtherWeekSchedule(data);
+      })
+      .catch(() => {
+        if (active) setOtherWeekSchedule(null);
+      });
+
+    return () => { active = false; };
+  }, [academicYear, role, studentId, week]);
+
   const groupedLessons = useMemo(() => Object.fromEntries(
     weekdays.map((day) => [
       day.value,
@@ -173,6 +209,24 @@ export function UserSchedulePage({ role }) {
   const subtitle = role === "PARENT" && selectedChild
     ? `Розклад занять: ${selectedChild.firstName} ${selectedChild.lastName}`
     : config.subtitle;
+  const nextLesson = useMemo(() => {
+    if (!schedule || academicYear !== options?.currentAcademicYear) return null;
+    if (week === options.currentWeek) {
+      const thisWeek = findNextLesson({ [week]: schedule }, week, now);
+      if (thisWeek) return thisWeek;
+    }
+    if (!otherWeekSchedule) return null;
+    return findNextLesson({ [week]: schedule, [3 - week]: otherWeekSchedule }, options.currentWeek, now, true);
+  }, [academicYear, now, options, schedule, otherWeekSchedule, week]);
+  const teacherNextLessonLabel = !academicYear
+    ? "Навчальний рік не налаштовано"
+    : error || (!nextLesson && otherWeekSchedule === null)
+      ? "Не вдалося визначити наступний урок"
+      : loading || (!nextLesson && otherWeekSchedule === undefined)
+        ? "Завантаження розкладу..."
+        : nextLesson
+          ? `${weekdays[nextLesson.dayIndex].label} · ${nextLesson.lesson.lessonNumber}-й урок · ${nextLesson.lesson.startTime}–${nextLesson.lesson.endTime}`
+          : "Запланованих уроків немає";
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
@@ -194,13 +248,21 @@ export function UserSchedulePage({ role }) {
                 week={week}
                 children={children}
                 studentId={studentId}
-                onWeekChange={setWeek}
+                nextLessonLabel={teacherNextLessonLabel}
+                onWeekChange={(value) => {
+                  if (value === week) return;
+                  setSchedule(null);
+                  setOtherWeekSchedule(undefined);
+                  setWeek(value);
+                }}
                 onStudentChange={(value) => {
                   if (value === "__add_child__") {
                     window.location.hash = "parent";
                     return;
                   }
+                  if (value === studentId) return;
                   setSchedule(null);
+                  setOtherWeekSchedule(undefined);
                   setStudentId(value);
                 }}
               />
@@ -224,6 +286,7 @@ export function UserSchedulePage({ role }) {
                   week={week}
                   options={options}
                   now={now}
+                  nextLesson={nextLesson}
                 />
               ) : null}
             </div>
@@ -235,9 +298,14 @@ export function UserSchedulePage({ role }) {
   );
 }
 
-function ScheduleFilters({ role, academicYear, week, children, studentId, onWeekChange, onStudentChange }) {
+function ScheduleFilters({ role, academicYear, week, children, studentId, nextLessonLabel, onWeekChange, onStudentChange }) {
   return (
-    <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] md:grid-cols-2 xl:grid-cols-[minmax(190px,1fr)_minmax(190px,1fr)_310px] xl:items-end">
+    <section className={cn(
+      "grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)]",
+      role === "TEACHER" && "md:grid-cols-2 xl:grid-cols-[minmax(190px,1fr)_minmax(190px,1fr)_310px] xl:items-end",
+      role === "PARENT" && "max-w-[760px] sm:grid-cols-[minmax(0,1fr)_310px] sm:items-end",
+      role === "STUDENT" && "max-w-[380px]",
+    )}>
       {role === "PARENT" ? (
         <SelectField label="Дитина" value={studentId} onChange={onStudentChange}>
           {!studentId ? <option value="">Оберіть дитину</option> : null}
@@ -248,16 +316,16 @@ function ScheduleFilters({ role, academicYear, week, children, studentId, onWeek
           ))}
           <option value="__add_child__">+ Додати дитину</option>
         </SelectField>
-      ) : (
-        <div className="hidden xl:block">
-          <p className="text-[0.75rem] font-semibold text-slate-500">Режим перегляду</p>
-          <p className="mt-2 flex h-10 items-center text-[0.86rem] font-semibold text-slate-800">
-            {role === "TEACHER" ? "Мої уроки" : "Мій клас"}
+      ) : role === "TEACHER" ? (
+        <div className="min-w-0">
+          <p className="text-[0.75rem] font-semibold text-slate-500">Наступний урок</p>
+          <p className="mt-2 flex min-h-10 items-center text-[0.82rem] font-semibold leading-5 text-slate-800">
+            {nextLessonLabel}
           </p>
         </div>
-      )}
+      ) : null}
 
-      <ReadOnlyField label="Навчальний рік" value={academicYear ? `${academicYear} н. р.` : "Не налаштовано"} />
+      {role === "TEACHER" ? <ReadOnlyField label="Навчальний рік" value={academicYear ? `${academicYear} н. р.` : "Не налаштовано"} /> : null}
 
       <div>
         <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">Навчальний тиждень</span>
@@ -307,7 +375,20 @@ function SelectField({ label, value, onChange, children }) {
   );
 }
 
-function ScheduleGrid({ groupedLessons, role, academicYear, week, options, now }) {
+function ScheduleGrid({ groupedLessons, role, academicYear, week, options, now, nextLesson }) {
+  if (role === "TEACHER") {
+    return (
+      <TeacherScheduleGrid
+        groupedLessons={groupedLessons}
+        academicYear={academicYear}
+        week={week}
+        options={options}
+        now={now}
+        nextLesson={nextLesson}
+      />
+    );
+  }
+
   return (
     <section className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-5" aria-label="Розклад на тиждень">
       {weekdays.map((day) => {
@@ -331,6 +412,7 @@ function ScheduleGrid({ groupedLessons, role, academicYear, week, options, now }
                   lesson={lesson}
                   role={role}
                   current={isToday && isCurrentLesson(lesson, now)}
+                  next={nextLesson?.week === week && nextLesson.lesson.id === lesson.id}
                 />
               )) : (
                 <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed border-slate-300 px-4 text-center text-[0.78rem] text-slate-400">
@@ -345,16 +427,79 @@ function ScheduleGrid({ groupedLessons, role, academicYear, week, options, now }
   );
 }
 
-function LessonCard({ lesson, role, current }) {
+function TeacherScheduleGrid({ groupedLessons, academicYear, week, options, now, nextLesson }) {
+  return (
+    <section className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-5" aria-label="Розклад на тиждень">
+      {weekdays.map((day) => {
+        const lessons = groupedLessons[day.value];
+        const lessonsByNumber = new Map(lessons.map((lesson) => [lesson.lessonNumber, lesson]));
+        const isToday = academicYear === options?.currentAcademicYear
+          && week === options?.currentWeek
+          && weekdays[now.getDay() - 1]?.value === day.value;
+
+        return (
+          <div key={day.value} className="grid min-w-0 grid-rows-[auto_repeat(8,minmax(0,1fr))] gap-y-3 md:row-span-9 md:grid-rows-subgrid">
+            <div className={cn("flex items-center justify-between border-b-2 px-1 pb-3", isToday ? "border-emerald-500" : "border-slate-800")}>
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="text-[0.88rem] font-bold text-slate-900">{day.label}</h2>
+                {isToday ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[0.65rem] font-bold text-emerald-700">Сьогодні</span> : null}
+              </div>
+              <span className="text-[0.7rem] font-medium text-slate-400">{lessonCount(lessons.length)}</span>
+            </div>
+            {lessonTimes.map(([startTime, endTime], index) => {
+              const lessonNumber = index + 1;
+              const lesson = lessonsByNumber.get(lessonNumber);
+              return lesson ? (
+                <LessonCard
+                  key={lessonNumber}
+                  lesson={lesson}
+                  role="TEACHER"
+                  current={isToday && isCurrentLesson(lesson, now)}
+                  next={nextLesson?.week === week && nextLesson.lesson.id === lesson.id}
+                />
+              ) : (
+                <TeacherEmptyLessonCard
+                  key={lessonNumber}
+                  lessonNumber={lessonNumber}
+                  startTime={startTime}
+                  endTime={endTime}
+                />
+              );
+            })}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function TeacherEmptyLessonCard({ lessonNumber, startTime, endTime }) {
+  return (
+    <div className="flex min-h-36 flex-col rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-slate-400" aria-label={`${lessonNumber}-й урок, ${startTime}–${endTime}: немає уроку`}>
+      <div className="flex items-center gap-1.5 text-[0.72rem] font-semibold">
+        <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+        <span>{startTime}–{endTime}</span>
+      </div>
+      <p className="mt-3 text-[0.68rem] font-bold uppercase">{lessonNumber}-й урок</p>
+      <p className="mt-1 text-[0.82rem]">Немає уроку</p>
+    </div>
+  );
+}
+
+function LessonCard({ lesson, role, current, next }) {
   const details = role === "TEACHER" ? lesson.className : lesson.teacher;
   return (
-    <article className={cn("rounded-lg border bg-white p-4 shadow-[0_10px_28px_-26px_rgba(15,23,42,0.5)]", current ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200")}>
+    <article className={cn(
+      "rounded-lg border bg-white p-4 shadow-[0_10px_28px_-26px_rgba(15,23,42,0.5)]",
+      current ? "border-emerald-400 ring-2 ring-emerald-100" : next ? "border-sky-300 bg-sky-50/40 ring-1 ring-sky-100" : "border-slate-200",
+    )}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-slate-500">
           <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
           <time>{lesson.startTime}–{lesson.endTime}</time>
         </div>
         {current ? <span className="rounded bg-emerald-100 px-2 py-1 text-[0.64rem] font-bold text-emerald-700">Зараз триває</span> : null}
+        {!current && next ? <span className="rounded bg-sky-100 px-2 py-1 text-[0.64rem] font-bold text-sky-700">Наступний</span> : null}
       </div>
       <p className="mt-3 text-[0.68rem] font-bold uppercase text-slate-400">{lesson.lessonNumber}-й урок</p>
       <h3 className="mt-1 break-words text-[0.9rem] font-bold leading-5 text-slate-900">{lesson.subject}</h3>
@@ -433,11 +578,6 @@ function EmptyState({ title, description }) {
 function isCurrentLesson(lesson, now) {
   const minutes = now.getHours() * 60 + now.getMinutes();
   return minutes >= timeToMinutes(lesson.startTime) && minutes < timeToMinutes(lesson.endTime);
-}
-
-function timeToMinutes(value) {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
 }
 
 function lessonCount(count) {
