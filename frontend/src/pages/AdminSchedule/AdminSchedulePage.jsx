@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ArrowLeftRight,
   ChevronDown,
   Clock3,
+  Copy,
   EllipsisVertical,
   MapPin,
   Pencil,
@@ -18,6 +20,7 @@ import { Input } from "@/components/ui/input.jsx";
 import { ApiError, adminClassesApi, adminScheduleApi, adminSubjectsApi } from "@/lib/api.js";
 import { cn } from "@/lib/utils.js";
 import { AdminLayout } from "@/pages/AdminHome/AdminLayout.jsx";
+import { COPY_MODES, copySchedule, countCopiedLessons, countLessons } from "./scheduleCopy.js";
 
 const weekdays = [
   { id: "MONDAY", label: "Понеділок" },
@@ -60,6 +63,7 @@ export function AdminSchedulePage() {
   const [lessonDialog, setLessonDialog] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [yearDialogOpen, setYearDialogOpen] = useState(false);
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState("");
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
@@ -67,6 +71,7 @@ export function AdminSchedulePage() {
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const pendingCopiedSchedule = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -112,6 +117,16 @@ export function AdminSchedulePage() {
         !classes.some((schoolClass) => String(schoolClass.id) === selectedClassId && schoolClass.academicYear === selectedYear)) {
       setSchedule(createEmptySchedule());
       setDirty(false);
+      return undefined;
+    }
+    const pending = pendingCopiedSchedule.current;
+    if (pending && pending.week === week && pending.classId === selectedClassId && pending.academicYear === selectedYear) {
+      pendingCopiedSchedule.current = null;
+      setSchedule(pending.schedule);
+      setDirty(true);
+      setLoadingSchedule(false);
+      setError("");
+      setSuccess("Розклад скопійовано в чернетку. Перевірте зміни та збережіть їх.");
       return undefined;
     }
     let active = true;
@@ -209,6 +224,25 @@ export function AdminSchedulePage() {
     }
   };
 
+  const applyCopiedSchedule = (targetWeek, copiedSchedule) => {
+    setCopyDialogOpen(false);
+    setOpenMenu("");
+    if (targetWeek === week) {
+      setSchedule(copiedSchedule);
+      setDirty(true);
+      setError("");
+      setSuccess("Розклад скопійовано в чернетку. Перевірте зміни та збережіть їх.");
+      return;
+    }
+    pendingCopiedSchedule.current = {
+      week: targetWeek,
+      classId: selectedClassId,
+      academicYear: selectedYear,
+      schedule: copiedSchedule,
+    };
+    setWeek(targetWeek);
+  };
+
   return (
     <AdminLayout
       activeItem="Розклад"
@@ -216,7 +250,7 @@ export function AdminSchedulePage() {
       subtitle="Перегляд та редагування розкладу занять для класів"
     >
       <Card className="rounded-lg p-4 sm:p-5">
-        <div className="grid gap-4 lg:grid-cols-[minmax(200px,1fr)_minmax(200px,1fr)_auto_auto] lg:items-end">
+        <div className="grid gap-4 lg:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto_auto_auto] lg:items-end">
           <SelectField label="Клас">
             <select
               value={selectedClassId}
@@ -258,6 +292,17 @@ export function AdminSchedulePage() {
               </button>
             ))}
           </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setCopyDialogOpen(true)}
+            disabled={!selectedClassId || loadingSchedule || savingSchedule}
+            className="h-10 rounded-md border border-slate-300 bg-white px-4 text-xs"
+          >
+            <Copy className="h-4 w-4" aria-hidden="true" />
+            Скопіювати розклад
+          </Button>
 
           <Button
             type="button"
@@ -304,8 +349,138 @@ export function AdminSchedulePage() {
       ) : null}
       {deleteTarget ? <DeleteLessonDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={deleteLesson} /> : null}
       {yearDialogOpen ? <AcademicYearDialog years={academicYears} onClose={() => setYearDialogOpen(false)} onCreate={addAcademicYear} /> : null}
+      {copyDialogOpen ? (
+        <CopyScheduleDialog
+          currentWeek={week}
+          currentSchedule={schedule}
+          classId={selectedClassId}
+          academicYear={selectedYear}
+          onClose={() => setCopyDialogOpen(false)}
+          onApply={applyCopiedSchedule}
+        />
+      ) : null}
     </AdminLayout>
   );
+}
+
+function CopyScheduleDialog({ currentWeek, currentSchedule, classId, academicYear, onClose, onApply }) {
+  const [sourceWeek, setSourceWeek] = useState(currentWeek);
+  const [targetWeek, setTargetWeek] = useState(currentWeek === 1 ? 2 : 1);
+  const [mode, setMode] = useState(COPY_MODES.EMPTY_SLOTS);
+  const [schedules, setSchedules] = useState({ [currentWeek]: currentSchedule });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const otherWeek = currentWeek === 1 ? 2 : 1;
+    adminScheduleApi.find({ classId, academicYear, week: otherWeek })
+      .then((response) => {
+        if (active) setSchedules((current) => ({ ...current, [otherWeek]: scheduleFromResponse(response) }));
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити розклад іншого тижня.");
+      })
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [academicYear, classId, currentWeek]);
+
+  const selectSource = (value) => {
+    const next = Number(value);
+    setSourceWeek(next);
+    if (next === targetWeek) setTargetWeek(next === 1 ? 2 : 1);
+  };
+  const selectTarget = (value) => {
+    const next = Number(value);
+    setTargetWeek(next);
+    if (next === sourceWeek) setSourceWeek(next === 1 ? 2 : 1);
+  };
+  const swap = () => {
+    setSourceWeek(targetWeek);
+    setTargetWeek(sourceWeek);
+  };
+  const source = schedules[sourceWeek] || createEmptySchedule();
+  const target = schedules[targetWeek] || createEmptySchedule();
+  const sourceCount = countLessons(source);
+  const targetCount = countLessons(target);
+  const copiedCount = countCopiedLessons(source, target, mode);
+  const apply = () => onApply(targetWeek, copySchedule(source, target, mode));
+
+  return (
+    <ModalFrame title="Скопіювати розклад" subtitle="Оберіть напрямок і спосіб копіювання" onClose={onClose}>
+      <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-end gap-3">
+        <FormField label="З">
+          <WeekSelect value={sourceWeek} onChange={selectSource} />
+        </FormField>
+        <button type="button" onClick={swap} className="mb-0.5 flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900" aria-label="Поміняти тижні місцями" title="Поміняти напрямок">
+          <ArrowLeftRight className="h-4 w-4" aria-hidden="true" />
+        </button>
+        <FormField label="До">
+          <WeekSelect value={targetWeek} onChange={selectTarget} />
+        </FormField>
+      </div>
+
+      <fieldset className="mt-5 space-y-2">
+        <legend className="mb-2 text-[0.76rem] font-semibold text-slate-700">Спосіб копіювання</legend>
+        <CopyModeOption
+          checked={mode === COPY_MODES.EMPTY_SLOTS}
+          onChange={() => setMode(COPY_MODES.EMPTY_SLOTS)}
+          title="Заповнити лише порожні слоти"
+          description="Наявні уроки цільового тижня залишаться без змін."
+        />
+        <CopyModeOption
+          checked={mode === COPY_MODES.REPLACE}
+          onChange={() => setMode(COPY_MODES.REPLACE)}
+          title="Замінити наявний розклад"
+          description="Усі уроки цільового тижня буде замінено скопійованими."
+        />
+      </fieldset>
+
+      <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4 text-[0.76rem] leading-5 text-slate-600">
+        {loading ? <p>Завантаження розкладів...</p> : (
+          <>
+            <p className="font-bold text-slate-900">{weekLabel(sourceWeek)} → {weekLabel(targetWeek)}</p>
+            <p className="mt-1">У джерелі: {sourceCount} уроків. У цільовому тижні: {targetCount} уроків.</p>
+            <p>Буде скопійовано: {copiedCount} уроків.</p>
+          </>
+        )}
+      </div>
+      {error ? <Alert className="mt-3">{error}</Alert> : null}
+      {!loading && !error && sourceCount === 0 ? <Alert className="mt-3">У вибраному тижні немає уроків для копіювання.</Alert> : null}
+
+      <div className="mt-6 flex justify-end gap-2">
+        <Button type="button" variant="ghost" onClick={onClose} className="h-10 rounded-md border border-slate-300 bg-white px-4 text-xs">Скасувати</Button>
+        <Button type="button" onClick={apply} disabled={loading || Boolean(error) || sourceCount === 0 || copiedCount === 0} className="h-10 rounded-md px-4 text-xs">
+          <Copy className="h-4 w-4" aria-hidden="true" />Застосувати
+        </Button>
+      </div>
+    </ModalFrame>
+  );
+}
+
+function WeekSelect({ value, onChange }) {
+  return (
+    <span className="relative block">
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.78rem] font-medium text-slate-700 outline-none hover:border-slate-400 focus:border-slate-500">
+        <option value={1}>Перший тиждень</option>
+        <option value={2}>Другий тиждень</option>
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+    </span>
+  );
+}
+
+function CopyModeOption({ checked, onChange, title, description }) {
+  return (
+    <label className={cn("flex cursor-pointer gap-3 rounded-md border p-3 transition-colors", checked ? "border-slate-500 bg-slate-50" : "border-slate-200 bg-white hover:border-slate-300")}>
+      <input type="radio" name="copy-mode" checked={checked} onChange={onChange} className="mt-0.5 h-4 w-4 accent-slate-800" />
+      <span><span className="block text-[0.8rem] font-semibold text-slate-800">{title}</span><span className="mt-1 block text-[0.72rem] leading-5 text-slate-500">{description}</span></span>
+    </label>
+  );
+}
+
+function weekLabel(weekNumber) {
+  return weekNumber === 1 ? "Перший тиждень" : "Другий тиждень";
 }
 
 function SelectField({ label, children }) {
