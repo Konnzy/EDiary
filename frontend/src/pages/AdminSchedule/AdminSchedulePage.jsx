@@ -64,6 +64,7 @@ export function AdminSchedulePage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [yearDialogOpen, setYearDialogOpen] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState("");
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
@@ -243,6 +244,18 @@ export function AdminSchedulePage() {
     setWeek(targetWeek);
   };
 
+  const clearSchedule = () => {
+    setSchedule(createEmptySchedule());
+    setDirty(true);
+    setClearDialogOpen(false);
+    setOpenMenu("");
+    setError("");
+    setSuccess("Розклад очищено в чернетці. Щоб застосувати зміни, збережіть їх.");
+  };
+
+  const selectedClass = classes.find((schoolClass) => String(schoolClass.id) === selectedClassId);
+  const lessonCount = countLessons(schedule);
+
   return (
     <AdminLayout
       activeItem="Розклад"
@@ -250,7 +263,7 @@ export function AdminSchedulePage() {
       subtitle="Перегляд та редагування розкладу занять для класів"
     >
       <Card className="rounded-lg p-4 sm:p-5">
-        <div className="grid gap-4 lg:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto_auto_auto] lg:items-end">
+        <div className="grid gap-4 lg:grid-cols-[minmax(200px,1fr)_minmax(200px,1fr)_auto] lg:items-end 2xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto_auto]">
           <SelectField label="Клас">
             <select
               value={selectedClassId}
@@ -293,26 +306,39 @@ export function AdminSchedulePage() {
             ))}
           </div>
 
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setCopyDialogOpen(true)}
-            disabled={!selectedClassId || loadingSchedule || savingSchedule}
-            className="h-10 rounded-md border border-slate-300 bg-white px-4 text-xs"
-          >
-            <Copy className="h-4 w-4" aria-hidden="true" />
-            Скопіювати розклад
-          </Button>
+          <div className="flex flex-wrap justify-end gap-2 lg:col-span-3 2xl:col-span-1 2xl:flex-nowrap">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setCopyDialogOpen(true)}
+              disabled={!selectedClassId || loadingSchedule || savingSchedule}
+              className="h-10 rounded-md border border-slate-300 bg-white px-4 text-xs"
+            >
+              <Copy className="h-4 w-4" aria-hidden="true" />
+              Скопіювати розклад
+            </Button>
 
-          <Button
-            type="button"
-            onClick={saveSchedule}
-            disabled={!selectedClassId || loadingSchedule || savingSchedule || !dirty}
-            className="h-10 rounded-md px-4 text-xs"
-          >
-            <Save className="h-4 w-4" aria-hidden="true" />
-            {savingSchedule ? "Збереження..." : "Зберегти зміни"}
-          </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setClearDialogOpen(true)}
+              disabled={!selectedClassId || loadingSchedule || savingSchedule || lessonCount === 0}
+              className="h-10 rounded-md border border-red-300 bg-white px-4 text-xs text-red-600 hover:border-red-400 hover:bg-red-50 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              Очистити розклад
+            </Button>
+
+            <Button
+              type="button"
+              onClick={saveSchedule}
+              disabled={!selectedClassId || loadingSchedule || savingSchedule || !dirty}
+              className="h-10 rounded-md px-4 text-xs"
+            >
+              <Save className="h-4 w-4" aria-hidden="true" />
+              {savingSchedule ? "Збереження..." : "Зберегти зміни"}
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -359,7 +385,34 @@ export function AdminSchedulePage() {
           onApply={applyCopiedSchedule}
         />
       ) : null}
+      {clearDialogOpen ? (
+        <ClearScheduleDialog
+          className={selectedClass ? `${selectedClass.number}-${selectedClass.letter}` : ""}
+          academicYear={selectedYear}
+          week={week}
+          lessonCount={lessonCount}
+          onClose={() => setClearDialogOpen(false)}
+          onConfirm={clearSchedule}
+        />
+      ) : null}
     </AdminLayout>
+  );
+}
+
+function ClearScheduleDialog({ className, academicYear, week, lessonCount, onClose, onConfirm }) {
+  return (
+    <ModalFrame title="Очистити розклад?" subtitle={`${className} · ${academicYear} н. р. · ${weekLabel(week)}`} onClose={onClose} alert>
+      <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-4 text-[0.8rem] leading-5 text-red-700">
+        <p className="font-semibold">Буде вилучено {lessonCount} уроків із вибраного тижня.</p>
+        <p className="mt-1">Спочатку зміни потраплять лише в чернетку. Остаточне очищення відбудеться після натискання «Зберегти зміни».</p>
+      </div>
+      <div className="mt-6 flex justify-end gap-2">
+        <Button type="button" variant="ghost" onClick={onClose} className="h-10 rounded-md border border-slate-300 bg-white px-4 text-xs">Скасувати</Button>
+        <Button type="button" onClick={onConfirm} className="h-10 rounded-md border border-red-700 bg-red-700 px-4 text-xs hover:bg-red-600">
+          <Trash2 className="h-4 w-4" aria-hidden="true" />Очистити розклад
+        </Button>
+      </div>
+    </ModalFrame>
   );
 }
 

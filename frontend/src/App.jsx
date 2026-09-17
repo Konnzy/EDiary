@@ -18,8 +18,10 @@ import { ParentHomePage } from "@/pages/ParentHome/ParentHomePage.jsx";
 import { TermsOfUsePage } from "@/pages/TermsOfUse/TermsOfUsePage.jsx";
 import { PrivacyPolicyPage } from "@/pages/PrivacyPolicy/PrivacyPolicyPage.jsx";
 import { UserSchedulePage } from "@/pages/Schedule/UserSchedulePage.jsx";
-import { authApi } from "@/lib/api.js";
+import { ApiError, authApi } from "@/lib/api.js";
 import { ThemeToggle } from "@/components/ThemeToggle.jsx";
+import { RouteAccessToast } from "@/components/RouteAccessToast.jsx";
+import { showRouteAccessNotice } from "@/lib/routeAccessNotice.js";
 
 function getRouteFromHash() {
   return window.location.hash.replace("#", "") || "login";
@@ -43,6 +45,7 @@ function ProtectedRoute({ allowedRole, loginRoute, children }) {
         if (!active) return;
 
         if (session.role !== allowedRole) {
+          showRouteAccessNotice("ACCESS_DENIED");
           window.location.hash = allowedRole === "ADMIN"
             ? loginRoute
             : (homeRoutes[session.role] || loginRoute);
@@ -51,8 +54,13 @@ function ProtectedRoute({ allowedRole, loginRoute, children }) {
 
         setChecking(false);
       })
-      .catch(() => {
-        if (active) window.location.hash = loginRoute;
+      .catch((error) => {
+        if (!active) return;
+
+        showRouteAccessNotice(error instanceof ApiError && [401, 403].includes(error.status)
+          ? "AUTH_REQUIRED"
+          : "SESSION_CHECK_FAILED");
+        window.location.hash = loginRoute;
       });
 
     return () => {
@@ -166,5 +174,5 @@ function AppContent() {
 }
 
 export default function App() {
-  return <><AppContent /><ThemeToggle /></>;
+  return <><AppContent /><RouteAccessToast /><ThemeToggle /></>;
 }
