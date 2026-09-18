@@ -12,6 +12,7 @@ import {
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { adminAuthApi } from "@/lib/api.js";
+import { isGuardedActionBlocked } from "@/lib/navigationGuard.js";
 import { cn } from "@/lib/utils.js";
 
 const admin = {
@@ -67,7 +68,7 @@ export function AdminLayout({ activeItem, title, subtitle, breadcrumb, actions, 
 }
 
 function TopBar() {
-  const handleLogout = async () => {
+  const performLogout = async () => {
     try {
       await adminAuthApi.logout();
     } catch {
@@ -75,6 +76,9 @@ function TopBar() {
     } finally {
       window.location.hash = "admin";
     }
+  };
+  const handleLogout = () => {
+    if (!isGuardedActionBlocked(performLogout)) void performLogout();
   };
 
   return (

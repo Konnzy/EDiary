@@ -51,7 +51,7 @@ const roleConfig = {
     navigation: [
       { label: "Головна", icon: Home, route: "student" },
       { label: "Розклад", icon: CalendarDays, route: "student/schedule" },
-      { label: "Предмети", icon: BookOpen },
+      { label: "Предмети", icon: BookOpen, route: "student/subjects" },
       { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
       { label: "Профіль", icon: User },
     ],
@@ -65,7 +65,7 @@ const roleConfig = {
     navigation: [
       { label: "Головна", icon: Home, route: "parent" },
       { label: "Розклад", icon: CalendarDays, route: "parent/schedule" },
-      { label: "Предмети", icon: BookOpen },
+      { label: "Предмети", icon: BookOpen, route: "parent/subjects" },
       { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
       { label: "Профіль", icon: User },
     ],
@@ -79,7 +79,7 @@ const roleConfig = {
     navigation: [
       { label: "Головна", icon: Home, route: "teacher" },
       { label: "Розклад", icon: CalendarDays, route: "teacher/schedule" },
-      { label: "Журнал", icon: NotebookText },
+      { label: "Журнал", icon: NotebookText, route: "teacher/journal" },
       { label: "Учні", icon: Users },
       { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
       { label: "Профіль", icon: User },
@@ -491,7 +491,7 @@ function LessonCard({ lesson, role, current, next }) {
   return (
     <article className={cn(
       "rounded-lg border bg-white p-4 shadow-[0_10px_28px_-26px_rgba(15,23,42,0.5)]",
-      current ? "border-emerald-400 bg-emerald-50/40 ring-2 ring-emerald-100" : next ? "border-sky-300 bg-sky-50/40 ring-1 ring-sky-100" : "border-slate-200",
+      current ? "schedule-lesson-current border-emerald-400 bg-emerald-50/40 ring-2 ring-emerald-100" : next ? "border-sky-300 bg-sky-50/40 ring-1 ring-sky-100" : "border-slate-200",
     )}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-slate-500">

@@ -26,7 +26,7 @@ const teacher = {
 const navigationItems = [
   { label: "Головна", icon: Home, active: true, route: "teacher" },
   { label: "Розклад", icon: CalendarDays, route: "teacher/schedule" },
-  { label: "Журнал", icon: NotebookText },
+  { label: "Журнал", icon: NotebookText, route: "teacher/journal" },
   { label: "Учні", icon: Users },
   { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
   { label: "Профіль", icon: User },
@@ -261,7 +261,7 @@ function TodayScheduleCard({ schedule }) {
         {!schedule.loading && !schedule.error ? schedule.lessons.map((lesson) => (
           <article
             key={lesson.id}
-            className="grid gap-3 rounded-md border border-slate-200/80 bg-slate-50/75 px-4 py-3 sm:grid-cols-[90px_minmax(0,1fr)_auto] sm:items-center"
+            className="grid gap-3 rounded-md border border-slate-200/80 bg-white px-4 py-3 transition-colors duration-200 hover:bg-slate-50 sm:grid-cols-[90px_minmax(0,1fr)_auto] sm:items-center"
           >
             <div className="border-slate-200/90 sm:border-r sm:pr-4">
               <time className="text-[0.72rem] font-semibold leading-none text-slate-400">{lesson.startTime}–{lesson.endTime}</time>
@@ -276,6 +276,7 @@ function TodayScheduleCard({ schedule }) {
             <Button
               type="button"
               variant="ghost"
+              onClick={() => { window.location.hash = "teacher/journal"; }}
               className="h-9 justify-self-start rounded-md px-3 text-[0.78rem] font-semibold text-slate-500 hover:bg-slate-100 sm:justify-self-end"
             >
               Журнал

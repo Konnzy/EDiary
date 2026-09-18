@@ -29,10 +29,10 @@ export function AuthInfoPanel() {
       aria-labelledby="intro-title"
     >
       <div className="w-full max-w-[440px]">
-        <div className="mb-7 flex justify-center text-slate-600" aria-hidden="true">
+        <div className="mb-7 flex justify-center" aria-hidden="true">
           <Pencil
-            className="h-[92px] w-[92px] fill-slate-600 stroke-slate-600"
-            strokeWidth={1.4}
+            className="h-[92px] w-[92px] fill-slate-600 stroke-slate-400"
+            strokeWidth={2}
           />
         </div>
 
@@ -52,10 +52,11 @@ export function AuthInfoPanel() {
             return (
               <motion.div
                 key={feature.title}
-                className="flex items-center gap-5 rounded-xl border border-slate-200/85 bg-white px-5 py-4 shadow-[0_12px_32px_-26px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_38px_-28px_rgba(15,23,42,0.55)]"
+                className="flex items-center gap-5 rounded-xl border border-slate-200/85 bg-white px-5 py-4 shadow-[0_12px_32px_-26px_rgba(15,23,42,0.45)] transition-[border-color,background-color,box-shadow] duration-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-[0_18px_38px_-28px_rgba(15,23,42,0.55)]"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.28, delay: 0.12 + index * 0.06 }}
+                whileHover={{ y: -2, transition: { duration: 0.18, ease: "easeOut" } }}
               >
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                   <Icon className="h-5 w-5" strokeWidth={2.2} aria-hidden="true" />

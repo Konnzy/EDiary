@@ -99,7 +99,7 @@ class AdminScheduleServiceTest {
             "2026/2027",
             1,
             new SaveScheduleRequest(List.of(
-                new SaveScheduleLessonRequest(Weekday.MONDAY, 2, 2L, 3L, "302")
+                new SaveScheduleLessonRequest(Weekday.MONDAY, 2, 2L, 3L, " 121 - А ")
             ))
         );
 
@@ -107,6 +107,7 @@ class AdminScheduleServiceTest {
         assertThat(response.lessons().getFirst().startTime()).isEqualTo("08:55");
         assertThat(response.lessons().getFirst().endTime()).isEqualTo("09:40");
         assertThat(response.lessons().getFirst().subject()).isEqualTo("Математика");
+        assertThat(response.lessons().getFirst().room()).isEqualTo("121-А");
     }
 
     @Test

@@ -24,7 +24,7 @@ const student = {
 const navigationItems = [
   { label: "Головна", icon: Home, active: true, route: "student" },
   { label: "Розклад", icon: CalendarDays, route: "student/schedule" },
-  { label: "Предмети", icon: BookOpen },
+  { label: "Предмети", icon: BookOpen, route: "student/subjects" },
   { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
   { label: "Профіль", icon: User },
 ];
@@ -287,7 +287,7 @@ function TodayScheduleCard({ schedule }) {
         {!schedule.loading && !schedule.error ? schedule.lessons.map((lesson) => (
           <article
             key={lesson.id}
-            className="rounded-md border border-slate-200/80 bg-slate-50/75 px-3.5 py-2"
+            className="rounded-md border border-slate-200/80 bg-white px-3.5 py-2 transition-colors duration-200 hover:bg-slate-50"
           >
             <time className="text-[0.72rem] font-medium leading-none text-slate-400">{lesson.startTime}–{lesson.endTime}</time>
             <h3 className="mt-1 text-[0.84rem] font-bold leading-4 text-slate-800">{lesson.subject}</h3>

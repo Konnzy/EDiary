@@ -150,6 +150,7 @@
   html.dark :is([class~="bg-emerald-50"], [class~="bg-emerald-100"], [class~="hover:bg-emerald-100"]:hover) { background-color: #173b32; }
   html.dark :is([class~="text-emerald-600"], [class~="text-emerald-700"], [class~="text-emerald-800"]) { color: #9be2bc; }
   html.dark :is([class~="border-emerald-100"], [class~="border-emerald-200"], [class~="border-emerald-300"], [class~="border-emerald-400"], [class~="border-emerald-500"], [class~="hover:border-emerald-300"]:hover) { border-color: #43866c; }
+  html.dark .schedule-lesson-current { background-color: #182f2c; }
 
   html.dark [class~="bg-amber-50"] { background-color: #3c301b; }
   html.dark :is([class~="text-amber-600"], [class~="text-amber-700"], [class~="text-amber-800"]) { color: #f4d08c; }

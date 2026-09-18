@@ -163,7 +163,7 @@ public class AdminScheduleService {
             if (entry.getId() == null || !referencedIds.contains(entry.getId())) {
                 entry.setSubject(subjects.get(lesson.subjectId()));
                 entry.setTeacher(teachers.get(lesson.teacherId()));
-                entry.setRoom(lesson.room().strip());
+                entry.setRoom(normalizeRoom(lesson.room()));
                 LocalTime[] times = LESSON_TIMES.get(lesson.lessonNumber() - 1);
                 entry.setStartTime(times[0]);
                 entry.setEndTime(times[1]);
@@ -200,9 +200,13 @@ public class AdminScheduleService {
         LocalTime[] times = LESSON_TIMES.get(lesson.lessonNumber() - 1);
         return entry.getSubject().getId().equals(lesson.subjectId())
             && entry.getTeacher().getId().equals(lesson.teacherId())
-            && Objects.equals(entry.getRoom(), lesson.room().strip())
+            && Objects.equals(entry.getRoom(), normalizeRoom(lesson.room()))
             && entry.getStartTime().equals(times[0])
             && entry.getEndTime().equals(times[1]);
+    }
+
+    private String normalizeRoom(String room) {
+        return room.strip().replaceAll("\\s+", " ").replaceAll("\\s*-\\s*", "-");
     }
 
     private void archive(ScheduleEntry entry, List<ScheduleEntry> archivedEntries) {

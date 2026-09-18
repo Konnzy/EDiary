@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { AdminHomePage } from "@/pages/AdminHome/AdminHomePage.jsx";
 import { AdminLoginPage } from "@/pages/AdminLogin/AdminLoginPage.jsx";
@@ -14,14 +14,17 @@ import { RequestRegistrationPage } from "@/pages/RequestRegistration/RequestRegi
 import { ResetPasswordPage } from "@/pages/ResetPassword/ResetPasswordPage.jsx";
 import { StudentHomePage } from "@/pages/StudentHome/StudentHomePage.jsx";
 import { TeacherHomePage } from "@/pages/TeacherHome/TeacherHomePage.jsx";
+import { TeacherJournalPage } from "@/pages/TeacherJournal/TeacherJournalPage.jsx";
 import { ParentHomePage } from "@/pages/ParentHome/ParentHomePage.jsx";
 import { TermsOfUsePage } from "@/pages/TermsOfUse/TermsOfUsePage.jsx";
 import { PrivacyPolicyPage } from "@/pages/PrivacyPolicy/PrivacyPolicyPage.jsx";
 import { UserSchedulePage } from "@/pages/Schedule/UserSchedulePage.jsx";
+import { UserSubjectsPage } from "@/pages/Subjects/UserSubjectsPage.jsx";
 import { ApiError, authApi } from "@/lib/api.js";
 import { ThemeToggle } from "@/components/ThemeToggle.jsx";
 import { RouteAccessToast } from "@/components/RouteAccessToast.jsx";
 import { showRouteAccessNotice } from "@/lib/routeAccessNotice.js";
+import { isRouteNavigationBlocked } from "@/lib/navigationGuard.js";
 
 function getRouteFromHash() {
   return window.location.hash.replace("#", "") || "login";
@@ -81,9 +84,21 @@ function ProtectedRoute({ allowedRole, loginRoute, children }) {
 
 function AppContent() {
   const [route, setRoute] = useState(getRouteFromHash);
+  const routeRef = useRef(route);
 
   useEffect(() => {
-    const handleHashChange = () => setRoute(getRouteFromHash());
+    const handleHashChange = () => {
+      const nextRoute = getRouteFromHash();
+      const currentRoute = routeRef.current;
+
+      if (isRouteNavigationBlocked(nextRoute, currentRoute)) {
+        window.history.replaceState(null, "", `#${currentRoute}`);
+        return;
+      }
+
+      routeRef.current = nextRoute;
+      setRoute(nextRoute);
+    };
 
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
@@ -133,15 +148,32 @@ function AppContent() {
     return <ProtectedRoute key={route} allowedRole="ADMIN" loginRoute="admin"><AdminSubjectsPage /></ProtectedRoute>;
   }
 
-  if (route === "admin/schedule") {
-    return <ProtectedRoute key={route} allowedRole="ADMIN" loginRoute="admin"><AdminSchedulePage /></ProtectedRoute>;
+  const adminScheduleRoute = /^admin\/schedule(?:\?(.*))?$/.exec(route);
+  if (adminScheduleRoute) {
+    const params = new URLSearchParams(adminScheduleRoute[1] || "");
+    const initialClassId = params.get("classId") || "";
+    const initialAcademicYear = params.get("academicYear") || "";
+    return (
+      <ProtectedRoute key={route} allowedRole="ADMIN" loginRoute="admin">
+        <AdminSchedulePage initialClassId={initialClassId} initialAcademicYear={initialAcademicYear} />
+      </ProtectedRoute>
+    );
   }
 
-  const classRoute = /^admin\/classes\/(\d+)(\/schedule)?$/.exec(route);
+  const legacyClassScheduleRoute = /^admin\/classes\/(\d+)\/schedule$/.exec(route);
+  if (legacyClassScheduleRoute) {
+    return (
+      <ProtectedRoute key={route} allowedRole="ADMIN" loginRoute="admin">
+        <AdminSchedulePage initialClassId={legacyClassScheduleRoute[1]} />
+      </ProtectedRoute>
+    );
+  }
+
+  const classRoute = /^admin\/classes\/(\d+)$/.exec(route);
   if (classRoute) {
     return (
       <ProtectedRoute key={route} allowedRole="ADMIN" loginRoute="admin">
-        <AdminClassDetailsPage classId={Number(classRoute[1])} scheduleView={Boolean(classRoute[2])} />
+        <AdminClassDetailsPage classId={Number(classRoute[1])} />
       </ProtectedRoute>
     );
   }
@@ -154,6 +186,10 @@ function AppContent() {
     return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserSchedulePage role="STUDENT" /></ProtectedRoute>;
   }
 
+  if (route === "student/subjects") {
+    return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserSubjectsPage role="STUDENT" /></ProtectedRoute>;
+  }
+
   if (route === "teacher") {
     return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherHomePage /></ProtectedRoute>;
   }
@@ -162,12 +198,20 @@ function AppContent() {
     return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><UserSchedulePage role="TEACHER" /></ProtectedRoute>;
   }
 
+  if (route === "teacher/journal") {
+    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherJournalPage /></ProtectedRoute>;
+  }
+
   if (route === "parent") {
     return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><ParentHomePage /></ProtectedRoute>;
   }
 
   if (route === "parent/schedule") {
     return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserSchedulePage role="PARENT" /></ProtectedRoute>;
+  }
+
+  if (route === "parent/subjects") {
+    return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserSubjectsPage role="PARENT" /></ProtectedRoute>;
   }
 
   return <LoginPage />;

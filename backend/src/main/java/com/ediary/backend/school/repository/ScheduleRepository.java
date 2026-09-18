@@ -4,6 +4,7 @@ import com.ediary.backend.school.entity.ScheduleEntry;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -11,6 +12,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ScheduleRepository extends JpaRepository<ScheduleEntry, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"subject", "teacher.user", "schoolClass"})
+    @Query("select entry from ScheduleEntry entry where entry.id = :scheduleId")
+    Optional<ScheduleEntry> findByIdForLessonCreation(@Param("scheduleId") Long scheduleId);
 
     @EntityGraph(attributePaths = {"subject", "teacher"})
     List<ScheduleEntry> findAllBySchoolClass_IdAndAcademicYearAndWeekNumberAndActiveTrueOrderByWeekdayAscLessonNumberAsc(

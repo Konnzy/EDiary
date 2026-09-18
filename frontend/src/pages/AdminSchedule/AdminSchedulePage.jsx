@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeftRight,
+  AlertTriangle,
   ChevronDown,
   Clock3,
   Copy,
   EllipsisVertical,
   MapPin,
+  Loader2,
   Pencil,
   Plus,
   Save,
@@ -18,8 +20,10 @@ import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { ApiError, adminClassesApi, adminScheduleApi, adminSubjectsApi } from "@/lib/api.js";
+import { allowRouteNavigation, registerNavigationGuard } from "@/lib/navigationGuard.js";
 import { cn } from "@/lib/utils.js";
 import { AdminLayout } from "@/pages/AdminHome/AdminLayout.jsx";
+import { isValidRoom, normalizeRoom, ROOM_MAX_LENGTH } from "./roomValidation.js";
 import { COPY_MODES, copySchedule, countCopiedLessons, countLessons } from "./scheduleCopy.js";
 
 const weekdays = [
@@ -53,11 +57,11 @@ function getCurrentAcademicYear() {
   return `${startYear}/${startYear + 1}`;
 }
 
-export function AdminSchedulePage() {
+export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "" }) {
   const [classes, setClasses] = useState([]);
-  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState(() => String(initialClassId));
   const [academicYears, setAcademicYears] = useState([]);
-  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedYear, setSelectedYear] = useState(() => initialAcademicYear);
   const [week, setWeek] = useState(1);
   const [schedule, setSchedule] = useState(createEmptySchedule);
   const [lessonDialog, setLessonDialog] = useState(null);
@@ -65,6 +69,7 @@ export function AdminSchedulePage() {
   const [yearDialogOpen, setYearDialogOpen] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [pendingChange, setPendingChange] = useState(null);
   const [openMenu, setOpenMenu] = useState("");
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
@@ -73,6 +78,27 @@ export function AdminSchedulePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const pendingCopiedSchedule = useRef(null);
+  const savedSchedule = useRef(createEmptySchedule());
+
+  useEffect(() => {
+    if (!dirty) return undefined;
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!dirty) return undefined;
+
+    return registerNavigationGuard((request) => {
+      setPendingChange(request);
+      return false;
+    });
+  }, [dirty]);
 
   useEffect(() => {
     let active = true;
@@ -82,7 +108,8 @@ export function AdminSchedulePage() {
         const availableYears = years.length ? years : ["2026/2027"];
         setAcademicYears(availableYears);
         const currentAcademicYear = getCurrentAcademicYear();
-        setSelectedYear(availableYears.includes(currentAcademicYear) ? currentAcademicYear : availableYears.at(-1));
+        const requestedYear = availableYears.includes(initialAcademicYear) ? initialAcademicYear : "";
+        setSelectedYear(requestedYear || (availableYears.includes(currentAcademicYear) ? currentAcademicYear : availableYears.at(-1)));
       })
       .catch((requestError) => {
         if (!active) return;
@@ -90,7 +117,7 @@ export function AdminSchedulePage() {
         setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити навчальні роки.");
       });
     return () => { active = false; };
-  }, []);
+  }, [initialAcademicYear]);
 
   useEffect(() => {
     if (!selectedYear) return undefined;
@@ -116,13 +143,16 @@ export function AdminSchedulePage() {
   useEffect(() => {
     if (!selectedClassId || !selectedYear || loadingClasses ||
         !classes.some((schoolClass) => String(schoolClass.id) === selectedClassId && schoolClass.academicYear === selectedYear)) {
-      setSchedule(createEmptySchedule());
+      const emptySchedule = createEmptySchedule();
+      savedSchedule.current = emptySchedule;
+      setSchedule(emptySchedule);
       setDirty(false);
       return undefined;
     }
     const pending = pendingCopiedSchedule.current;
     if (pending && pending.week === week && pending.classId === selectedClassId && pending.academicYear === selectedYear) {
       pendingCopiedSchedule.current = null;
+      savedSchedule.current = pending.baseline;
       setSchedule(pending.schedule);
       setDirty(true);
       setLoadingSchedule(false);
@@ -137,12 +167,16 @@ export function AdminSchedulePage() {
     adminScheduleApi.find({ classId: selectedClassId, academicYear: selectedYear, week })
       .then((response) => {
         if (!active) return;
-        setSchedule(scheduleFromResponse(response));
+        const loadedSchedule = scheduleFromResponse(response);
+        savedSchedule.current = loadedSchedule;
+        setSchedule(loadedSchedule);
         setDirty(false);
       })
       .catch((requestError) => {
         if (!active) return;
-        setSchedule(createEmptySchedule());
+        const emptySchedule = createEmptySchedule();
+        savedSchedule.current = emptySchedule;
+        setSchedule(emptySchedule);
         setDirty(false);
         setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити розклад.");
       })
@@ -197,7 +231,7 @@ export function AdminSchedulePage() {
   };
 
   const saveSchedule = async () => {
-    if (!selectedClassId || !selectedYear || savingSchedule) return;
+    if (!selectedClassId || !selectedYear || savingSchedule) return false;
     setSavingSchedule(true);
     setError("");
     setSuccess("");
@@ -215,17 +249,55 @@ export function AdminSchedulePage() {
         week,
         lessons,
       });
-      setSchedule(scheduleFromResponse(response));
+      const savedResponse = scheduleFromResponse(response);
+      savedSchedule.current = savedResponse;
+      setSchedule(savedResponse);
       setDirty(false);
       setSuccess("Зміни в розкладі збережено.");
+      return true;
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "Не вдалося зберегти розклад.");
+      return false;
     } finally {
       setSavingSchedule(false);
     }
   };
 
-  const applyCopiedSchedule = (targetWeek, copiedSchedule) => {
+  const requestContextChange = (action) => {
+    if (dirty) {
+      setPendingChange({ action });
+      return;
+    }
+    action();
+  };
+
+  const continuePendingChange = (change) => {
+    if (change?.route) {
+      allowRouteNavigation(change.route);
+      window.location.hash = change.route;
+      return;
+    }
+    if (change?.action) void change.action();
+  };
+
+  const discardAndContinue = () => {
+    const change = pendingChange;
+    setSchedule(savedSchedule.current);
+    setDirty(false);
+    setError("");
+    setSuccess("");
+    setPendingChange(null);
+    continuePendingChange(change);
+  };
+
+  const saveAndContinue = async () => {
+    const change = pendingChange;
+    if (!await saveSchedule()) return;
+    setPendingChange(null);
+    continuePendingChange(change);
+  };
+
+  const applyCopiedSchedule = (targetWeek, copiedSchedule, baseline) => {
     setCopyDialogOpen(false);
     setOpenMenu("");
     if (targetWeek === week) {
@@ -235,13 +307,16 @@ export function AdminSchedulePage() {
       setSuccess("Розклад скопійовано в чернетку. Перевірте зміни та збережіть їх.");
       return;
     }
-    pendingCopiedSchedule.current = {
-      week: targetWeek,
-      classId: selectedClassId,
-      academicYear: selectedYear,
-      schedule: copiedSchedule,
-    };
-    setWeek(targetWeek);
+    requestContextChange(() => {
+      pendingCopiedSchedule.current = {
+        week: targetWeek,
+        classId: selectedClassId,
+        academicYear: selectedYear,
+        schedule: copiedSchedule,
+        baseline,
+      };
+      setWeek(targetWeek);
+    });
   };
 
   const clearSchedule = () => {
@@ -267,7 +342,10 @@ export function AdminSchedulePage() {
           <SelectField label="Клас">
             <select
               value={selectedClassId}
-              onChange={(event) => setSelectedClassId(event.target.value)}
+              onChange={(event) => {
+                const nextClassId = event.target.value;
+                if (nextClassId !== selectedClassId) requestContextChange(() => setSelectedClassId(nextClassId));
+              }}
               disabled={loadingClasses}
               className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-none hover:border-slate-400 focus:border-slate-500 disabled:opacity-60"
             >
@@ -282,7 +360,10 @@ export function AdminSchedulePage() {
           <SelectField label="Навчальний рік">
             <select
               value={selectedYear}
-              onChange={(event) => changeAcademicYear(event.target.value)}
+              onChange={(event) => {
+                const nextYear = event.target.value;
+                if (nextYear !== selectedYear) requestContextChange(() => changeAcademicYear(nextYear));
+              }}
               className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-none hover:border-slate-400 focus:border-slate-500"
             >
               {academicYears.map((year) => <option key={year} value={year}>{year} н. р.</option>)}
@@ -290,23 +371,26 @@ export function AdminSchedulePage() {
             </select>
           </SelectField>
 
-          <div className="grid h-10 grid-cols-2 rounded-md border border-slate-200 bg-slate-100 p-1" role="group" aria-label="Вибір навчального тижня">
-            {[1, 2].map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setWeek(item)}
-                className={cn(
-                  "min-w-[140px] rounded px-4 text-[0.78rem] font-semibold transition-colors",
-                  week === item ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
-                )}
-              >
-                {item === 1 ? "Перший тиждень" : "Другий тиждень"}
-              </button>
-            ))}
+          <div>
+            <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">Навчальний тиждень</span>
+            <div className="grid h-10 grid-cols-2 rounded-md border border-slate-200 bg-slate-100 p-1" role="group" aria-label="Вибір навчального тижня">
+              {[1, 2].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => item !== week && requestContextChange(() => setWeek(item))}
+                  className={cn(
+                    "min-w-[140px] rounded px-4 text-[0.78rem] font-semibold transition-colors",
+                    week === item ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+                  )}
+                >
+                  {item === 1 ? "Перший тиждень" : "Другий тиждень"}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex flex-wrap justify-end gap-2 lg:col-span-3 2xl:col-span-1 2xl:flex-nowrap">
+          <div className="flex flex-wrap items-end justify-end gap-2 lg:col-span-3 2xl:col-span-1 2xl:flex-nowrap">
             <Button
               type="button"
               variant="ghost"
@@ -329,15 +413,21 @@ export function AdminSchedulePage() {
               Очистити розклад
             </Button>
 
-            <Button
-              type="button"
-              onClick={saveSchedule}
-              disabled={!selectedClassId || loadingSchedule || savingSchedule || !dirty}
-              className="h-10 rounded-md px-4 text-xs"
-            >
-              <Save className="h-4 w-4" aria-hidden="true" />
-              {savingSchedule ? "Збереження..." : "Зберегти зміни"}
-            </Button>
+            <div className="min-w-[178px]">
+              <p className={cn("mb-2 inline-flex items-center gap-2 whitespace-nowrap text-[0.72rem] font-medium", dirty ? "text-amber-700" : "text-emerald-700")}>
+                <span className={cn("h-2 w-2 rounded-full", dirty ? "bg-amber-400" : "bg-emerald-500")} aria-hidden="true" />
+                {dirty ? "Є незбережені зміни" : "Усі зміни збережено"}
+              </p>
+              <Button
+                type="button"
+                onClick={saveSchedule}
+                disabled={!selectedClassId || loadingSchedule || savingSchedule || !dirty}
+                className="h-10 w-full rounded-md px-4 text-xs"
+              >
+                <Save className="h-4 w-4" aria-hidden="true" />
+                {savingSchedule ? "Збереження..." : "Зберегти зміни"}
+              </Button>
+            </div>
           </div>
         </div>
       </Card>
@@ -395,7 +485,41 @@ export function AdminSchedulePage() {
           onConfirm={clearSchedule}
         />
       ) : null}
+      {pendingChange ? (
+        <UnsavedChangesDialog
+          className={selectedClass ? `${selectedClass.number}-${selectedClass.letter}` : ""}
+          academicYear={selectedYear}
+          week={week}
+          saving={savingSchedule}
+          error={error}
+          onCancel={() => setPendingChange(null)}
+          onDiscard={discardAndContinue}
+          onSave={saveAndContinue}
+        />
+      ) : null}
     </AdminLayout>
+  );
+}
+
+function UnsavedChangesDialog({ className, academicYear, week, saving, error, onCancel, onDiscard, onSave }) {
+  return (
+    <ModalFrame title="Є незбережені зміни" subtitle={`${className} · ${academicYear} н. р. · ${weekLabel(week)}`} onClose={onCancel} alert>
+      <div className="mt-5 flex gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-800">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+        <div className="text-[0.8rem] leading-5">
+          <p className="font-semibold">Зміни ще не збережено в системі.</p>
+          <p className="mt-1">Якщо продовжити без збереження, поточну чернетку розкладу буде втрачено.</p>
+        </div>
+      </div>
+      {error ? <Alert className="mt-3">{error}</Alert> : null}
+      <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button type="button" variant="ghost" onClick={onDiscard} disabled={saving} className="h-10 rounded-md border border-red-300 bg-white px-4 text-xs text-red-600 hover:border-red-400 hover:bg-red-50 hover:text-red-700">Вийти без збереження</Button>
+        <Button type="button" onClick={onSave} disabled={saving} className="h-10 rounded-md px-4 text-xs">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
+          {saving ? "Збереження..." : "Зберегти й продовжити"}
+        </Button>
+      </div>
+    </ModalFrame>
   );
 }
 
@@ -457,7 +581,7 @@ function CopyScheduleDialog({ currentWeek, currentSchedule, classId, academicYea
   const sourceCount = countLessons(source);
   const targetCount = countLessons(target);
   const copiedCount = countCopiedLessons(source, target, mode);
-  const apply = () => onApply(targetWeek, copySchedule(source, target, mode));
+  const apply = () => onApply(targetWeek, copySchedule(source, target, mode), target);
 
   return (
     <ModalFrame title="Скопіювати розклад" subtitle="Оберіть напрямок і спосіб копіювання" onClose={onClose}>
@@ -686,11 +810,16 @@ function LessonDialog({ dialog, onClose, onSave }) {
 
   const submit = (event) => {
     event.preventDefault();
-    if (!form.subjectId || !form.teacherId || !form.room.trim()) {
+    const room = normalizeRoom(form.room);
+    if (!form.subjectId || !form.teacherId || !room) {
       setError("Оберіть предмет і вчителя та вкажіть кабінет.");
       return;
     }
-    onSave({ ...form, lessonNumber: Number(form.lessonNumber), subject: form.subject.trim(), teacher: form.teacher.trim(), room: form.room.trim() });
+    if (!isValidRoom(room)) {
+      setError("Кабінет може містити лише літери, цифри, пробіли та дефіс.");
+      return;
+    }
+    onSave({ ...form, lessonNumber: Number(form.lessonNumber), subject: form.subject.trim(), teacher: form.teacher.trim(), room });
   };
 
   return (
@@ -721,7 +850,7 @@ function LessonDialog({ dialog, onClose, onSave }) {
           </div>
         </FormField>
 
-        <FormField label="Кабінет"><Input value={form.room} onChange={(event) => update("room", event.target.value)} maxLength={20} placeholder="Наприклад, 302" /></FormField>
+        <FormField label="Кабінет"><Input value={form.room} onChange={(event) => update("room", event.target.value)} onBlur={() => update("room", normalizeRoom(form.room))} maxLength={ROOM_MAX_LENGTH} placeholder="Наприклад, 302 або 121-А" autoComplete="off" /></FormField>
         {error ? <Alert>{error}</Alert> : null}
         <DialogActions onClose={onClose} submitLabel={editing ? "Зберегти" : "Додати урок"} disabled={isLoadingOptions} />
       </form>

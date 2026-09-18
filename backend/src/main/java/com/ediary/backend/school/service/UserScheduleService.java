@@ -13,11 +13,8 @@ import com.ediary.backend.user.entity.StudentProfile;
 import com.ediary.backend.user.repository.StudentParentLinkRepository;
 import com.ediary.backend.user.repository.StudentProfileRepository;
 import java.time.Clock;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -39,19 +36,19 @@ public class UserScheduleService {
     @Transactional(readOnly = true)
     public ScheduleOptionsResponse findOptions() {
         LocalDate today = LocalDate.now(clock);
-        String currentAcademicYear = academicYear(today);
+        String currentAcademicYear = SchedulePeriod.academicYear(today);
         return new ScheduleOptionsResponse(
             academicYearRepository.findAllByOrderByValueAsc().stream()
                 .map(AcademicYear::getValue)
                 .toList(),
             currentAcademicYear,
-            weekNumber(today)
+            SchedulePeriod.weekNumber(today)
         );
     }
 
     @Transactional(readOnly = true)
     public UserScheduleResponse findForStudent(String login, Integer week) {
-        String academicYear = academicYear(LocalDate.now(clock));
+        String academicYear = SchedulePeriod.academicYear(LocalDate.now(clock));
         validatePeriod(academicYear, week);
         StudentProfile student = studentProfileRepository.findByUser_LoginIgnoreCase(login)
             .orElseThrow(() -> new ApplicationException(
@@ -68,7 +65,7 @@ public class UserScheduleService {
         Long studentId,
         Integer week
     ) {
-        String academicYear = academicYear(LocalDate.now(clock));
+        String academicYear = SchedulePeriod.academicYear(LocalDate.now(clock));
         validatePeriod(academicYear, week);
         StudentProfile student = studentParentLinkRepository
             .findByParentLoginAndStudentId(parentLogin, studentId)
@@ -83,7 +80,7 @@ public class UserScheduleService {
 
     @Transactional(readOnly = true)
     public UserScheduleResponse findForTeacher(String login, Integer week) {
-        String academicYear = academicYear(LocalDate.now(clock));
+        String academicYear = SchedulePeriod.academicYear(LocalDate.now(clock));
         validatePeriod(academicYear, week);
         List<ScheduleEntry> entries = scheduleRepository.findAllForTeacher(login, academicYear, week);
         return new UserScheduleResponse(
@@ -175,17 +172,4 @@ public class UserScheduleService {
         }
     }
 
-    private String academicYear(LocalDate date) {
-        int startYear = date.getMonthValue() >= 9 ? date.getYear() : date.getYear() - 1;
-        return startYear + "/" + (startYear + 1);
-    }
-
-    private int weekNumber(LocalDate date) {
-        int startYear = date.getMonthValue() >= 9 ? date.getYear() : date.getYear() - 1;
-        LocalDate firstCycleMonday = LocalDate.of(startYear, 9, 1)
-            .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        LocalDate currentMonday = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        long elapsedWeeks = ChronoUnit.WEEKS.between(firstCycleMonday, currentMonday);
-        return Math.floorMod(elapsedWeeks, 2) + 1;
-    }
 }

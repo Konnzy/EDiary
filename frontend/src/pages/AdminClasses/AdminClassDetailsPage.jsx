@@ -20,7 +20,7 @@ function requestMessage(error, fallback) {
   return error instanceof ApiError ? error.message : fallback;
 }
 
-export function AdminClassDetailsPage({ classId, scheduleView }) {
+export function AdminClassDetailsPage({ classId }) {
   const [schoolClass, setSchoolClass] = useState(null);
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
@@ -99,10 +99,10 @@ export function AdminClassDetailsPage({ classId, scheduleView }) {
   return (
     <AdminLayout
       activeItem="Класи"
-      title={scheduleView ? `Розклад ${className}` : className}
-      subtitle={scheduleView ? "Перегляд занять обраного класу." : "Керування класом і складом учнів."}
-      breadcrumb={<ClassBreadcrumb classId={classId} className={className} scheduleView={scheduleView} />}
-      actions={!loading && schoolClass?.editable && !scheduleView ? (
+      title={className}
+      subtitle="Керування класом і складом учнів."
+      breadcrumb={<ClassBreadcrumb classId={classId} className={className} />}
+      actions={!loading && schoolClass?.editable ? (
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={requestDeletion} disabled={checkingDeletion} className="h-10 rounded-md border border-red-600 bg-red-600 px-4 text-white hover:bg-red-500 hover:text-white">
             {checkingDeletion ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
@@ -117,23 +117,21 @@ export function AdminClassDetailsPage({ classId, scheduleView }) {
       ) : error ? (
         <div className="space-y-4"><Alert>{error}</Alert><Button onClick={load} className="rounded-md">Спробувати ще раз</Button></div>
       ) : schoolClass ? (
-        scheduleView ? <SchedulePlaceholder classId={classId} /> : (
-          <>
-            <ClassSummary schoolClass={schoolClass} studentCount={students.length} />
-            {actionError ? <div className="mt-5"><Alert>{actionError}</Alert></div> : null}
-            {notice ? <SuccessNotice>{notice}</SuccessNotice> : null}
-            <StudentsSection
-              students={students}
-              visibleStudents={visibleStudents}
-              query={query}
-              onQueryChange={setQuery}
-              onAdd={() => setDialog({ type: "add" })}
-              onTransfer={(student) => setDialog({ type: "transfer", student })}
-              onRemove={(student) => setDialog({ type: "remove", student })}
-              editable={schoolClass.editable}
-            />
-          </>
-        )
+        <>
+          <ClassSummary schoolClass={schoolClass} studentCount={students.length} />
+          {actionError ? <div className="mt-5"><Alert>{actionError}</Alert></div> : null}
+          {notice ? <SuccessNotice>{notice}</SuccessNotice> : null}
+          <StudentsSection
+            students={students}
+            visibleStudents={visibleStudents}
+            query={query}
+            onQueryChange={setQuery}
+            onAdd={() => setDialog({ type: "add" })}
+            onTransfer={(student) => setDialog({ type: "transfer", student })}
+            onRemove={(student) => setDialog({ type: "remove", student })}
+            editable={schoolClass.editable}
+          />
+        </>
       ) : null}
 
       {editing ? (
@@ -155,16 +153,13 @@ export function AdminClassDetailsPage({ classId, scheduleView }) {
   );
 }
 
-function ClassBreadcrumb({ classId, className, scheduleView }) {
-  return <><a href="#admin/classes" className="hover:text-slate-900">Класи</a><ChevronRight className="h-3.5 w-3.5" /><a href={`#admin/classes/${classId}`} className="font-medium text-slate-700" aria-current={scheduleView ? undefined : "page"}>{className}</a>{scheduleView ? <><ChevronRight className="h-3.5 w-3.5" /><span className="font-medium text-slate-700" aria-current="page">Розклад</span></> : null}</>;
-}
-
-function SchedulePlaceholder({ classId }) {
-  return <div className="rounded-lg border border-slate-200 bg-white px-6 py-12 text-center"><CalendarDays className="mx-auto h-8 w-8 text-slate-400" /><h2 className="mt-4 font-semibold">Розклад ще не підключено</h2><p className="mt-2 text-sm text-slate-500">Заняття цього класу з'являться після підключення модуля розкладу.</p><a href={`#admin/classes/${classId}`} className="mt-5 inline-block text-sm font-semibold underline">Повернутися до класу</a></div>;
+function ClassBreadcrumb({ classId, className }) {
+  return <><a href="#admin/classes" className="hover:text-slate-900">Класи</a><ChevronRight className="h-3.5 w-3.5" /><a href={`#admin/classes/${classId}`} className="font-medium text-slate-700" aria-current="page">{className}</a></>;
 }
 
 function ClassSummary({ schoolClass, studentCount }) {
-  return <section aria-label="Інформація про клас" className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6"><dl className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4"><Info label="Класний керівник" value={schoolClass.classTeacherName || "Не призначено"} /><Info label="Кількість учнів" value={`${studentCount} / ${CLASS_CAPACITY}`} /><Info label="Максимальна місткість" value={`${CLASS_CAPACITY} учнів`} /><Info label="Статус класу" value={<span className={`inline-flex rounded-full border px-3 py-1 text-xs ${schoolClass.editable ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>{schoolClass.editable ? "Активний" : "Архівний"}</span>} /></dl><a href={`#admin/classes/${schoolClass.id}/schedule`} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950"><CalendarDays className="h-4 w-4" />Переглянути розклад класу<ChevronRight className="h-4 w-4" /></a></section>;
+  const scheduleHref = `#admin/schedule?classId=${schoolClass.id}&academicYear=${encodeURIComponent(schoolClass.academicYear)}`;
+  return <section aria-label="Інформація про клас" className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6"><dl className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4"><Info label="Класний керівник" value={schoolClass.classTeacherName || "Не призначено"} /><Info label="Кількість учнів" value={`${studentCount} / ${CLASS_CAPACITY}`} /><Info label="Максимальна місткість" value={`${CLASS_CAPACITY} учнів`} /><Info label="Статус класу" value={<span className={`inline-flex rounded-full border px-3 py-1 text-xs ${schoolClass.editable ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>{schoolClass.editable ? "Активний" : "Архівний"}</span>} /></dl><a href={scheduleHref} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950"><CalendarDays className="h-4 w-4" />Переглянути розклад класу<ChevronRight className="h-4 w-4" /></a></section>;
 }
 
 function Info({ label, value }) {

@@ -25,7 +25,7 @@ import { formatToday, useTodaySchedule } from "@/hooks/useTodaySchedule.js";
 const navigationItems = [
   { label: "Головна", icon: Home, active: true, route: "parent" },
   { label: "Розклад", icon: CalendarDays, route: "parent/schedule" },
-  { label: "Предмети", icon: BookOpen },
+  { label: "Предмети", icon: BookOpen, route: "parent/subjects" },
   { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
   { label: "Профіль", icon: User },
 ];
@@ -262,7 +262,7 @@ function TodayScheduleCard({ schedule }) {
         {!schedule.loading && schedule.error ? <p className="py-8 text-center text-[0.78rem] text-red-500">{schedule.error}</p> : null}
         {!schedule.loading && !schedule.error && !schedule.lessons.length ? <p className="py-8 text-center text-[0.78rem] text-slate-400">Сьогодні уроків немає</p> : null}
         {!schedule.loading && !schedule.error ? schedule.lessons.map((lesson) => (
-          <article key={lesson.id} className="rounded-md border border-slate-200/80 bg-slate-50/75 px-3.5 py-2"><time className="text-[0.72rem] font-medium leading-none text-slate-400">{lesson.startTime}–{lesson.endTime}</time><h3 className="mt-1 text-[0.84rem] font-bold leading-4 text-slate-800">{lesson.subject}</h3><p className="mt-0.5 text-[0.72rem] leading-4 text-slate-500">{lesson.teacher} · {lesson.room ? `Кабінет ${lesson.room}` : "Кабінет не вказано"}</p></article>
+          <article key={lesson.id} className="rounded-md border border-slate-200/80 bg-white px-3.5 py-2 transition-colors duration-200 hover:bg-slate-50"><time className="text-[0.72rem] font-medium leading-none text-slate-400">{lesson.startTime}–{lesson.endTime}</time><h3 className="mt-1 text-[0.84rem] font-bold leading-4 text-slate-800">{lesson.subject}</h3><p className="mt-0.5 text-[0.72rem] leading-4 text-slate-500">{lesson.teacher} · {lesson.room ? `Кабінет ${lesson.room}` : "Кабінет не вказано"}</p></article>
         )) : null}
         <a href="#parent/schedule" className="mt-3 inline-flex text-[0.76rem] font-semibold text-slate-600 hover:text-slate-900">Відкрити розклад</a>
       </CardContent>
