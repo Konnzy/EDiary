@@ -20,7 +20,7 @@ test("builds subject summary statistics", () => {
     previousAverage: 8,
     grades: [{ grade: 9 }, { grade: 10 }],
     attendance: [{ status: "PRESENT" }, { status: "ABSENT" }, { status: "EXCUSED" }, { status: "PRESENT" }],
-    homework: [{ status: "ACTIVE" }, { status: "ACTIVE" }, { status: "OVERDUE" }, { status: "COMPLETED" }],
+    homework: [{ status: "ACTIVE" }, { status: "ACTIVE" }, { status: "OVERDUE" }, { status: "COMPLETED" }, { status: "COMPLETED_LATE" }],
   });
 
   assert.deepEqual(stats, {
@@ -28,8 +28,12 @@ test("builds subject summary statistics", () => {
     delta: 1.5,
     missed: 2,
     missedPercent: 50,
+    attended: 2,
+    totalLessons: 4,
     activeHomework: 2,
     overdueHomework: 1,
+    completedHomework: 2,
+    completedLateHomework: 1,
   });
 });
 

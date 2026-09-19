@@ -2,41 +2,31 @@ import {
   BookOpenCheck,
   CalendarDays,
   GraduationCap,
-  Home,
   LogOut,
-  Mail,
-  NotebookText,
-  User,
   UserRound,
-  Users,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card, CardContent, CardHeader } from "@/components/ui/card.jsx";
 import { authApi } from "@/lib/api.js";
+import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
+import { userIdentities } from "@/lib/userIdentity.js";
 import { cn } from "@/lib/utils.js";
 import { formatToday, useTodaySchedule } from "@/hooks/useTodaySchedule.js";
 
-const teacher = {
-  name: "Олександр Коваленко",
-  role: "Вчитель",
-};
+const teacher = userIdentities.TEACHER;
 
-const navigationItems = [
-  { label: "Головна", icon: Home, active: true, route: "teacher" },
-  { label: "Розклад", icon: CalendarDays, route: "teacher/schedule" },
-  { label: "Журнал", icon: NotebookText, route: "teacher/journal" },
-  { label: "Учні", icon: Users },
-  { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
-  { label: "Профіль", icon: User },
-];
+const navigationItems = teacherNavigationItems.map((item) => ({
+  ...item,
+  active: item.route === "teacher",
+}));
 
 const homework = [
   {
     group: "Алгебра • 10-А",
     title: "Параграф 14, впр. 245-250",
-    status: "Активне",
+    status: "Призначено",
     due: "До 24.05",
     submitted: "18/24 здано",
   },
@@ -157,8 +147,8 @@ function TopBar() {
 
         <div className="hidden items-center gap-3 rounded-sm bg-slate-50 px-3 py-1.5 sm:flex">
           <div className="text-right leading-tight">
-            <div className="text-[0.78rem] font-bold text-slate-800">{teacher.name}</div>
-            <div className="text-[0.7rem] text-slate-500">{teacher.role}</div>
+            <div className="text-[0.78rem] font-bold text-slate-800">{teacher.displayName}</div>
+            <div className="text-[0.7rem] text-slate-500">{teacher.roleLabel}</div>
           </div>
           <UserRound className="h-8 w-8 text-slate-900" strokeWidth={1.8} aria-hidden="true" />
         </div>
@@ -225,7 +215,7 @@ function Sidebar() {
               disabled={!item.route}
               onClick={() => { if (item.route) window.location.hash = item.route; }}
               className={cn(
-                "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.9rem] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.82rem] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 item.active
                   ? "bg-slate-100 text-slate-900"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",

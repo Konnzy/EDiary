@@ -10,15 +10,15 @@ import {
   LogOut,
   Mail,
   MapPin,
-  NotebookText,
   User,
   UserRound,
-  Users,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { Alert } from "@/components/ui/alert.jsx";
 import { ApiError, authApi, parentApi, scheduleApi } from "@/lib/api.js";
+import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
+import { userIdentities } from "@/lib/userIdentity.js";
 import { cn } from "@/lib/utils.js";
 import { findNextLesson, timeToMinutes } from "@/pages/Schedule/nextLesson.js";
 
@@ -45,45 +45,38 @@ const roleConfig = {
   STUDENT: {
     homeRoute: "student",
     scheduleRoute: "student/schedule",
-    profileName: "Профіль учня",
-    roleLabel: "Учень",
+    profileName: userIdentities.STUDENT.displayName,
+    roleLabel: userIdentities.STUDENT.roleLabel,
     subtitle: "Розклад занять вашого класу",
     navigation: [
       { label: "Головна", icon: Home, route: "student" },
       { label: "Розклад", icon: CalendarDays, route: "student/schedule" },
       { label: "Предмети", icon: BookOpen, route: "student/subjects" },
       { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
-      { label: "Профіль", icon: User },
+      { label: "Профіль", icon: User, route: "student/profile" },
     ],
   },
   PARENT: {
     homeRoute: "parent",
     scheduleRoute: "parent/schedule",
-    profileName: "Профіль батьків",
-    roleLabel: "Батьки",
+    profileName: userIdentities.PARENT.displayName,
+    roleLabel: userIdentities.PARENT.roleLabel,
     subtitle: "Розклад занять обраної дитини",
     navigation: [
       { label: "Головна", icon: Home, route: "parent" },
       { label: "Розклад", icon: CalendarDays, route: "parent/schedule" },
       { label: "Предмети", icon: BookOpen, route: "parent/subjects" },
       { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
-      { label: "Профіль", icon: User },
+      { label: "Профіль", icon: User, route: "parent/profile" },
     ],
   },
   TEACHER: {
     homeRoute: "teacher",
     scheduleRoute: "teacher/schedule",
-    profileName: "Профіль учителя",
-    roleLabel: "Вчитель",
+    profileName: userIdentities.TEACHER.displayName,
+    roleLabel: userIdentities.TEACHER.roleLabel,
     subtitle: "Ваші уроки за класами та предметами",
-    navigation: [
-      { label: "Головна", icon: Home, route: "teacher" },
-      { label: "Розклад", icon: CalendarDays, route: "teacher/schedule" },
-      { label: "Журнал", icon: NotebookText, route: "teacher/journal" },
-      { label: "Учні", icon: Users },
-      { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
-      { label: "Профіль", icon: User },
-    ],
+    navigation: teacherNavigationItems,
   },
 };
 
@@ -302,7 +295,7 @@ function ScheduleFilters({ role, academicYear, week, children, studentId, nextLe
   return (
     <section className={cn(
       "grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)]",
-      role === "TEACHER" && "md:grid-cols-2 xl:grid-cols-[minmax(190px,1fr)_minmax(190px,1fr)_310px] xl:items-end",
+      role === "TEACHER" && "max-w-[960px] md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_180px_310px] xl:items-end",
       role === "PARENT" && "max-w-[760px] sm:grid-cols-[minmax(0,1fr)_310px] sm:items-end",
       role === "STUDENT" && "max-w-[380px]",
     )}>
@@ -325,7 +318,7 @@ function ScheduleFilters({ role, academicYear, week, children, studentId, nextLe
         </div>
       ) : null}
 
-      {role === "TEACHER" ? <ReadOnlyField label="Навчальний рік" value={academicYear ? `${academicYear} н. р.` : "Не налаштовано"} /> : null}
+      {role === "TEACHER" ? <AcademicYearInfo value={academicYear ? `${academicYear} н. р.` : "Не налаштовано"} /> : null}
 
       <div>
         <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">Навчальний тиждень</span>
@@ -350,11 +343,11 @@ function ScheduleFilters({ role, academicYear, week, children, studentId, nextLe
   );
 }
 
-function ReadOnlyField({ label, value }) {
+function AcademicYearInfo({ value }) {
   return (
     <div>
-      <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">{label}</span>
-      <p className="flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-[0.8rem] font-semibold text-slate-700">
+      <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">Навчальний рік</span>
+      <p className="flex min-h-10 items-center text-[0.82rem] font-bold text-slate-900">
         {value}
       </p>
     </div>
@@ -551,7 +544,7 @@ function Navigation({ config, compact = false }) {
     const active = item.route === config.scheduleRoute;
     const className = cn(
       compact ? "inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-md px-1" : "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left",
-      "text-[0.78rem] font-semibold transition-colors",
+      "text-[0.82rem] font-semibold transition-colors",
       active ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
       !item.route && "cursor-default hover:bg-transparent hover:text-slate-500",
     );

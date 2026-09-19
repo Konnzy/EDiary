@@ -13,20 +13,18 @@ import { AppFooter } from "@/components/AppFooter.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { Card, CardContent, CardHeader } from "@/components/ui/card.jsx";
 import { authApi } from "@/lib/api.js";
+import { userIdentities } from "@/lib/userIdentity.js";
 import { cn } from "@/lib/utils.js";
 import { formatToday, useTodaySchedule } from "@/hooks/useTodaySchedule.js";
 
-const student = {
-  name: "Іван Петренко",
-  role: "Учень",
-};
+const student = userIdentities.STUDENT;
 
 const navigationItems = [
   { label: "Головна", icon: Home, active: true, route: "student" },
   { label: "Розклад", icon: CalendarDays, route: "student/schedule" },
   { label: "Предмети", icon: BookOpen, route: "student/subjects" },
   { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
-  { label: "Профіль", icon: User },
+  { label: "Профіль", icon: User, route: "student/profile" },
 ];
 
 const grades = [
@@ -183,8 +181,8 @@ function TopBar() {
 
         <div className="hidden items-center gap-3 rounded-sm bg-slate-50 px-3 py-1.5 sm:flex">
           <div className="text-right leading-tight">
-            <div className="text-[0.78rem] font-bold text-slate-800">{student.name}</div>
-            <div className="text-[0.7rem] text-slate-500">{student.role}</div>
+            <div className="text-[0.78rem] font-bold text-slate-800">{student.displayName}</div>
+            <div className="text-[0.7rem] text-slate-500">{student.roleLabel}</div>
           </div>
           <UserRound className="h-8 w-8 text-slate-900" strokeWidth={1.8} aria-hidden="true" />
         </div>
@@ -219,7 +217,7 @@ function MobileNavigation() {
               disabled={!item.route}
               onClick={() => { if (item.route) window.location.hash = item.route; }}
               className={cn(
-                "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-1 text-[0.72rem] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-[480px]:gap-2 min-[480px]:px-2 min-[480px]:text-[0.78rem]",
+                "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-1 text-[0.82rem] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-[480px]:gap-2 min-[480px]:px-2",
                 item.active
                   ? "bg-slate-100 text-slate-900"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
@@ -251,7 +249,7 @@ function Sidebar() {
               disabled={!item.route}
               onClick={() => { if (item.route) window.location.hash = item.route; }}
               className={cn(
-                "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.9rem] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.82rem] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 item.active
                   ? "bg-slate-100 text-slate-900"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",

@@ -20,6 +20,7 @@ import { TermsOfUsePage } from "@/pages/TermsOfUse/TermsOfUsePage.jsx";
 import { PrivacyPolicyPage } from "@/pages/PrivacyPolicy/PrivacyPolicyPage.jsx";
 import { UserSchedulePage } from "@/pages/Schedule/UserSchedulePage.jsx";
 import { UserSubjectsPage } from "@/pages/Subjects/UserSubjectsPage.jsx";
+import { UserProfilePage } from "@/pages/Profile/UserProfilePage.jsx";
 import { ApiError, authApi } from "@/lib/api.js";
 import { ThemeToggle } from "@/components/ThemeToggle.jsx";
 import { RouteAccessToast } from "@/components/RouteAccessToast.jsx";
@@ -190,6 +191,10 @@ function AppContent() {
     return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserSubjectsPage role="STUDENT" /></ProtectedRoute>;
   }
 
+  if (route === "student/profile") {
+    return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserProfilePage role="STUDENT" /></ProtectedRoute>;
+  }
+
   if (route === "teacher") {
     return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherHomePage /></ProtectedRoute>;
   }
@@ -202,6 +207,10 @@ function AppContent() {
     return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherJournalPage /></ProtectedRoute>;
   }
 
+  if (route === "teacher/profile") {
+    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><UserProfilePage role="TEACHER" /></ProtectedRoute>;
+  }
+
   if (route === "parent") {
     return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><ParentHomePage /></ProtectedRoute>;
   }
@@ -212,6 +221,10 @@ function AppContent() {
 
   if (route === "parent/subjects") {
     return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserSubjectsPage role="PARENT" /></ProtectedRoute>;
+  }
+
+  if (route === "parent/profile") {
+    return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserProfilePage role="PARENT" /></ProtectedRoute>;
   }
 
   return <LoginPage />;

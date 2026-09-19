@@ -21,13 +21,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -187,12 +181,7 @@ public class AdminScheduleService {
             scheduleRepository.flush();
         }
         savedEntries = scheduleRepository.saveAllAndFlush(savedEntries);
-        savedEntries.sort((left, right) -> {
-            int weekdayComparison = left.getWeekday().compareTo(right.getWeekday());
-            return weekdayComparison != 0
-                ? weekdayComparison
-                : left.getLessonNumber().compareTo(right.getLessonNumber());
-        });
+        savedEntries.sort(Comparator.comparing(ScheduleEntry::getWeekday).thenComparingInt(ScheduleEntry::getLessonNumber));
         return toResponse(classId, academicYear, week, savedEntries);
     }
 

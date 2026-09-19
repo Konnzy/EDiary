@@ -143,9 +143,9 @@
     border-color: #6a84a1;
   }
 
-  html.dark :is([class~="bg-sky-100"], [class~="bg-sky-50/40"]) { background-color: #15354d; }
+  html.dark :is([class~="bg-sky-50"], [class~="bg-sky-100"], [class~="bg-sky-50/40"]) { background-color: #15354d; }
   html.dark [class~="text-sky-700"] { color: #a6d9fb; }
-  html.dark [class~="border-sky-300"] { border-color: #4681aa; }
+  html.dark :is([class~="border-sky-200"], [class~="border-sky-300"]) { border-color: #4681aa; }
 
   html.dark :is([class~="bg-emerald-50"], [class~="bg-emerald-100"], [class~="hover:bg-emerald-100"]:hover) { background-color: #173b32; }
   html.dark :is([class~="text-emerald-600"], [class~="text-emerald-700"], [class~="text-emerald-800"]) { color: #9be2bc; }
@@ -156,6 +156,18 @@
   html.dark :is([class~="text-amber-600"], [class~="text-amber-700"], [class~="text-amber-800"]) { color: #f4d08c; }
   html.dark :is([class~="border-amber-200"], [class~="border-amber-300"]) { border-color: #8b6b38; }
 
+  html.dark [class~="bg-teal-50"] { background-color: #153a38; }
+  html.dark [class~="text-teal-700"] { color: #8adbd0; }
+  html.dark [class~="border-teal-200"] { border-color: #3f817c; }
+
+  html.dark [class~="bg-violet-50"] { background-color: #312746; }
+  html.dark [class~="text-violet-700"] { color: #cbbcf6; }
+  html.dark [class~="border-violet-200"] { border-color: #725d99; }
+
+  html.dark [class~="bg-indigo-50"] { background-color: #252d4b; }
+  html.dark [class~="text-indigo-700"] { color: #bdc8ff; }
+  html.dark [class~="border-indigo-200"] { border-color: #596b9d; }
+
   html.dark :is([class~="bg-red-50"], [class~="bg-red-50/30"], [class~="hover:bg-red-50"]:hover) { background-color: #41262c; }
   html.dark :is([class~="text-red-500"], [class~="text-red-600"], [class~="text-red-700"]) { color: #f7aaaa; }
   html.dark :is([class~="border-red-200"], [class~="border-red-300"], [class~="border-red-400"]) { border-color: #a05a65; }
@@ -165,7 +177,7 @@
   html.dark :is([class~="border-rose-200"], [class~="border-rose-300"], [class~="hover:border-rose-300"]:hover) { border-color: #9f6275; }
   html.dark [class~="hover:bg-rose-100"]:hover { background-color: #52303d; }
 
-  html.dark :is([class~="ring-slate-900/[0.015]"], [class~="ring-sky-100"], [class~="ring-emerald-100"], [class~="ring-emerald-200"], [class~="ring-amber-200"], [class~="ring-rose-200"]) {
+  html.dark :is([class~="ring-slate-900/[0.015]"], [class~="ring-sky-100"], [class~="ring-sky-200"], [class~="ring-emerald-100"], [class~="ring-emerald-200"], [class~="ring-amber-200"], [class~="ring-rose-200"]) {
     --tw-ring-color: #5e6d7b;
   }
 

@@ -7,33 +7,7 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { cn } from "@/lib/utils.js";
 import { authApi } from "@/lib/api.js";
-
-function getPasswordScore(password) {
-  let score = 0;
-
-  if (password.length >= 8) score += 1;
-  if (/[a-zA-Zа-яА-ЯіІїЇєЄґҐ]/.test(password)) score += 1;
-  if (/\d/.test(password)) score += 1;
-  if (/[^a-zA-Zа-яА-ЯіІїЇєЄґҐ\d]/.test(password)) score += 1;
-
-  return score;
-}
-
-function getStrengthMeta(score) {
-  if (score >= 4) {
-    return { label: "Висока", width: "w-full", color: "bg-emerald-500" };
-  }
-
-  if (score >= 3) {
-    return { label: "Середня", width: "w-2/3", color: "bg-amber-400" };
-  }
-
-  if (score >= 1) {
-    return { label: "Низька", width: "w-1/3", color: "bg-red-400" };
-  }
-
-  return { label: "Не визначена", width: "w-0", color: "bg-transparent" };
-}
+import { getPasswordStrength } from "@/lib/passwordStrength.js";
 
 function validatePassword(password, confirmPassword) {
   if (!password) {
@@ -75,7 +49,7 @@ export function ResetPasswordPage({ token = "" }) {
   const [notice, setNotice] = useState("");
   const validToken = /^[A-Za-z0-9_-]{43}$/.test(token);
 
-  const strength = useMemo(() => getStrengthMeta(getPasswordScore(password)), [password]);
+  const strength = useMemo(() => getPasswordStrength(password), [password]);
   const error = !validToken ? "Посилання недійсне. Запитайте нове посилання для відновлення пароля." : serverError || (submitted ? validatePassword(password, confirmPassword) : "");
 
   const handleSubmit = async (event) => {

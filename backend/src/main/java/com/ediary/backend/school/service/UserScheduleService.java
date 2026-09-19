@@ -9,6 +9,7 @@ import com.ediary.backend.school.entity.ScheduleEntry;
 import com.ediary.backend.school.entity.SchoolClass;
 import com.ediary.backend.school.repository.AcademicYearRepository;
 import com.ediary.backend.school.repository.ScheduleRepository;
+import com.ediary.backend.user.entity.StudentParentLink;
 import com.ediary.backend.user.entity.StudentProfile;
 import com.ediary.backend.user.repository.StudentParentLinkRepository;
 import com.ediary.backend.user.repository.StudentProfileRepository;
@@ -69,7 +70,7 @@ public class UserScheduleService {
         validatePeriod(academicYear, week);
         StudentProfile student = studentParentLinkRepository
             .findByParentLoginAndStudentId(parentLogin, studentId)
-            .map(link -> link.getStudent())
+            .map(StudentParentLink::getStudent)
             .orElseThrow(() -> new ApplicationException(
                 HttpStatus.NOT_FOUND,
                 "PARENT_CHILD_NOT_FOUND",

@@ -6,7 +6,9 @@ import {
   createInitialJournalState,
   gradeKey,
   lessonDates,
+  normalizeLessonEntry,
   normalizeGradeEntry,
+  resolveHomeworkStatus,
 } from "./journalModel.js";
 
 test("builds lesson dates only for configured weekdays", () => {
@@ -31,23 +33,41 @@ test("migrates legacy grade markers to a separate attendance status", () => {
   assert.deepEqual(normalizeGradeEntry({ value: "10", comment: "Добре" }), {
     grade: "10",
     attendanceStatus: "PRESENT",
+    homeworkStatus: "",
     comment: "Добре",
   });
   assert.deepEqual(normalizeGradeEntry({ value: "Н", comment: "" }), {
     grade: "",
     attendanceStatus: "ABSENT",
+    homeworkStatus: "",
     comment: "",
   });
   assert.deepEqual(normalizeGradeEntry({ value: "Зв.", comment: "" }), {
     grade: "",
     attendanceStatus: "RELEASED",
+    homeworkStatus: "",
     comment: "",
   });
+});
+
+test("normalizes homework metadata and derives an unfinished homework status", () => {
+  const lesson = normalizeLessonEntry({
+    workType: "CLASSWORK",
+    topic: "Тема",
+    homework: "Вправа 1",
+    homeworkDeadline: "2026-09-10",
+  });
+
+  assert.equal(lesson.homeworkDeadline, "2026-09-10");
+  assert.equal(resolveHomeworkStatus({}, lesson, new Date("2026-09-11T12:00:00")), "OVERDUE");
+  assert.equal(resolveHomeworkStatus({ homeworkStatus: "COMPLETED_LATE" }, lesson), "COMPLETED_LATE");
+  assert.equal(resolveHomeworkStatus({}, { ...lesson, homework: "" }), "");
 });
 
 test("creates a populated initial prototype", () => {
   const state = createInitialJournalState();
   assert.ok(Object.keys(state.grades).length > 0);
   assert.ok(Object.keys(state.lessons).length > 0);
-  assert.ok(Object.values(state.grades).every((entry) => "grade" in entry && "attendanceStatus" in entry));
+  assert.ok(Object.values(state.grades).every((entry) => "grade" in entry && "attendanceStatus" in entry && "homeworkStatus" in entry));
+  assert.ok(Object.values(state.lessons).every((entry) => "homeworkDeadline" in entry));
 });

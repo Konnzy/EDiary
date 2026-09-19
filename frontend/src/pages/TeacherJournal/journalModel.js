@@ -10,6 +10,13 @@ export const workTypes = [
   { value: "THEMATIC", label: "Тематична", shortLabel: "Тем." },
 ];
 
+export const homeworkStatuses = [
+  { value: "ACTIVE", label: "Призначено" },
+  { value: "OVERDUE", label: "Прострочено" },
+  { value: "COMPLETED", label: "Виконано" },
+  { value: "COMPLETED_LATE", label: "Із запізненням" },
+];
+
 export const periods = [
   { value: "2026-09", label: "Вересень 2026" },
   { value: "2026-10", label: "Жовтень 2026" },
@@ -48,7 +55,7 @@ export const journalClasses = [
   },
 ];
 
-const weekdayLabels = ["Нд", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+const weekdayLabels = ["Неділя", "Понеділок", "Вівторок", "Середа", "Четвер", "П'ятниця", "Субота"];
 
 export function contextKey(classId, subjectId, period) {
   return `${classId}:${subjectId}:${period}`;
@@ -110,6 +117,11 @@ export function createInitialJournalState() {
       grades[gradeKey(context, studentId, dates[index])] = {
         grade: /^\d+$/.test(String(value)) ? String(value) : "",
         attendanceStatus: legacyStatus,
+        homeworkStatus: index === 0
+          ? "COMPLETED"
+          : index === 1 && studentId === "ivanov"
+            ? "COMPLETED_LATE"
+            : "",
         comment: "",
       };
     });
@@ -122,21 +134,25 @@ export function createInitialJournalState() {
         workType: "CLASSWORK",
         topic: "Повторення дій з раціональними числами",
         homework: "Повторити правила, вправи 12-16",
+        homeworkDeadline: "2026-09-07",
       },
       [lessonKey(context, dates[1])]: {
         workType: "INDEPENDENT",
         topic: "Лінійні рівняння з однією змінною",
         homework: "Параграф 2, вправи 38, 40",
+        homeworkDeadline: "2026-09-10",
       },
       [lessonKey(context, dates[2])]: {
         workType: "CLASSWORK",
         topic: "Розв'язування текстових задач",
         homework: "Вправи 51-54",
+        homeworkDeadline: "2026-09-14",
       },
       [lessonKey(context, dates[3])]: {
         workType: "CONTROL",
         topic: "Контрольна робота з теми «Лінійні рівняння»",
         homework: "",
+        homeworkDeadline: "",
       },
     },
   };
@@ -151,6 +167,9 @@ export function readJournalState() {
         ...parsed,
         grades: Object.fromEntries(
           Object.entries(parsed.grades).map(([key, entry]) => [key, normalizeGradeEntry(entry)]),
+        ),
+        lessons: Object.fromEntries(
+          Object.entries(parsed.lessons).map(([key, entry]) => [key, normalizeLessonEntry(entry)]),
         ),
       };
     }
@@ -168,6 +187,9 @@ export function normalizeGradeEntry(entry) {
       attendanceStatus: ["PRESENT", "ABSENT", "EXCUSED", "RELEASED"].includes(entry.attendanceStatus)
         ? entry.attendanceStatus
         : "PRESENT",
+      homeworkStatus: homeworkStatuses.some((item) => item.value === entry.homeworkStatus)
+        ? entry.homeworkStatus
+        : "",
       comment: typeof entry.comment === "string" ? entry.comment : "",
     };
   }
@@ -176,8 +198,35 @@ export function normalizeGradeEntry(entry) {
   return {
     grade: /^([1-9]|1[0-2])$/.test(legacyValue) ? legacyValue : "",
     attendanceStatus: legacyValue === "Н" ? "ABSENT" : legacyValue === "Зв." ? "RELEASED" : "PRESENT",
+    homeworkStatus: "",
     comment: typeof entry.comment === "string" ? entry.comment : "",
   };
+}
+
+export function normalizeLessonEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    return { workType: "CLASSWORK", topic: "", homework: "", homeworkDeadline: "" };
+  }
+  return {
+    workType: workTypes.some((item) => item.value === entry.workType) ? entry.workType : "CLASSWORK",
+    topic: typeof entry.topic === "string" ? entry.topic : "",
+    homework: typeof entry.homework === "string" ? entry.homework : "",
+    homeworkDeadline: /^\d{4}-\d{2}-\d{2}$/.test(entry.homeworkDeadline || "")
+      ? entry.homeworkDeadline
+      : "",
+  };
+}
+
+export function resolveHomeworkStatus(entry, lesson, referenceDate = new Date()) {
+  if (!lesson?.homework?.trim()) return "";
+  if (homeworkStatuses.some((item) => item.value === entry?.homeworkStatus)) {
+    return entry.homeworkStatus;
+  }
+  if (lesson.homeworkDeadline) {
+    const endOfDeadline = new Date(`${lesson.homeworkDeadline}T23:59:59`);
+    if (endOfDeadline < referenceDate) return "OVERDUE";
+  }
+  return "ACTIVE";
 }
 
 export function writeJournalState(state) {

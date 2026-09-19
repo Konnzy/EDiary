@@ -1,23 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
-  CalendarDays,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   GraduationCap,
-  Home,
   LogOut,
-  Mail,
-  NotebookText,
   Pencil,
   Plus,
   Save,
   Trash2,
-  User,
   UserRound,
-  Users,
   X,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
@@ -25,29 +19,24 @@ import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { authApi } from "@/lib/api.js";
 import { allowRouteNavigation, registerNavigationGuard } from "@/lib/navigationGuard.js";
+import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
+import { userIdentities } from "@/lib/userIdentity.js";
 import { cn } from "@/lib/utils.js";
 import {
   calculateAverage,
   contextKey,
   dateParts,
   gradeKey,
+  homeworkStatuses,
   journalClasses,
   lessonDates,
   lessonKey,
   periods,
   readJournalState,
+  resolveHomeworkStatus,
   workTypes,
   writeJournalState,
 } from "./journalModel.js";
-
-const teacherNavigation = [
-  { label: "Головна", icon: Home, route: "teacher" },
-  { label: "Розклад", icon: CalendarDays, route: "teacher/schedule" },
-  { label: "Журнал", icon: NotebookText, route: "teacher/journal" },
-  { label: "Учні", icon: Users },
-  { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
-  { label: "Профіль", icon: User },
-];
 
 const gradeValues = Array.from({ length: 12 }, (_, index) => String(index + 1));
 const attendanceOptions = [
@@ -56,6 +45,16 @@ const attendanceOptions = [
   { value: "EXCUSED", label: "ПП" },
   { value: "RELEASED", label: "З" },
 ];
+
+const workTypeClasses = {
+  CLASSWORK: "border-sky-200 bg-sky-50 text-sky-700",
+  HOMEWORK: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  INDEPENDENT: "border-amber-200 bg-amber-50 text-amber-700",
+  CONTROL: "border-red-200 bg-red-50 text-red-600",
+  PRACTICAL: "border-teal-200 bg-teal-50 text-teal-700",
+  LABORATORY: "border-violet-200 bg-violet-50 text-violet-700",
+  THEMATIC: "border-indigo-200 bg-indigo-50 text-indigo-700",
+};
 
 export function TeacherJournalPage() {
   const [classId, setClassId] = useState(journalClasses[0].id);
@@ -209,8 +208,8 @@ export function TeacherJournalPage() {
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-2 text-[0.72rem] text-slate-500">
                     <span className="inline-flex h-7 items-center rounded border border-emerald-200 bg-emerald-50 px-2.5 text-emerald-700">П — присутній</span>
-                    <span className="inline-flex h-7 items-center rounded border border-slate-200 bg-slate-50 px-2.5">Н — відсутній</span>
-                    <span className="inline-flex h-7 items-center rounded border border-slate-300 bg-slate-100 px-2.5 text-slate-700">ПП — поважна причина</span>
+                    <span className="inline-flex h-7 items-center rounded border border-red-200 bg-red-50 px-2.5 text-red-600">Н — відсутній</span>
+                    <span className="inline-flex h-7 items-center rounded border border-sky-200 bg-sky-50 px-2.5 text-sky-700">ПП — поважна причина</span>
                     <span className="inline-flex h-7 items-center rounded border border-amber-200 bg-amber-50 px-2.5 text-amber-700">З — звільнений</span>
                   </div>
                 </div>
@@ -250,6 +249,7 @@ export function TeacherJournalPage() {
           key={`${gradeEditor.student.id}:${gradeEditor.date}`}
           editor={gradeEditor}
           initialValue={journal.grades[gradeKey(context, gradeEditor.student.id, gradeEditor.date)]}
+          lesson={journal.lessons[lessonKey(context, gradeEditor.date)]}
           onClose={() => setGradeEditor(null)}
           onSave={(value) => saveGrade(gradeEditor.student.id, gradeEditor.date, value)}
           onDelete={() => deleteGrade(gradeEditor.student.id, gradeEditor.date)}
@@ -403,20 +403,26 @@ function DateHeader({ date, lesson, onClick }) {
   const today = date === new Date().toLocaleDateString("sv-SE");
   const topic = lesson?.topic || "Не вказано";
   const homework = lesson?.homework || "Не задано";
+  const homeworkDeadline = lesson?.homeworkDeadline
+    ? new Intl.DateTimeFormat("uk-UA", { day: "2-digit", month: "2-digit" }).format(new Date(`${lesson.homeworkDeadline}T12:00:00`))
+    : "";
   return (
-    <th className={cn("w-[136px] min-w-[136px] max-w-[136px] border-b border-r border-slate-200 p-0 text-center align-top", today && "bg-emerald-50")}>
-      <button type="button" onClick={onClick} className="group/date flex min-h-[138px] w-full flex-col items-center px-2 py-2.5 text-left hover:bg-slate-100" title="Редагувати дані уроку">
-        <span className="text-[0.64rem] font-semibold uppercase text-slate-400">{parts.weekday}</span>
+    <th className={cn("w-[168px] min-w-[168px] max-w-[168px] border-b border-r border-slate-200 p-0 text-center align-top", today && "bg-emerald-50")}>
+      <button type="button" onClick={onClick} className="group/date flex min-h-[154px] w-full flex-col items-center px-2 py-2.5 text-left hover:bg-slate-100" title="Редагувати дані уроку">
+        <span className="text-[0.64rem] font-semibold text-slate-500">{parts.weekday}</span>
         <span className="mt-0.5 text-[0.82rem] font-bold text-slate-800">{parts.day}.{parts.month}</span>
         <span className={cn(
           "mt-1 flex h-5 max-w-full items-center rounded px-1.5 text-[0.6rem] font-bold",
-          type ? "bg-sky-100 text-sky-700" : "text-slate-300 group-hover/date:bg-white group-hover/date:text-slate-500",
+          type
+            ? cn("border", workTypeClasses[type.value])
+            : "text-slate-300 group-hover/date:bg-white group-hover/date:text-slate-500",
         )}>
-          {type?.shortLabel || <Pencil className="h-3 w-3" aria-hidden="true" />}
+          {type?.label || <Pencil className="h-3 w-3" aria-hidden="true" />}
         </span>
         <span className="mt-2.5 w-full border-t border-slate-200 pt-2 text-[0.66rem] font-normal leading-4 text-slate-600" title={`Тема: ${topic}`}>
           <span className="block truncate"><span className="font-semibold">Тема:</span> {topic}</span>
           <span className="mt-0.5 block truncate" title={`Домашнє завдання: ${homework}`}><span className="font-semibold">ДЗ:</span> {homework}</span>
+          {homeworkDeadline ? <span className="mt-0.5 block truncate text-slate-400"><span className="font-semibold">До:</span> {homeworkDeadline}</span> : null}
         </span>
       </button>
     </th>
@@ -450,9 +456,10 @@ function GradeCell({ grade, onClick }) {
           !grade && "border-transparent text-slate-300 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600",
           numeric && Number(gradeValue) >= 10 && "border-sky-300 bg-sky-100 text-sky-700",
           numeric && Number(gradeValue) >= 7 && Number(gradeValue) < 10 && "border-emerald-200 bg-emerald-50 text-emerald-700",
-          numeric && Number(gradeValue) < 7 && "border-amber-200 bg-amber-50 text-amber-700",
+          numeric && Number(gradeValue) >= 4 && Number(gradeValue) < 7 && "border-amber-200 bg-amber-50 text-amber-700",
+          numeric && Number(gradeValue) < 4 && "border-red-200 bg-red-50 text-red-600",
           !gradeValue && attendanceStatus === "ABSENT" && "border-red-200 bg-red-50 text-red-600",
-          !gradeValue && attendanceStatus === "EXCUSED" && "border-slate-300 bg-slate-100 text-slate-700",
+          !gradeValue && attendanceStatus === "EXCUSED" && "border-sky-200 bg-sky-50 text-sky-700",
           !gradeValue && attendanceStatus === "RELEASED" && "border-amber-200 bg-amber-50 text-amber-700",
         )}
         title={title}
@@ -462,7 +469,7 @@ function GradeCell({ grade, onClick }) {
           <span className={cn(
             "absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded px-1 text-[0.52rem] font-bold leading-4 shadow-sm",
             attendanceStatus === "ABSENT" && "bg-red-100 text-red-700",
-            attendanceStatus === "EXCUSED" && "bg-slate-100 text-slate-700",
+            attendanceStatus === "EXCUSED" && "bg-sky-100 text-sky-700",
             attendanceStatus === "RELEASED" && "bg-amber-100 text-amber-700",
           )}>{attendanceLabel}</span>
         ) : null}
@@ -472,7 +479,7 @@ function GradeCell({ grade, onClick }) {
 }
 
 function LessonDetailsDialog({ date, className, subject, initialValue, onClose, onSave }) {
-  const [form, setForm] = useState(() => initialValue || { workType: "CLASSWORK", topic: "", homework: "" });
+  const [form, setForm] = useState(() => initialValue || { workType: "CLASSWORK", topic: "", homework: "", homeworkDeadline: "" });
   const panel = useRef(null);
   const formattedDate = new Intl.DateTimeFormat("uk-UA", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     .format(new Date(`${date}T12:00:00`));
@@ -490,6 +497,7 @@ function LessonDetailsDialog({ date, className, subject, initialValue, onClose, 
       workType: form.workType,
       topic: form.topic.trim().replace(/\s+/g, " "),
       homework: form.homework.trim().replace(/\s+/g, " "),
+      homeworkDeadline: form.homework.trim() ? form.homeworkDeadline || "" : "",
     });
   };
 
@@ -509,6 +517,17 @@ function LessonDetailsDialog({ date, className, subject, initialValue, onClose, 
           </SelectField>
           <TextAreaField label="Тема уроку" value={form.topic} maxLength={200} rows={3} placeholder="Вкажіть тему уроку" onChange={(value) => setForm((current) => ({ ...current, topic: value }))} />
           <TextAreaField label="Домашнє завдання" value={form.homework} maxLength={500} rows={4} placeholder="Вкажіть домашнє завдання" onChange={(value) => setForm((current) => ({ ...current, homework: value }))} />
+          <label className="block">
+            <span className="mb-2 block text-[0.74rem] font-semibold text-slate-600">Дедлайн ДЗ <span className="font-normal text-slate-400">(необов’язково)</span></span>
+            <input
+              type="date"
+              value={form.homeworkDeadline || ""}
+              min={date}
+              disabled={!form.homework.trim()}
+              onChange={(event) => setForm((current) => ({ ...current, homeworkDeadline: event.target.value }))}
+              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.8rem] font-medium text-slate-700 outline-none transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            />
+          </label>
           <div className="flex justify-end pt-1">
             <Button type="submit" className="h-10 rounded-md px-4 text-xs"><CheckCircle2 className="h-4 w-4" />Застосувати</Button>
           </div>
@@ -527,15 +546,17 @@ function TextAreaField({ label, value, onChange, ...props }) {
   );
 }
 
-function GradePopover({ editor, initialValue, onClose, onSave, onDelete }) {
+function GradePopover({ editor, initialValue, lesson, onClose, onSave, onDelete }) {
   const [grade, setGrade] = useState(initialValue?.grade || "");
   const [attendanceStatus, setAttendanceStatus] = useState(initialValue?.attendanceStatus || "PRESENT");
+  const hasHomework = Boolean(lesson?.homework?.trim());
+  const [homeworkStatus, setHomeworkStatus] = useState(() => resolveHomeworkStatus(initialValue, lesson));
   const [comment, setComment] = useState(initialValue?.comment || "");
   const [error, setError] = useState("");
   const panel = useRef(null);
   const width = Math.min(320, window.innerWidth - 24);
   const left = Math.max(12, Math.min(editor.rect.left + editor.rect.width / 2 - width / 2, window.innerWidth - width - 12));
-  const estimatedHeight = 445;
+  const estimatedHeight = hasHomework ? 610 : 445;
   const top = Math.max(12, Math.min(editor.rect.bottom + 8, window.innerHeight - estimatedHeight - 12));
 
   useEffect(() => {
@@ -553,19 +574,20 @@ function GradePopover({ editor, initialValue, onClose, onSave, onDelete }) {
 
   const submit = (event) => {
     event.preventDefault();
-    if (!grade && attendanceStatus === "PRESENT") {
+    if (!grade && attendanceStatus === "PRESENT" && !hasHomework) {
       setError("Оберіть оцінку або змініть статус відвідування.");
       return;
     }
     onSave({
       grade,
       attendanceStatus,
+      homeworkStatus: hasHomework ? homeworkStatus : "",
       comment: comment.trim().replace(/\s+/g, " "),
     });
   };
 
   return (
-    <section ref={panel} role="dialog" aria-label={`Оцінка: ${editor.student.name}`} className="fixed z-[90] rounded-lg border border-slate-200 bg-white p-4 shadow-2xl" style={{ left, top, width }}>
+    <section ref={panel} role="dialog" aria-label={`Оцінка: ${editor.student.name}`} className="fixed z-[90] max-h-[calc(100vh-24px)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 shadow-2xl" style={{ left, top, width }}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-[0.86rem] font-bold text-slate-900">{editor.student.name}</h2>
@@ -607,6 +629,28 @@ function GradePopover({ editor, initialValue, onClose, onSave, onDelete }) {
           ))}
         </div>
         <p className="mt-2 text-[0.64rem] leading-4 text-slate-400">Оцінка та відвідування зберігаються незалежно.</p>
+        {hasHomework ? (
+          <div className="mt-3 border-t border-slate-200 pt-3">
+            <p className="text-[0.7rem] font-semibold text-slate-600">Статус домашнього завдання</p>
+            <p className="mt-1 line-clamp-2 text-[0.68rem] leading-4 text-slate-500" title={lesson.homework}>{lesson.homework}</p>
+            {lesson.homeworkDeadline ? <p className="mt-1 text-[0.64rem] text-slate-400">Виконати до {formatJournalDate(lesson.homeworkDeadline)}</p> : null}
+            <div className="mt-2 grid grid-cols-2 gap-1.5" aria-label="Статус домашнього завдання">
+              {homeworkStatuses.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => { setHomeworkStatus(option.value); setError(""); }}
+                  className={cn(
+                    "h-9 rounded border px-2 text-[0.68rem] font-semibold transition-colors",
+                    homeworkStatus === option.value ? "border-slate-800 bg-slate-800 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={3} maxLength={200} placeholder="Коментар до оцінки" className="mt-3 w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.76rem] leading-5 text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200" />
         {error ? <p className="mt-2 text-[0.7rem] text-red-600">{error}</p> : null}
         <div className="mt-3 flex items-center justify-end gap-2">
@@ -619,6 +663,11 @@ function GradePopover({ editor, initialValue, onClose, onSave, onDelete }) {
       </form>
     </section>
   );
+}
+
+function formatJournalDate(date) {
+  return new Intl.DateTimeFormat("uk-UA", { day: "2-digit", month: "2-digit", year: "numeric" })
+    .format(new Date(`${date}T12:00:00`));
 }
 
 function UnsavedJournalDialog({ className, subject, period, onClose, onDiscard, onSave }) {
@@ -667,7 +716,7 @@ function TeacherTopBar({ onLogout }) {
       <div className="flex items-center gap-1.5 sm:gap-4">
         <NotificationButton />
         <div className="hidden items-center gap-3 bg-slate-50 px-3 py-1.5 sm:flex">
-          <div className="text-right leading-tight"><div className="text-[0.78rem] font-bold">Профіль учителя</div><div className="text-[0.7rem] text-slate-500">Вчитель</div></div>
+          <div className="text-right leading-tight"><div className="text-[0.78rem] font-bold">{userIdentities.TEACHER.displayName}</div><div className="text-[0.7rem] text-slate-500">{userIdentities.TEACHER.roleLabel}</div></div>
           <UserRound className="h-8 w-8" strokeWidth={1.8} aria-hidden="true" />
         </div>
         <button type="button" onClick={onLogout} className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[0.82rem] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Вийти</span></button>
@@ -677,12 +726,12 @@ function TeacherTopBar({ onLogout }) {
 }
 
 function TeacherNavigation({ compact = false }) {
-  const content = teacherNavigation.map((item) => {
+  const content = teacherNavigationItems.map((item) => {
     const Icon = item.icon;
     const active = item.route === "teacher/journal";
     const classes = cn(
       compact ? "inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-md px-1" : "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left",
-      "text-[0.78rem] font-semibold transition-colors",
+      "text-[0.82rem] font-semibold transition-colors",
       active ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
       !item.route && "cursor-default hover:bg-transparent hover:text-slate-500",
     );

@@ -34,7 +34,7 @@ export const subjectProgress = [
     ],
     homework: [
       { id: 1, assignedDate: "17.09.2026", dueDate: "21.09.2026", title: "§ 8, № 124–129", status: "ACTIVE" },
-      { id: 2, assignedDate: "14.09.2026", dueDate: "17.09.2026", title: "§ 7, № 108–112", status: "COMPLETED" },
+      { id: 2, assignedDate: "14.09.2026", dueDate: "17.09.2026", title: "§ 7, № 108–112", status: "COMPLETED_LATE" },
       { id: 3, assignedDate: "10.09.2026", dueDate: "14.09.2026", title: "Повторити формули скороченого множення", status: "OVERDUE" },
       { id: 4, assignedDate: "07.09.2026", dueDate: "10.09.2026", title: "§ 6, № 91–96", status: "COMPLETED" },
       { id: "mh-2026-05", assignedDate: "20.05.2026", dueDate: "25.05.2026", title: "Підготуватися до підсумкової контрольної", status: "COMPLETED" },
@@ -211,8 +211,23 @@ export function getSubjectStats(subject) {
     : 0;
   const activeHomework = subject.homework.filter((item) => item.status === "ACTIVE").length;
   const overdueHomework = subject.homework.filter((item) => item.status === "OVERDUE").length;
+  const attended = subject.attendance.filter((item) => item.status === "PRESENT").length;
+  const totalLessons = subject.attendance.length;
+  const completedHomework = subject.homework.filter((item) => ["COMPLETED", "COMPLETED_LATE"].includes(item.status)).length;
+  const completedLateHomework = subject.homework.filter((item) => item.status === "COMPLETED_LATE").length;
 
-  return { average, delta, missed, missedPercent, activeHomework, overdueHomework };
+  return {
+    average,
+    delta,
+    missed,
+    missedPercent,
+    attended,
+    totalLessons,
+    activeHomework,
+    overdueHomework,
+    completedHomework,
+    completedLateHomework,
+  };
 }
 
 function dateMatchesPeriod(value, academicYear, period) {

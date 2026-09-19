@@ -27,6 +27,7 @@ import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { Alert } from "@/components/ui/alert.jsx";
 import { Card } from "@/components/ui/card.jsx";
 import { ApiError, authApi, parentApi } from "@/lib/api.js";
+import { userIdentities } from "@/lib/userIdentity.js";
 import { cn } from "@/lib/utils.js";
 import {
   academicYears,
@@ -46,13 +47,14 @@ const tabs = [
 const attendanceLabels = {
   PRESENT: { label: "Присутній", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
   ABSENT: { label: "Відсутній", className: "bg-red-50 text-red-600 ring-red-200" },
-  EXCUSED: { label: "Поважна причина", className: "bg-sky-100 text-sky-700 ring-sky-100" },
+  EXCUSED: { label: "Поважна причина", className: "bg-sky-50 text-sky-700 ring-sky-200" },
   RELEASED: { label: "Звільнений", className: "bg-amber-50 text-amber-700 ring-amber-200" },
 };
 
 const homeworkLabels = {
-  ACTIVE: { label: "Активне", className: "bg-sky-100 text-sky-700 ring-sky-100" },
+  ACTIVE: { label: "Призначено", className: "bg-sky-50 text-sky-700 ring-sky-200" },
   COMPLETED: { label: "Виконано", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+  COMPLETED_LATE: { label: "Виконано із запізненням", className: "bg-amber-50 text-amber-700 ring-amber-200" },
   OVERDUE: { label: "Прострочено", className: "bg-red-50 text-red-600 ring-red-200" },
 };
 
@@ -60,29 +62,29 @@ const roleConfig = {
   STUDENT: {
     homeRoute: "student",
     subjectsRoute: "student/subjects",
-    profileName: "Профіль учня",
-    roleLabel: "Учень",
+    profileName: userIdentities.STUDENT.displayName,
+    roleLabel: userIdentities.STUDENT.roleLabel,
     subtitle: "Успішність, відвідування та завдання з ваших предметів",
     navigation: [
       { label: "Головна", icon: Home, route: "student" },
       { label: "Розклад", icon: CalendarDays, route: "student/schedule" },
       { label: "Предмети", icon: BookOpen, route: "student/subjects" },
       { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
-      { label: "Профіль", icon: User },
+      { label: "Профіль", icon: User, route: "student/profile" },
     ],
   },
   PARENT: {
     homeRoute: "parent",
     subjectsRoute: "parent/subjects",
-    profileName: "Профіль батьків",
-    roleLabel: "Батьки",
+    profileName: userIdentities.PARENT.displayName,
+    roleLabel: userIdentities.PARENT.roleLabel,
     subtitle: "Успішність, відвідування та завдання обраної дитини",
     navigation: [
       { label: "Головна", icon: Home, route: "parent" },
       { label: "Розклад", icon: CalendarDays, route: "parent/schedule" },
       { label: "Предмети", icon: BookOpen, route: "parent/subjects" },
       { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
-      { label: "Профіль", icon: User },
+      { label: "Профіль", icon: User, route: "parent/profile" },
     ],
   },
 };
@@ -300,12 +302,14 @@ function SummaryCards({ tab, stats, forecast }) {
   const cards = tab === "attendance"
     ? [
       { label: "Кількість пропущених уроків", value: stats.missed, icon: CalendarDays, tone: "slate" },
-      { label: "Пропущено занять", value: `${stats.missedPercent}%`, icon: CircleAlert, tone: stats.missedPercent > 20 ? "red" : "slate" },
+      { label: "Пропущено уроків", value: `${stats.missedPercent}%`, icon: CircleAlert, tone: stats.missedPercent > 20 ? "red" : "slate" },
+      { label: "Відвідано уроків", value: `${stats.attended} із ${stats.totalLessons}`, icon: CheckCircle2, tone: "emerald" },
     ]
     : tab === "homework"
       ? [
-        { label: "Активні завдання", value: stats.activeHomework, icon: CheckCircle2, tone: "emerald" },
+        { label: "Призначено завдань", value: stats.activeHomework, icon: CheckCircle2, tone: "emerald" },
         { label: "Прострочені завдання", value: stats.overdueHomework, icon: CircleAlert, tone: stats.overdueHomework ? "red" : "slate" },
+        { label: "Виконано завдань", value: stats.completedHomework, detail: `з них ${stats.completedLateHomework} із запізненням`, icon: ClipboardCheck, tone: "emerald" },
       ]
       : [
         { label: "Середній бал з предмета", value: stats.average ?? "—", suffix: stats.average === null ? "" : "з 12", icon: BarChart3, tone: "slate" },
@@ -405,10 +409,11 @@ function GradesPanel({ subject, stats }) {
   return (
     <>
       <PanelHeading title="Оцінки за період" meta={`${countLabel(subject.grades.length, "оцінка", "оцінки", "оцінок")} · середній бал ${stats.average ?? "—"}`} />
-      <div className="mt-4 hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[680px] border-collapse text-left">
-          <thead><tr className="border-b border-slate-200 text-[0.7rem] font-bold text-slate-400"><th className="pb-3 pr-4">Дата</th><th className="pb-3 pr-4">Тип роботи</th><th className="pb-3 pr-4 text-center">Оцінка</th><th className="pb-3">Коментар учителя</th></tr></thead>
-          <tbody>{subject.grades.map((item) => <tr key={item.id} className="border-b border-slate-100 text-[0.8rem] last:border-0"><td className="py-3.5 pr-4 font-medium text-slate-500">{item.date}</td><td className="py-3.5 pr-4 font-semibold text-slate-800">{item.workType}</td><td className="py-3.5 pr-4 text-center"><GradeBadge value={item.grade} /></td><td className="py-3.5 text-slate-500">{item.comment || "—"}</td></tr>)}</tbody>
+      <div className="mt-4 hidden overflow-x-auto rounded-md border border-slate-200 md:block">
+        <table className="w-full min-w-[680px] table-fixed border-collapse text-left">
+          <colgroup><col className="w-[16%]" /><col className="w-[30%]" /><col className="w-[14%]" /><col className="w-[40%]" /></colgroup>
+          <thead className="bg-slate-50"><tr className="border-b border-slate-200 text-[0.7rem] font-bold text-slate-500"><th className="border-r border-slate-200 px-4 py-3">Дата</th><th className="border-r border-slate-200 px-4 py-3">Тип роботи</th><th className="border-r border-slate-200 px-4 py-3 text-center">Оцінка</th><th className="px-4 py-3">Коментар учителя</th></tr></thead>
+          <tbody>{subject.grades.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{item.date}</td><td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.workType}</td><td className="border-r border-slate-100 px-4 py-3.5 text-center"><GradeBadge value={item.grade} /></td><td className="px-4 py-3.5 text-slate-500">{item.comment || "—"}</td></tr>)}</tbody>
         </table>
       </div>
       <div className="mt-4 space-y-3 md:hidden">
@@ -423,10 +428,44 @@ function AttendancePanel({ subject }) {
   return (
     <>
       <PanelHeading title="Відвідування уроків" meta={`${countLabel(subject.attendance.length, "заняття", "заняття", "занять")} у періоді`} />
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 hidden overflow-x-auto rounded-md border border-slate-200 md:block">
+        <table className="w-full min-w-[640px] table-fixed border-collapse text-left">
+          <colgroup><col className="w-[16%]" /><col className="w-[58%]" /><col className="w-[26%]" /></colgroup>
+          <thead className="bg-slate-50">
+            <tr className="border-b border-slate-200 text-[0.7rem] font-bold text-slate-500">
+              <th className="border-r border-slate-200 px-4 py-3">Дата</th>
+              <th className="border-r border-slate-200 px-4 py-3">Тема уроку</th>
+              <th className="px-4 py-3 text-center">Статус відвідування</th>
+            </tr>
+          </thead>
+          <tbody>
+            {subject.attendance.map((item) => {
+              const status = attendanceLabels[item.status];
+              return (
+                <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0">
+                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{item.date}</td>
+                  <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.topic}</td>
+                  <td className="px-4 py-3.5 text-center"><StatusBadge status={status} /></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-4 space-y-3 md:hidden">
         {subject.attendance.map((item) => {
           const status = attendanceLabels[item.status];
-          return <article key={item.id} className="flex flex-col gap-3 rounded-md border border-slate-200 px-3.5 py-3 sm:flex-row sm:items-center"><time className="w-24 shrink-0 text-[0.74rem] font-semibold text-slate-500">{item.date}</time><p className="min-w-0 flex-1 text-[0.8rem] font-medium text-slate-700">{item.topic}</p><span className={cn("inline-flex w-fit rounded-md px-2.5 py-1.5 text-[0.68rem] font-bold ring-1 ring-inset", status.className)}>{status.label}</span></article>;
+          return (
+            <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <time className="text-[0.7rem] font-medium text-slate-400">{item.date}</time>
+                  <h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.topic}</h3>
+                </div>
+                <StatusBadge status={status} />
+              </div>
+            </article>
+          );
         })}
       </div>
     </>
@@ -438,20 +477,54 @@ function HomeworkPanel({ subject }) {
   return (
     <>
       <PanelHeading title="Домашні завдання" meta={`${countLabel(subject.homework.length, "завдання", "завдання", "завдань")} у періоді`} />
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 hidden overflow-x-auto rounded-md border border-slate-200 md:block">
+        <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
+          <colgroup><col className="w-[16%]" /><col className="w-[16%]" /><col className="w-[42%]" /><col className="w-[26%]" /></colgroup>
+          <thead className="bg-slate-50">
+            <tr className="border-b border-slate-200 text-[0.7rem] font-bold text-slate-500">
+              <th className="border-r border-slate-200 px-4 py-3">Дата видачі</th>
+              <th className="border-r border-slate-200 px-4 py-3">Термін здачі</th>
+              <th className="border-r border-slate-200 px-4 py-3">Опис домашнього завдання</th>
+              <th className="px-4 py-3 text-center">Статус домашнього завдання</th>
+            </tr>
+          </thead>
+          <tbody>
+            {subject.homework.map((item) => {
+              const status = homeworkLabels[item.status];
+              return (
+                <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0">
+                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{item.assignedDate}</td>
+                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{item.dueDate || "—"}</td>
+                  <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.title}</td>
+                  <td className="px-4 py-3.5 text-center"><StatusBadge status={status} /></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-4 space-y-3 md:hidden">
         {subject.homework.map((item) => {
           const status = homeworkLabels[item.status];
           return (
-            <article key={item.id} className="flex flex-col gap-3 rounded-md border border-slate-200 px-4 py-3.5 sm:flex-row sm:items-center">
-              <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-md", item.status === "OVERDUE" ? "bg-red-50 text-red-600" : item.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600")}><ClipboardCheck className="h-4.5 w-4.5" aria-hidden="true" /></span>
-              <div className="min-w-0 flex-1"><h3 className="text-[0.82rem] font-bold leading-5 text-slate-800">{item.title}</h3><p className="mt-1 text-[0.7rem] text-slate-400">Задано {item.assignedDate} · Виконати до {item.dueDate}</p></div>
-              <span className={cn("inline-flex w-fit shrink-0 rounded-md px-2.5 py-1.5 text-[0.68rem] font-bold ring-1 ring-inset", status.className)}>{status.label}</span>
+            <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[0.7rem] font-medium text-slate-400">{item.assignedDate} · до {item.dueDate || "без терміну"}</p>
+                  <h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.title}</h3>
+                </div>
+                <StatusBadge status={status} />
+              </div>
             </article>
           );
         })}
       </div>
     </>
   );
+}
+
+function StatusBadge({ status }) {
+  return <span className={cn("inline-flex w-fit shrink-0 rounded-md px-2.5 py-1.5 text-[0.68rem] font-bold ring-1 ring-inset", status.className)}>{status.label}</span>;
 }
 
 function PanelHeading({ title, meta }) {
@@ -463,7 +536,13 @@ function EmptyPeriodData({ message }) {
 }
 
 function GradeBadge({ value }) {
-  const tone = value >= 10 ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : value >= 7 ? "bg-sky-100 text-sky-700 ring-sky-100" : "bg-amber-50 text-amber-700 ring-amber-200";
+  const tone = value >= 10
+    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+    : value >= 7
+      ? "bg-sky-50 text-sky-700 ring-sky-200"
+      : value >= 4
+        ? "bg-amber-50 text-amber-700 ring-amber-200"
+        : "bg-red-50 text-red-600 ring-red-200";
   return <span className={cn("inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-[0.78rem] font-bold ring-1 ring-inset", tone)}>{value}</span>;
 }
 
