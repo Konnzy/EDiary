@@ -97,7 +97,7 @@ function TeacherList({ teachers }) {
 
 function SubjectActions({ subject, onEdit, onDelete, alignRight = false }) {
   const actionClass = "inline-flex h-8 items-center gap-1.5 rounded-md border bg-white px-2.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2";
-  return <div className={cn("flex flex-wrap gap-2", alignRight && "justify-end")}><button type="button" onClick={() => onEdit(subject)} className={cn(actionClass, "border-slate-800 bg-slate-800 text-white hover:bg-slate-700 focus-visible:ring-slate-400")}><Pencil className="h-3.5 w-3.5" />Редагувати</button><button type="button" onClick={() => onDelete(subject)} className={cn(actionClass, "border-red-600 bg-red-600 text-white hover:bg-red-500 focus-visible:ring-red-400")}><Trash2 className="h-3.5 w-3.5" />Видалити</button></div>;
+  return <div className={cn("flex flex-wrap gap-2", alignRight && "justify-end")}><button type="button" onClick={() => onEdit(subject)} className={cn(actionClass, "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-400")}><Pencil className="h-3.5 w-3.5" />Редагувати</button><button type="button" onClick={() => onDelete(subject)} className={cn(actionClass, "border-red-300 bg-red-50 text-red-700 hover:bg-red-100 focus-visible:ring-red-400")}><Trash2 className="h-3.5 w-3.5" />Видалити</button></div>;
 }
 
 function EmptyState({ query, onCreate }) {

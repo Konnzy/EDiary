@@ -1,7 +1,7 @@
 package com.ediary.backend.registration.entity;
 
-import com.ediary.backend.school.entity.SchoolClass;
-import com.ediary.backend.school.entity.Subject;
+import com.ediary.backend.schedule.entity.SchoolClass;
+import com.ediary.backend.schedule.entity.Subject;
 import com.ediary.backend.user.entity.AppUser;
 import com.ediary.backend.user.entity.StudentProfile;
 import com.ediary.backend.user.entity.UserRole;

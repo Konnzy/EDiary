@@ -5,6 +5,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  KeyRound,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -77,6 +79,29 @@ function formatPhone(value) {
     .join(" ");
 }
 
+function phoneForForm(value) {
+  if (!value) return "";
+  const digits = value.replace(/\D/g, "").replace(/^380/, "");
+  return formatPhone(digits);
+}
+
+function validateEditForm(form) {
+  const errors = {};
+  if (!/^[a-z0-9](?:[a-z0-9._-]{1,48}[a-z0-9])$/.test(form.login)) {
+    errors.login = "3–50 символів; початок і кінець — літера або цифра";
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    errors.email = "Некоректний формат пошти";
+  }
+  if (!UKRAINIAN_NAME_PATTERN.test(form.firstName.trim())) errors.firstName = "Введіть ім’я українськими літерами";
+  if (!UKRAINIAN_NAME_PATTERN.test(form.lastName.trim())) errors.lastName = "Введіть прізвище українськими літерами";
+  if (form.patronymic.trim() && !UKRAINIAN_NAME_PATTERN.test(form.patronymic.trim())) errors.patronymic = "Введіть по батькові українськими літерами";
+  if (["TEACHER", "PARENT"].includes(form.role) && form.phone.replace(/\D/g, "").length !== 9) {
+    errors.phone = "Введіть номер у форматі XX XXX XX XX";
+  }
+  return errors;
+}
+
 function formatParentLinkCode(value) {
   const characters = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
   return characters.length > 4
@@ -146,6 +171,8 @@ export function AdminUsersPage() {
   const [dialog, setDialog] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editDialog, setEditDialog] = useState(null);
+  const [resetDialog, setResetDialog] = useState(null);
 
   const loadUsers = useCallback(async () => {
     setIsLoading(true);
@@ -195,6 +222,18 @@ export function AdminUsersPage() {
 
   const handleDeleted = async (message) => {
     setDeleteDialog(null);
+    setNotice(message);
+    await loadUsers();
+  };
+
+  const handleEdited = async (message) => {
+    setEditDialog(null);
+    setNotice(message);
+    await loadUsers();
+  };
+
+  const handlePasswordReset = async (message) => {
+    setResetDialog(null);
     setNotice(message);
     await loadUsers();
   };
@@ -260,8 +299,8 @@ export function AdminUsersPage() {
         {!error && !isLoading && data?.content?.length === 0 ? <EmptyState /> : null}
         {!error && !isLoading && data?.content?.length ? (
           <>
-            <DesktopTable users={data.content} onChangeStatus={setDialog} onDelete={setDeleteDialog} />
-            <MobileList users={data.content} onChangeStatus={setDialog} onDelete={setDeleteDialog} />
+            <DesktopTable users={data.content} onChangeStatus={setDialog} onEdit={setEditDialog} onResetPassword={setResetDialog} onDelete={setDeleteDialog} />
+            <MobileList users={data.content} onChangeStatus={setDialog} onEdit={setEditDialog} onResetPassword={setResetDialog} onDelete={setDeleteDialog} />
             <Pagination data={data} page={page} onPageChange={setPage} />
           </>
         ) : null}
@@ -288,6 +327,22 @@ export function AdminUsersPage() {
           user={deleteDialog}
           onClose={() => setDeleteDialog(null)}
           onCompleted={handleDeleted}
+        />
+      ) : null}
+
+      {editDialog ? (
+        <EditUserDialog
+          user={editDialog}
+          onClose={() => setEditDialog(null)}
+          onCompleted={handleEdited}
+        />
+      ) : null}
+
+      {resetDialog ? (
+        <ResetPasswordDialog
+          user={resetDialog}
+          onClose={() => setResetDialog(null)}
+          onCompleted={handlePasswordReset}
         />
       ) : null}
     </AdminLayout>
@@ -482,10 +537,10 @@ function FilterSelect({ label, value, options, onChange }) {
   );
 }
 
-function DesktopTable({ users, onChangeStatus, onDelete }) {
+function DesktopTable({ users, onChangeStatus, onEdit, onResetPassword, onDelete }) {
   return (
-    <div className="hidden overflow-x-auto md:block">
-      <table className="w-full min-w-[920px] border-collapse text-left">
+    <div className="hidden overflow-x-auto xl:block">
+      <table className="w-full min-w-[1120px] border-collapse text-left">
         <thead className="bg-slate-50 text-[0.7rem] font-bold uppercase text-slate-400">
           <tr><th className="px-5 py-3">Користувач</th><th className="px-4 py-3">Роль</th><th className="px-4 py-3">Статус</th><th className="px-4 py-3">Створено</th><th className="px-5 py-3 text-right">Дії</th></tr>
         </thead>
@@ -496,7 +551,7 @@ function DesktopTable({ users, onChangeStatus, onDelete }) {
               <td className="px-4 py-4 font-semibold">{roleLabels[user.role]}</td>
               <td className="px-4 py-4"><StatusBadge status={user.status} /></td>
               <td className="px-4 py-4 text-slate-400">{formatDate(user.createdAt)}</td>
-              <td className="px-5 py-4"><UserActions user={user} onChangeStatus={onChangeStatus} onDelete={onDelete} alignRight /></td>
+              <td className="px-5 py-4"><UserActions user={user} onChangeStatus={onChangeStatus} onEdit={onEdit} onResetPassword={onResetPassword} onDelete={onDelete} alignRight /></td>
             </tr>
           ))}
         </tbody>
@@ -505,27 +560,202 @@ function DesktopTable({ users, onChangeStatus, onDelete }) {
   );
 }
 
-function MobileList({ users, onChangeStatus, onDelete }) {
+function MobileList({ users, onChangeStatus, onEdit, onResetPassword, onDelete }) {
   return (
-    <div className="divide-y divide-slate-100 md:hidden">
+    <div className="divide-y divide-slate-100 xl:hidden">
       {users.map((user) => (
         <article key={user.id} className="px-4 py-4">
           <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[0.88rem] font-bold text-slate-900">{user.login}</h2><p className="mt-1 truncate text-[0.74rem] text-slate-400">{user.email}</p></div><StatusBadge status={user.status} /></div>
           <div className="mt-3 text-[0.75rem] font-semibold text-slate-500">{roleLabels[user.role]} · створено {formatDate(user.createdAt)}</div>
-          <div className="mt-4"><UserActions user={user} onChangeStatus={onChangeStatus} onDelete={onDelete} /></div>
+          <div className="mt-4"><UserActions user={user} onChangeStatus={onChangeStatus} onEdit={onEdit} onResetPassword={onResetPassword} onDelete={onDelete} /></div>
         </article>
       ))}
     </div>
   );
 }
 
-function UserActions({ user, onChangeStatus, onDelete, alignRight = false }) {
+function UserActions({ user, onChangeStatus, onEdit, onResetPassword, onDelete, alignRight = false }) {
   const actionClass = "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[0.71rem] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2";
   return (
     <div className={cn("flex flex-wrap gap-2", alignRight && "justify-end")}>
-      {user.status === "BLOCKED" ? <button type="button" onClick={() => onChangeStatus({ user, nextStatus: "ACTIVE" })} className={cn(actionClass, "bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-emerald-500")}><CheckCircle2 className="h-3.5 w-3.5" />Розблокувати</button> : null}
-      {user.status === "ACTIVE" ? <button type="button" onClick={() => onChangeStatus({ user, nextStatus: "BLOCKED" })} className={cn(actionClass, "bg-amber-500 text-slate-950 hover:bg-amber-400 focus-visible:ring-amber-500")}><Ban className="h-3.5 w-3.5" />Блокувати</button> : null}
-      {user.role !== "ADMIN" ? <button type="button" onClick={() => onDelete(user)} className={cn(actionClass, "bg-red-600 text-white hover:bg-red-500 focus-visible:ring-red-500")}><Trash2 className="h-3.5 w-3.5" />Видалити</button> : null}
+      <button type="button" onClick={() => onEdit(user)} className={cn(actionClass, "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-400")}><Pencil className="h-3.5 w-3.5" />Редагувати</button>
+      <button type="button" onClick={() => onResetPassword(user)} className={cn(actionClass, "border border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 focus-visible:ring-sky-400")}><KeyRound className="h-3.5 w-3.5" />Скинути пароль</button>
+      {user.status === "BLOCKED" ? <button type="button" onClick={() => onChangeStatus({ user, nextStatus: "ACTIVE" })} className={cn(actionClass, "border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 focus-visible:ring-emerald-400")}><CheckCircle2 className="h-3.5 w-3.5" />Розблокувати</button> : null}
+      {user.status === "ACTIVE" ? <button type="button" onClick={() => onChangeStatus({ user, nextStatus: "BLOCKED" })} className={cn(actionClass, "border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 focus-visible:ring-amber-400")}><Ban className="h-3.5 w-3.5" />Блокувати</button> : null}
+      {user.role !== "ADMIN" ? <button type="button" onClick={() => onDelete(user)} className={cn(actionClass, "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 focus-visible:ring-red-400")}><Trash2 className="h-3.5 w-3.5" />Видалити</button> : null}
+    </div>
+  );
+}
+
+function EditUserDialog({ user, onClose, onCompleted }) {
+  const [form, setForm] = useState({
+    login: user.login,
+    firstName: user.firstName || "",
+    lastName: user.lastName || "",
+    patronymic: user.patronymic || "",
+    email: user.email,
+    phone: phoneForForm(user.phone),
+    role: user.role,
+  });
+  const [errors, setErrors] = useState({});
+  const [serverError, setServerError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const phoneEnabled = ["TEACHER", "PARENT"].includes(form.role);
+
+  const update = (field, value) => {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "role" && !["TEACHER", "PARENT"].includes(value) ? { phone: "" } : null),
+    }));
+    setErrors((current) => ({ ...current, [field]: "" }));
+    setServerError("");
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    const validationErrors = validateEditForm(form);
+    setErrors(validationErrors);
+    if (Object.keys(validationErrors).length) return;
+
+    setIsSubmitting(true);
+    setServerError("");
+    try {
+      await adminUsersApi.update(user.id, {
+        login: form.login,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        patronymic: form.patronymic.trim() || null,
+        email: form.email.trim(),
+        phone: phoneEnabled ? `+380${form.phone.replace(/\D/g, "")}` : null,
+        role: form.role,
+      });
+      await onCompleted(`Дані користувача ${form.login} оновлено.`);
+    } catch (requestError) {
+      if (requestError instanceof ApiError) {
+        const fieldErrors = { ...(requestError.fieldErrors || {}) };
+        if (requestError.code === "LOGIN_ALREADY_EXISTS") fieldErrors.login = "Цей логін уже використовується";
+        if (requestError.code === "EMAIL_ALREADY_REGISTERED") fieldErrors.email = "Ця електронна пошта вже використовується";
+        setErrors((current) => ({ ...current, ...fieldErrors }));
+        setServerError(requestError.message);
+      } else {
+        setServerError("Не вдалося оновити дані користувача.");
+      }
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section role="dialog" aria-modal="true" aria-labelledby="edit-user-title" className="max-h-[calc(100dvh-2rem)] w-full max-w-[640px] overflow-y-auto rounded-lg border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 id="edit-user-title" className="text-[1.05rem] font-bold text-slate-950">Редагувати користувача</h2>
+            <p className="mt-1 text-[0.8rem] text-slate-500">Зміна даних облікового запису та ролі</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={isSubmitting} className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Закрити"><X className="h-4 w-4" /></button>
+        </div>
+
+        {serverError ? <div className="mt-4"><Alert>{serverError}</Alert></div> : null}
+
+        <form onSubmit={submit} className="mt-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CreateField label="Логін" error={errors.login}>
+              <Input value={form.login} onChange={(event) => update("login", formatLogin(event.target.value))} maxLength={50} autoComplete="off" autoCapitalize="none" spellCheck={false} />
+            </CreateField>
+            <CreateField label="Роль" error={errors.role}>
+              <select value={form.role} onChange={(event) => update("role", event.target.value)} disabled={user.role === "ADMIN"} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.82rem] text-slate-700 outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">
+                {user.role === "ADMIN" ? <option value="ADMIN">Адміністратор</option> : null}
+                <option value="STUDENT">Учень</option>
+                <option value="TEACHER">Вчитель</option>
+                <option value="PARENT">Батьки</option>
+              </select>
+            </CreateField>
+            <CreateField label="Ім’я" error={errors.firstName}>
+              <Input value={form.firstName} onChange={(event) => update("firstName", formatName(event.target.value))} maxLength={50} autoComplete="off" />
+            </CreateField>
+            <CreateField label="Прізвище" error={errors.lastName}>
+              <Input value={form.lastName} onChange={(event) => update("lastName", formatName(event.target.value))} maxLength={50} autoComplete="off" />
+            </CreateField>
+            <CreateField label="По батькові (необов’язково)" error={errors.patronymic}>
+              <Input value={form.patronymic} onChange={(event) => update("patronymic", formatName(event.target.value))} maxLength={50} autoComplete="off" />
+            </CreateField>
+            <CreateField label="Електронна пошта" error={errors.email}>
+              <Input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} maxLength={100} autoComplete="off" />
+            </CreateField>
+            <CreateField label="Номер телефону" error={errors.phone}>
+              <div className="relative">
+                <span className={cn("pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[0.82rem]", phoneEnabled ? "text-slate-600" : "text-slate-400")}>+380</span>
+                <Input type="tel" inputMode="numeric" value={form.phone} onChange={(event) => update("phone", formatPhone(event.target.value))} disabled={!phoneEnabled} className="pl-[3.8rem] disabled:cursor-not-allowed disabled:bg-slate-100" placeholder="XX XXX XX XX" />
+              </div>
+              {!phoneEnabled ? <span className="mt-1.5 block text-[0.7rem] font-normal text-slate-400">Особистий телефон для цієї ролі не зберігається</span> : null}
+            </CreateField>
+          </div>
+
+          {user.role !== "ADMIN" && form.role !== user.role ? (
+            <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[0.77rem] leading-5 text-amber-800">
+              Роль буде змінено лише за відсутності пов’язаних оцінок, занять, класів або дітей. Після зміни активні сесії користувача завершаться.
+            </div>
+          ) : null}
+          {user.role === "ADMIN" ? (
+            <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-[0.77rem] leading-5 text-slate-600">
+              Роль адміністратора захищена та не змінюється в цьому вікні.
+            </div>
+          ) : null}
+
+          <div className="mt-6 flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} className="h-10 rounded-md border border-slate-300 bg-white px-4">Скасувати</Button>
+            <Button type="submit" disabled={isSubmitting} className="h-10 min-w-[124px] rounded-md px-4">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+              Зберегти
+            </Button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function ResetPasswordDialog({ user, onClose, onCompleted }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    setIsSubmitting(true);
+    setError("");
+    try {
+      const response = await adminUsersApi.resetPassword(user.id);
+      await onCompleted(response.message || `Тимчасовий пароль надіслано користувачу ${user.login}.`);
+    } catch (requestError) {
+      setError(requestError instanceof ApiError ? requestError.message : "Не вдалося скинути пароль користувача.");
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section role="dialog" aria-modal="true" aria-labelledby="reset-user-password-title" className="w-full max-w-[480px] rounded-lg border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 id="reset-user-password-title" className="text-[1.05rem] font-bold text-slate-950">Скинути пароль</h2>
+            <p className="mt-1 text-[0.8rem] text-slate-500">{user.login} · {roleLabels[user.role]}</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={isSubmitting} className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Закрити"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="mt-5 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-[0.8rem] leading-5 text-sky-900">
+          Новий тимчасовий пароль буде згенеровано на сервері та надіслано на <strong>{user.email}</strong>. Адміністратор не побачить пароль. Усі активні сесії користувача завершаться.
+        </div>
+        {error ? <div className="mt-4"><Alert>{error}</Alert></div> : null}
+
+        <div className="mt-6 flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} className="h-10 rounded-md border border-slate-300 bg-white px-4">Скасувати</Button>
+          <Button type="button" onClick={submit} disabled={isSubmitting} className="h-10 min-w-[152px] rounded-md bg-sky-700 px-4 text-white hover:bg-sky-600">
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+            Скинути пароль
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }

@@ -132,7 +132,7 @@ export const adminRegistrationApi = {
   }),
 };
 
-export const adminUsersApi = {
+  export const adminUsersApi = {
   create: (payload) => request("/admin/users", {
     method: "POST",
     body: payload,
@@ -145,11 +145,20 @@ export const adminUsersApi = {
     if (status) params.set("status", status);
     return request(`/admin/users?${params}`);
   },
-  changeStatus: (userId, status) => request(`/admin/users/${userId}/status`, {
+    changeStatus: (userId, status) => request(`/admin/users/${userId}/status`, {
     method: "PATCH",
     body: { status },
-    csrf: true,
-  }),
+      csrf: true,
+    }),
+    update: (userId, payload) => request(`/admin/users/${userId}`, {
+      method: "PATCH",
+      body: payload,
+      csrf: true,
+    }),
+    resetPassword: (userId) => request(`/admin/users/${userId}/reset-password`, {
+      method: "POST",
+      csrf: true,
+    }),
   getDeletionEligibility: (userId) => request(`/admin/users/${userId}/deletion-eligibility`),
   delete: (userId) => request(`/admin/users/${userId}`, {
     method: "DELETE",

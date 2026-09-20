@@ -1,0 +1,44 @@
+package com.ediary.backend.notification.entity;
+
+import com.ediary.backend.user.entity.AppUser;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "user_notification_settings")
+@Getter
+@Setter
+@NoArgsConstructor
+public class UserNotificationSettings {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "settings_id")
+    private Long id;
+
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    private AppUser user;
+
+    @Column(name = "grade_email_enabled", nullable = false)
+    private boolean gradeEmailEnabled = true;
+
+    @Column(name = "homework_email_enabled", nullable = false)
+    private boolean homeworkEmailEnabled = true;
+
+    @Column(name = "attendance_email_enabled", nullable = false)
+    private boolean attendanceEmailEnabled = true;
+
+    @Column(name = "homework_status_email_enabled", nullable = false)
+    private boolean homeworkStatusEmailEnabled = true;
+}

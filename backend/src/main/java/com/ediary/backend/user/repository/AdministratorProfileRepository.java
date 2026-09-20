@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface AdministratorProfileRepository extends JpaRepository<AdministratorProfile, Long> {
 
+    Optional<AdministratorProfile> findByUser_Id(Long userId);
+
     @EntityGraph(attributePaths = "user")
     Optional<AdministratorProfile> findByUserLoginIgnoreCase(String login);
 }

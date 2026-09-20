@@ -15,6 +15,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface RegistrationRequestRepository extends JpaRepository<RegistrationRequest, Long> {
 
+    long deleteByRequestedStudent_User_Id(Long userId);
+
+    long deleteByProcessedUser_Id(Long userId);
+
     boolean existsByEmailIgnoreCaseAndStatus(String email, RegistrationStatus status);
 
     long countByStatus(RegistrationStatus status);

@@ -3,6 +3,7 @@ package com.ediary.backend.user.repository;
 import com.ediary.backend.user.entity.TeacherProfile;
 import com.ediary.backend.user.entity.UserStatus;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,6 +11,18 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface TeacherProfileRepository extends JpaRepository<TeacherProfile, Long> {
+
+    Optional<TeacherProfile> findByUser_Id(Long userId);
+
+    long deleteByUser_Id(Long userId);
+
+    @Query("""
+        select case when count(subject) > 0 then true else false end
+        from TeacherProfile teacher
+        join teacher.subjects subject
+        where teacher.user.id = :userId
+        """)
+    boolean hasAssignedSubjects(@Param("userId") Long userId);
 
     @EntityGraph(attributePaths = "user")
     List<TeacherProfile> findAllByUser_StatusOrderBySurnameAscNameAsc(UserStatus status);

@@ -35,6 +35,9 @@ public class AdministratorProfile {
     @Column(name = "admin_surname", nullable = false, length = 50)
     private String surname;
 
+    @Column(name = "admin_patronymic", length = 50)
+    private String patronymic;
+
     @Column(name = "admin_code_hash", nullable = false, unique = true)
     private String codeHash;
 }

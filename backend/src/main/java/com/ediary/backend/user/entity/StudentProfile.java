@@ -1,6 +1,6 @@
 package com.ediary.backend.user.entity;
 
-import com.ediary.backend.school.entity.SchoolClass;
+import com.ediary.backend.schedule.entity.SchoolClass;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

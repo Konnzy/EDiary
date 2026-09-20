@@ -160,7 +160,6 @@ export function ResetPasswordPage({ token = "" }) {
               {isLoading ? "Збереження..." : "Зберегти пароль"}
             </Button>
             </fieldset>
-            {!notice ? <a href="#forgot-password" className="block text-center text-sm text-slate-600 underline">Отримати нове посилання</a> : null}
           </form>
 
           <div className="mt-8 flex justify-center">

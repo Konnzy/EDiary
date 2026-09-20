@@ -14,10 +14,16 @@ import org.springframework.data.repository.query.Param;
 
 public interface StudentProfileRepository extends JpaRepository<StudentProfile, Long> {
 
+    Optional<StudentProfile> findByUser_Id(Long userId);
+
     @EntityGraph(attributePaths = {"user", "schoolClass"})
     Optional<StudentProfile> findByUser_LoginIgnoreCase(String login);
 
     long countBySchoolClassId(Long classId);
+
+    boolean existsByUser_IdAndSchoolClassIsNotNull(Long userId);
+
+    long deleteByUser_Id(Long userId);
 
     boolean existsByParentLinkCodeHash(String parentLinkCodeHash);
 
