@@ -13,6 +13,22 @@ import org.springframework.data.repository.query.Param;
 
 public interface ScheduleRepository extends JpaRepository<ScheduleEntry, Long> {
 
+    interface TeacherClassAssignment {
+        Long getTeacherId();
+        Integer getClassNumber();
+        String getClassLetter();
+    }
+
+    @Query("""
+        select distinct entry.teacher.id as teacherId,
+            entry.schoolClass.number as classNumber,
+            entry.schoolClass.letter as classLetter
+        from ScheduleEntry entry
+        where entry.active = true
+        order by entry.teacher.id, entry.schoolClass.number, entry.schoolClass.letter
+        """)
+    List<TeacherClassAssignment> findActiveTeacherClassAssignments();
+
     boolean existsByTeacher_User_Id(Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRightLeft, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Plus, Search, Trash2, UserMinus, Users, X } from "lucide-react";
+import { ArrowRightLeft, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Plus, Search, Trash2, UserMinus, Users, X } from "lucide-react";
 import { Alert } from "@/components/ui/alert.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
@@ -31,6 +31,7 @@ export function AdminClassDetailsPage({ classId }) {
   const [dialog, setDialog] = useState(null);
   const [editing, setEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [journalPreviewStudent, setJournalPreviewStudent] = useState(null);
   const [checkingDeletion, setCheckingDeletion] = useState(false);
   const [actionError, setActionError] = useState("");
 
@@ -129,6 +130,7 @@ export function AdminClassDetailsPage({ classId }) {
             onAdd={() => setDialog({ type: "add" })}
             onTransfer={(student) => setDialog({ type: "transfer", student })}
             onRemove={(student) => setDialog({ type: "remove", student })}
+            onViewLearningData={setJournalPreviewStudent}
             editable={schoolClass.editable}
           />
         </>
@@ -148,6 +150,13 @@ export function AdminClassDetailsPage({ classId }) {
 
       {deleteDialogOpen ? (
         <DeleteClassDialog schoolClass={schoolClass} onClose={() => setDeleteDialogOpen(false)} />
+      ) : null}
+
+      {journalPreviewStudent ? (
+        <JournalPendingDialog
+          student={journalPreviewStudent}
+          onClose={() => setJournalPreviewStudent(null)}
+        />
       ) : null}
     </AdminLayout>
   );
@@ -170,13 +179,27 @@ function SuccessNotice({ children }) {
   return <div role="status" className="mt-5 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4 shrink-0" />{children}</div>;
 }
 
-function StudentsSection({ students, visibleStudents, query, onQueryChange, onAdd, onTransfer, onRemove, editable }) {
+function StudentsSection({ students, visibleStudents, query, onQueryChange, onAdd, onTransfer, onRemove, onViewLearningData, editable }) {
   const full = students.length >= CLASS_CAPACITY;
-  return <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5"><h2 className="text-base font-bold">Учні класу <span className="ml-2 font-normal text-slate-400">{students.length}</span></h2>{editable ? <Button onClick={onAdd} disabled={full} title={full ? "У класі немає вільних місць" : "Додати учня"} className="h-10 rounded-md"><Plus className="h-4 w-4" />Додати учня</Button> : <span className="text-xs text-slate-500">Архівний склад, лише перегляд</span>}</div><div className="border-b border-slate-100 p-5"><div className="relative max-w-lg"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><Input aria-label="Пошук учнів за ПІБ або логіном" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Пошук за ПІБ або логіном" className="pl-10" /></div>{full ? <p className="mt-3 text-xs text-amber-700">У класі немає вільних місць.</p> : null}</div>{visibleStudents.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500"><tr><th className="px-5 py-3 font-medium">Учень</th><th className="px-5 py-3 font-medium">Статус учня</th>{editable ? <th className="px-5 py-3 text-right font-medium">Дії</th> : null}</tr></thead><tbody className="divide-y divide-slate-100">{visibleStudents.map((student) => <StudentRow key={student.id} student={student} editable={editable} onTransfer={() => onTransfer(student)} onRemove={() => onRemove(student)} />)}</tbody></table></div> : <div className="py-12 text-center text-sm text-slate-500"><Users className="mx-auto mb-3 h-7 w-7 text-slate-300" />{query ? "Учнів за цим запитом не знайдено." : "У класі поки немає учнів."}</div>}</section>;
+  return <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5"><h2 className="text-base font-bold">Учні класу <span className="ml-2 font-normal text-slate-400">{students.length}</span></h2>{editable ? <Button onClick={onAdd} disabled={full} title={full ? "У класі немає вільних місць" : "Додати учня"} className="h-10 rounded-md"><Plus className="h-4 w-4" />Додати учня</Button> : <span className="text-xs text-slate-500">Архівний склад, лише перегляд</span>}</div><div className="border-b border-slate-100 p-5"><div className="relative max-w-lg"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><Input aria-label="Пошук учнів за ПІБ або логіном" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Пошук за ПІБ або логіном" className="pl-10" /></div>{full ? <p className="mt-3 text-xs text-amber-700">У класі немає вільних місць.</p> : null}</div>{visibleStudents.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500"><tr><th className="px-5 py-3 font-medium">Учень</th><th className="px-5 py-3 font-medium">Статус учня</th><th className="px-5 py-3 text-right font-medium">Дії</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleStudents.map((student) => <StudentRow key={student.id} student={student} editable={editable} onViewLearningData={() => onViewLearningData(student)} onTransfer={() => onTransfer(student)} onRemove={() => onRemove(student)} />)}</tbody></table></div> : <div className="py-12 text-center text-sm text-slate-500"><Users className="mx-auto mb-3 h-7 w-7 text-slate-300" />{query ? "Учнів за цим запитом не знайдено." : "У класі поки немає учнів."}</div>}</section>;
 }
 
-function StudentRow({ student, onTransfer, onRemove, editable }) {
-  return <tr className="hover:bg-slate-50/60"><td className="px-5 py-4"><div className="font-semibold text-slate-800">{student.fullName}</div><div className="mt-1 text-xs text-slate-500">{student.login}</div><div className="mt-1 break-all text-xs text-slate-400">{student.email}</div></td><td className="px-5 py-4"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${statusStyles[student.status] || statusStyles.STUDYING}`}>{statusLabels[student.status] || student.status}</span></td>{editable ? <td className="px-5 py-4"><div className="flex flex-wrap justify-end gap-2"><Button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-700 hover:bg-slate-100" onClick={onTransfer} title="Перевести до іншого класу"><ArrowRightLeft className="h-4 w-4" /><span className="hidden 2xl:inline">Перевести до іншого класу</span><span className="sr-only 2xl:hidden">Перевести до іншого класу</span></Button><Button className="h-9 rounded-md border border-red-300 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100" onClick={onRemove} title="Вилучити з класу"><UserMinus className="h-4 w-4" /><span className="hidden 2xl:inline">Вилучити з класу</span><span className="sr-only 2xl:hidden">Вилучити з класу</span></Button></div></td> : null}</tr>;
+function StudentRow({ student, onViewLearningData, onTransfer, onRemove, editable }) {
+  return <tr className="hover:bg-slate-50/60"><td className="px-5 py-4"><div className="font-semibold text-slate-800">{student.fullName}</div><div className="mt-1 text-xs text-slate-500">{student.login}</div><div className="mt-1 break-all text-xs text-slate-400">{student.email}</div></td><td className="px-5 py-4"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${statusStyles[student.status] || statusStyles.STUDYING}`}>{statusLabels[student.status] || student.status}</span></td><td className="px-5 py-4"><div className="flex flex-wrap justify-end gap-2"><Button className="h-9 rounded-md border border-sky-300 bg-sky-50 px-3 text-xs text-sky-700 hover:bg-sky-100" onClick={onViewLearningData} title="Навчальні дані"><BookOpen className="h-4 w-4" /><span className="hidden 2xl:inline">Навчальні дані</span><span className="sr-only 2xl:hidden">Навчальні дані</span></Button>{editable ? <><Button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-700 hover:bg-slate-100" onClick={onTransfer} title="Перевести до іншого класу"><ArrowRightLeft className="h-4 w-4" /><span className="hidden 2xl:inline">Перевести до іншого класу</span><span className="sr-only 2xl:hidden">Перевести до іншого класу</span></Button><Button className="h-9 rounded-md border border-red-300 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100" onClick={onRemove} title="Вилучити з класу"><UserMinus className="h-4 w-4" /><span className="hidden 2xl:inline">Вилучити з класу</span><span className="sr-only 2xl:hidden">Вилучити з класу</span></Button></> : null}</div></td></tr>;
+}
+
+function JournalPendingDialog({ student, onClose }) {
+  const panel = useRef(null);
+
+  useEffect(() => {
+    const previous = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    panel.current?.focus();
+    return () => { document.body.style.overflow = previousOverflow; previous?.focus(); };
+  }, []);
+
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><section ref={panel} tabIndex={-1} onKeyDown={(event) => event.key === "Escape" && onClose()} role="dialog" aria-modal="true" aria-labelledby="journal-pending-title" className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-2xl outline-none sm:p-6"><div className="flex items-start justify-between gap-4"><div><h2 id="journal-pending-title" className="text-base font-bold text-slate-950">Навчальні дані</h2><p className="mt-1 text-xs text-slate-500">{student.fullName}</p></div><button type="button" onClick={onClose} aria-label="Закрити" className="rounded p-1 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button></div><div className="mt-5 flex gap-4 rounded-md border border-sky-200 bg-sky-50 p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-sky-200 bg-white text-sky-700"><BookOpen className="h-5 w-5" /></span><div><h3 className="text-sm font-bold text-slate-900">Очікується реалізація модуля журналу</h3><p className="mt-1 text-sm leading-6 text-slate-600">Тут буде доступний перегляд оцінок, відвідування та домашніх завдань учня в режимі лише для читання.</p></div></div><div className="mt-6 flex justify-end"><Button type="button" onClick={onClose} className="h-9 rounded-md px-4 text-xs">Зрозуміло</Button></div></section></div>;
 }
 
 function MembershipDialog({ dialog, schoolClass, classes, onClose, onConfirm }) {

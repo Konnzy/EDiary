@@ -11,6 +11,7 @@ import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.schedule.dto.request.SaveSubjectRequest;
 import com.ediary.backend.schedule.entity.Subject;
 import com.ediary.backend.schedule.repository.SubjectRepository;
+import com.ediary.backend.schedule.repository.ScheduleRepository;
 import com.ediary.backend.user.entity.AppUser;
 import com.ediary.backend.user.entity.TeacherProfile;
 import com.ediary.backend.user.entity.UserStatus;
@@ -29,12 +30,14 @@ class AdminSubjectServiceTest {
 
     @Mock private SubjectRepository subjectRepository;
     @Mock private TeacherProfileRepository teacherProfileRepository;
+    @Mock private ScheduleRepository scheduleRepository;
+    @Mock private ScheduleRepository.TeacherClassAssignment classAssignment;
 
     private AdminSubjectService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminSubjectService(subjectRepository, teacherProfileRepository);
+        service = new AdminSubjectService(subjectRepository, teacherProfileRepository, scheduleRepository);
     }
 
     @Test
@@ -67,6 +70,28 @@ class AdminSubjectServiceTest {
             .isInstanceOf(ApplicationException.class)
             .satisfies(error -> assertThat(((ApplicationException) error).getCode())
                 .isEqualTo("SUBJECT_ALREADY_EXISTS"));
+    }
+
+    @Test
+    void returnsTeacherSubjectAndClassLoadForOptions() {
+        TeacherProfile teacher = activeTeacher(1L, "Іваненко", "Іван");
+        teacher.getSubjects().add(subject(7L, "Математика"));
+        teacher.getSubjects().add(subject(8L, "Алгебра"));
+        when(classAssignment.getTeacherId()).thenReturn(1L);
+        when(classAssignment.getClassNumber()).thenReturn(9);
+        when(classAssignment.getClassLetter()).thenReturn("А");
+        when(scheduleRepository.findActiveTeacherClassAssignments())
+            .thenReturn(List.of(classAssignment));
+        when(teacherProfileRepository.findAllByOrderBySurnameAscNameAsc())
+            .thenReturn(List.of(teacher));
+
+        var response = service.getOptions();
+
+        assertThat(response.teachers()).singleElement().satisfies(option -> {
+            assertThat(option.subjectIds()).containsExactly(8L, 7L);
+            assertThat(option.subjectTitles()).containsExactly("Алгебра", "Математика");
+            assertThat(option.classNames()).containsExactly("9-А");
+        });
     }
 
     @Test

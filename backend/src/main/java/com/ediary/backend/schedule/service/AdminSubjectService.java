@@ -8,6 +8,7 @@ import com.ediary.backend.schedule.dto.response.SubjectDeletionEligibilityRespon
 import com.ediary.backend.schedule.dto.response.SubjectTeacherResponse;
 import com.ediary.backend.schedule.entity.Subject;
 import com.ediary.backend.schedule.repository.SubjectRepository;
+import com.ediary.backend.schedule.repository.ScheduleRepository;
 import com.ediary.backend.user.entity.TeacherProfile;
 import com.ediary.backend.user.entity.UserStatus;
 import com.ediary.backend.user.repository.TeacherProfileRepository;
@@ -29,6 +30,7 @@ public class AdminSubjectService {
 
     private final SubjectRepository subjectRepository;
     private final TeacherProfileRepository teacherProfileRepository;
+    private final ScheduleRepository scheduleRepository;
 
     @Transactional(readOnly = true)
     public List<AdminSubjectResponse> findAll(String query) {
@@ -51,10 +53,23 @@ public class AdminSubjectService {
 
     @Transactional(readOnly = true)
     public AdminSubjectOptionsResponse getOptions() {
+        Map<Long, List<String>> classesByTeacher = scheduleRepository
+            .findActiveTeacherClassAssignments()
+            .stream()
+            .collect(Collectors.groupingBy(
+                ScheduleRepository.TeacherClassAssignment::getTeacherId,
+                Collectors.mapping(
+                    assignment -> assignment.getClassNumber() + "-" + assignment.getClassLetter(),
+                    Collectors.toList()
+                )
+            ));
         List<SubjectTeacherResponse> teachers = teacherProfileRepository
             .findAllByOrderBySurnameAscNameAsc()
             .stream()
-            .map(this::toTeacherResponse)
+            .map(teacher -> toTeacherResponse(
+                teacher,
+                classesByTeacher.getOrDefault(teacher.getId(), List.of())
+            ))
             .toList();
         return new AdminSubjectOptionsResponse(teachers);
     }
@@ -218,7 +233,24 @@ public class AdminSubjectService {
     }
 
     private SubjectTeacherResponse toTeacherResponse(TeacherProfile teacher) {
-        return new SubjectTeacherResponse(teacher.getId(), fullName(teacher), teacher.getUser().getStatus());
+        return toTeacherResponse(teacher, List.of());
+    }
+
+    private SubjectTeacherResponse toTeacherResponse(
+        TeacherProfile teacher,
+        List<String> classNames
+    ) {
+        List<Subject> subjects = teacher.getSubjects().stream()
+            .sorted((left, right) -> left.getTitle().compareToIgnoreCase(right.getTitle()))
+            .toList();
+        return new SubjectTeacherResponse(
+            teacher.getId(),
+            fullName(teacher),
+            teacher.getUser().getStatus(),
+            subjects.stream().map(Subject::getId).toList(),
+            subjects.stream().map(Subject::getTitle).toList(),
+            classNames
+        );
     }
 
     private String fullName(TeacherProfile teacher) {

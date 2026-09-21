@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, CheckCircle2, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, UserRound, Users, X } from "lucide-react";
+import { BookOpen, CheckCircle2, ChevronDown, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, UserRound, Users, X } from "lucide-react";
 import { Alert } from "@/components/ui/alert.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -153,7 +153,104 @@ function SubjectDialog({ subject, onClose, onCompleted }) {
     }
   };
 
-  return <ModalFrame title={editing ? "Редагувати предмет" : "Створити предмет"} subtitle="Вкажіть назву та оберіть одного або кількох учителів." onClose={onClose} busy={submitting}><form onSubmit={submit} className="mt-5 space-y-5"><label className="block text-sm font-semibold text-slate-700">Назва предмета<Input value={title} onChange={(event) => { setTitle(event.target.value); setFieldError(""); }} maxLength={50} autoFocus placeholder="Наприклад, Математика" className={cn("mt-2", fieldError && "border-red-400")} />{fieldError ? <span className="mt-1.5 block text-xs font-normal text-red-500">{fieldError}</span> : null}</label><div><div className="mb-2 flex items-end justify-between gap-3"><div><h3 className="text-sm font-semibold text-slate-700">Вчителі</h3><p className="mt-1 text-xs text-slate-500">Обрано: {teacherIds.length}</p></div></div><div className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><Input value={teacherQuery} onChange={(event) => setTeacherQuery(event.target.value)} placeholder="Пошук учителя" aria-label="Пошук учителя" className="pl-10" /></div><div className="mt-2 max-h-60 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200">{loadingOptions ? <div className="flex justify-center p-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div> : visibleTeachers.length ? visibleTeachers.map((teacher) => { const selected = teacherIds.includes(teacher.id); const unavailable = teacher.status !== "ACTIVE" && !selected; return <label key={teacher.id} className={cn("flex items-center gap-3 p-3 text-sm", unavailable ? "cursor-not-allowed bg-slate-50 text-slate-400" : "cursor-pointer hover:bg-slate-50")}><input type="checkbox" checked={selected} disabled={unavailable} onChange={() => toggleTeacher(teacher.id)} /><UserRound className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate font-medium">{teacher.fullName}</span><span className={cn("text-xs", teacher.status === "ACTIVE" ? "text-emerald-600" : "text-amber-600")}>{teacherStatusLabels[teacher.status]}</span></label>; }) : <p className="p-5 text-sm text-slate-500">Учителів не знайдено.</p>}</div></div>{error ? <Alert>{error}</Alert> : null}<div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onClose} disabled={submitting} className="h-10 rounded-md border border-slate-300 bg-white px-4">Скасувати</Button><Button type="submit" disabled={submitting || loadingOptions} className="h-10 min-w-[120px] rounded-md px-4">{submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{editing ? "Зберегти" : "Створити"}</Button></div></form></ModalFrame>;
+  return (
+    <ModalFrame
+      title={editing ? "Редагувати предмет" : "Створити предмет"}
+      subtitle="Вкажіть назву та оберіть одного або кількох учителів."
+      onClose={onClose}
+      busy={submitting}
+    >
+      <form onSubmit={submit} className="mt-5 space-y-5">
+        <label className="block text-sm font-semibold text-slate-700">
+          Назва предмета
+          <Input
+            value={title}
+            onChange={(event) => { setTitle(event.target.value); setFieldError(""); }}
+            maxLength={50}
+            autoFocus
+            placeholder="Наприклад, Математика"
+            className={cn("mt-2", fieldError && "border-red-400")}
+          />
+          {fieldError ? <span className="mt-1.5 block text-xs font-normal text-red-500">{fieldError}</span> : null}
+        </label>
+
+        <div>
+          <div className="mb-2 flex items-end justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-700">Вчителі</h3>
+              <p className="mt-1 text-xs text-slate-500">Обрано: {teacherIds.length}</p>
+            </div>
+          </div>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+            <Input value={teacherQuery} onChange={(event) => setTeacherQuery(event.target.value)} placeholder="Пошук учителя" aria-label="Пошук учителя" className="pl-10" />
+          </div>
+          <div className="mt-2 max-h-72 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200">
+            {loadingOptions ? (
+              <div className="flex justify-center p-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+            ) : visibleTeachers.length ? visibleTeachers.map((teacher) => {
+              const selected = teacherIds.includes(teacher.id);
+              const unavailable = teacher.status !== "ACTIVE" && !selected;
+              const alreadyAssigned = Boolean(subject?.id && teacher.subjectIds?.includes(subject.id));
+              return (
+                <TeacherOption
+                  key={teacher.id}
+                  teacher={teacher}
+                  selected={selected}
+                  unavailable={unavailable}
+                  alreadyAssigned={alreadyAssigned}
+                  onToggle={() => toggleTeacher(teacher.id)}
+                />
+              );
+            }) : <p className="p-5 text-sm text-slate-500">Учителів не знайдено.</p>}
+          </div>
+        </div>
+
+        {error ? <Alert>{error}</Alert> : null}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={submitting} className="h-10 rounded-md border border-slate-300 bg-white px-4">Скасувати</Button>
+          <Button type="submit" disabled={submitting || loadingOptions} className="h-10 min-w-[120px] rounded-md px-4">
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {editing ? "Зберегти" : "Створити"}
+          </Button>
+        </div>
+      </form>
+    </ModalFrame>
+  );
+}
+
+function TeacherOption({ teacher, selected, unavailable, alreadyAssigned, onToggle }) {
+  const subjectTitles = teacher.subjectTitles || [];
+  const classNames = teacher.classNames || [];
+  return (
+    <div className={cn("p-3 text-sm", unavailable ? "bg-slate-50 text-slate-400" : "hover:bg-slate-50")}>
+      <div className="flex items-start gap-3">
+        <label className={cn("flex min-w-0 flex-1 items-center gap-3", unavailable ? "cursor-not-allowed" : "cursor-pointer")}>
+          <input type="checkbox" checked={selected} disabled={unavailable} onChange={onToggle} />
+          <UserRound className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 truncate font-medium">{teacher.fullName}</span>
+        </label>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {alreadyAssigned ? <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[0.68rem] font-semibold text-emerald-700">Вже викладає</span> : null}
+          {teacher.status !== "ACTIVE" ? <span className="text-xs font-medium text-amber-600">{teacherStatusLabels[teacher.status]}</span> : null}
+        </div>
+      </div>
+      <details className="group mt-2 pl-7">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800">
+          {subjectTitles.length} {subjectWord(subjectTitles.length)} · {classNames.length} {classWord(classNames.length)}
+          <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="mt-2 grid gap-2 rounded-md border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 sm:grid-cols-2">
+          <LoadDetail label="Предмети" values={subjectTitles} empty="Ще не призначено" />
+          <LoadDetail label="Класи" values={classNames} empty="У розкладі немає класів" />
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function LoadDetail({ label, values, empty }) {
+  return <div><div className="font-bold text-slate-700">{label}</div><div className="mt-0.5">{values.length ? values.join(", ") : empty}</div></div>;
 }
 
 function DeleteSubjectDialog({ subject, onClose, onCompleted }) {
@@ -198,4 +295,10 @@ function subjectWord(value) {
   if (value % 10 === 1 && value % 100 !== 11) return "предмет";
   if ([2, 3, 4].includes(value % 10) && ![12, 13, 14].includes(value % 100)) return "предмети";
   return "предметів";
+}
+
+function classWord(value) {
+  if (value % 10 === 1 && value % 100 !== 11) return "клас";
+  if ([2, 3, 4].includes(value % 10) && ![12, 13, 14].includes(value % 100)) return "класи";
+  return "класів";
 }
