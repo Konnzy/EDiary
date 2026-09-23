@@ -144,7 +144,7 @@
   }
 
   html.dark :is([class~="bg-sky-50"], [class~="bg-sky-100"], [class~="bg-sky-50/40"]) { background-color: #15354d; }
-  html.dark [class~="text-sky-700"] { color: #a6d9fb; }
+  html.dark :is([class~="text-sky-700"], [class~="text-sky-900"]) { color: #a6d9fb; }
   html.dark :is([class~="border-sky-200"], [class~="border-sky-300"]) { border-color: #4681aa; }
 
   html.dark :is([class~="bg-emerald-50"], [class~="bg-emerald-100"], [class~="hover:bg-emerald-100"]:hover) { background-color: #173b32; }

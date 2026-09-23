@@ -46,4 +46,8 @@ public class SchoolClass {
     public String getDisplayName() {
         return number + "-" + letter;
     }
+
+    public boolean isDraft() {
+        return classTeacher == null;
+    }
 }

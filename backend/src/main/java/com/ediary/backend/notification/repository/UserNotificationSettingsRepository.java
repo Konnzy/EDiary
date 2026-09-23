@@ -5,4 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserNotificationSettingsRepository extends JpaRepository<UserNotificationSettings, Long> {
     long deleteByUser_Id(Long userId);
+
+    java.util.Optional<UserNotificationSettings> findByUser_Id(Long userId);
 }

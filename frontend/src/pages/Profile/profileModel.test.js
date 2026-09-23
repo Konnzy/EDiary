@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  normalizeProfilePreferences,
+  mapProfileResponse,
   validateAvatarFile,
   validatePasswordChange,
   validatePhone,
@@ -36,30 +36,15 @@ test("calculates the same password strength levels used by password reset", () =
   assert.equal(getPasswordStrength("Letters123!").label, "Висока");
 });
 
-test("normalizes stored preferences without losing defaults", () => {
-  const fallback = {
-    avatar: "",
-    phone: "+380 00 000 00 00",
-    selectedChildId: "child-1",
-    notifications: { newGrade: true, newHomework: true, absence: true },
-  };
-  assert.deepEqual(normalizeProfilePreferences({ notifications: { newGrade: false } }, fallback), {
-    avatar: "",
-    phone: "+380 00 000 00 00",
-    selectedChildId: "child-1",
-    notifications: { newGrade: false, newHomework: true, absence: true },
+test("maps the current user's role data without example content", () => {
+  const profile = mapProfileResponse({
+    role: "PARENT", firstName: "Олена", lastName: "Іваненко", patronymic: "Петрівна",
+    login: "parent.ivanenko", email: "parent@example.com", phone: "+380671234567",
+    avatarVersion: null, notifications: { newGrade: false },
+    children: [{ id: 42, fullName: "Іваненко Артем", className: null, teacherName: null }],
   });
-});
-
-test("normalizes the teacher notification preferences independently", () => {
-  const fallback = {
-    avatar: "",
-    phone: "+380 67 765 43 21",
-    selectedChildId: "",
-    notifications: { newMessage: true, scheduleChange: true },
-  };
-  assert.deepEqual(normalizeProfilePreferences({ notifications: { newMessage: false } }, fallback).notifications, {
-    newMessage: false,
-    scheduleChange: true,
-  });
+  assert.equal(profile.fullName, "Іваненко Олена Петрівна");
+  assert.equal(profile.children[0].id, "42");
+  assert.equal(profile.children[0].className, "Не призначено");
+  assert.equal(profile.notifications.newGrade, false);
 });

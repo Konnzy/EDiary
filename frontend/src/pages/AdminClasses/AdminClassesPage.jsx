@@ -26,6 +26,12 @@ const emptyForm = {
   classTeacherId: "",
 };
 
+const classStatus = {
+  ACTIVE: { label: "Активний", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  DRAFT: { label: "Чернетка", className: "border-amber-200 bg-amber-50 text-amber-800" },
+  ARCHIVED: { label: "Архівний", className: "border-slate-200 bg-slate-50 text-slate-600" },
+};
+
 function normalizeClassLetter(value) {
   return value.toUpperCase().replace(/[^А-ЯІЇЄҐ]/g, "").slice(0, 1);
 }
@@ -241,6 +247,7 @@ export function AdminClassesPage() {
 }
 
 function ClassCard({ schoolClass }) {
+  const status = classStatus[schoolClass.status] || classStatus.ARCHIVED;
   return (
     <a
       href={`#admin/classes/${schoolClass.id}`}
@@ -251,9 +258,9 @@ function ClassCard({ schoolClass }) {
         <span className="text-[1.45rem] font-bold text-slate-950">{schoolClass.number}-{schoolClass.letter}</span>
         <span className={cn(
           "rounded-full border px-2.5 py-1 text-[0.68rem] font-bold",
-          schoolClass.editable ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600",
+          status.className,
         )}>
-          {schoolClass.editable ? "Активний" : "Архівний"}
+          {status.label}
         </span>
       </div>
 
@@ -331,7 +338,7 @@ export function ClassDialog({ schoolClass, academicYear, onClose, onSaved }) {
         await onSaved(`Клас ${payload.number}-${payload.letter} оновлено`);
       } else {
         await adminClassesApi.create(payload);
-        await onSaved(`Клас ${payload.number}-${payload.letter} створено`);
+        await onSaved(`Клас ${payload.number}-${payload.letter} створено${payload.classTeacherId ? "" : " як чернетку"}`);
       }
     } catch (requestError) {
       if (requestError instanceof ApiError) {
@@ -378,7 +385,7 @@ export function ClassDialog({ schoolClass, academicYear, onClose, onSaved }) {
                 disabled={isLoadingOptions}
                 className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-none disabled:opacity-60"
               >
-                <option value="">Не призначено</option>
+                <option value="">Не призначено (чернетка)</option>
                 {visibleTeachers.map((teacher) => {
                   const assignedElsewhere = teacher.assignedClassId && teacher.assignedClassId !== schoolClass?.id;
                   return (
@@ -394,7 +401,9 @@ export function ClassDialog({ schoolClass, academicYear, onClose, onSaved }) {
 
           <div className="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-[0.77rem] leading-5 text-slate-600">
             <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
-            Один учитель може бути класним керівником лише одного класу.
+            {form.classTeacherId
+              ? "Після призначення керівника клас стане активним. Один учитель може вести лише один клас."
+              : "Клас залишиться чернеткою. Додати учнів і розклад можна після призначення керівника."}
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Bell,
   BookOpen,
@@ -29,26 +29,23 @@ import { Alert } from "@/components/ui/alert.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
-import { authApi } from "@/lib/api.js";
+import { authApi, userProfileApi } from "@/lib/api.js";
 import { getPasswordStrength } from "@/lib/passwordStrength.js";
 import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
-import { userIdentities } from "@/lib/userIdentity.js";
+import { formatShortName } from "@/lib/userIdentity.js";
 import { cn } from "@/lib/utils.js";
 import {
   normalizePhone,
-  profileData,
-  readProfilePreferences,
+  mapProfileResponse,
   validateAvatarFile,
   validatePasswordChange,
   validatePhone,
-  writeProfilePreferences,
 } from "./profileModel.js";
 
 const roleConfig = {
   STUDENT: {
     homeRoute: "student",
     profileRoute: "student/profile",
-    displayName: userIdentities.STUDENT.displayName,
     title: "Профіль учня",
     subtitle: "Особиста інформація та налаштування облікового запису",
     navigation: [
@@ -62,7 +59,6 @@ const roleConfig = {
   PARENT: {
     homeRoute: "parent",
     profileRoute: "parent/profile",
-    displayName: userIdentities.PARENT.displayName,
     title: "Профіль батьків",
     subtitle: "Особиста інформація та налаштування облікового запису",
     navigation: [
@@ -76,7 +72,6 @@ const roleConfig = {
   TEACHER: {
     homeRoute: "teacher",
     profileRoute: "teacher/profile",
-    displayName: userIdentities.TEACHER.displayName,
     title: "Профіль учителя",
     subtitle: "Особиста та професійна інформація і налаштування облікового запису",
     navigation: teacherNavigationItems,
@@ -102,24 +97,41 @@ const notificationOptions = {
 
 export function UserProfilePage({ role }) {
   const config = roleConfig[role];
-  const data = profileData[role];
-  const [preferences, setPreferences] = useState(() => readProfilePreferences(role));
+  const [data, setData] = useState(null);
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [pending, setPending] = useState("");
   const [avatarError, setAvatarError] = useState("");
   const [avatarNotice, setAvatarNotice] = useState("");
-  const [phone, setPhone] = useState(() => preferences.phone);
+  const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [phoneNotice, setPhoneNotice] = useState("");
-  const [notificationDraft, setNotificationDraft] = useState(() => preferences.notifications);
+  const [notificationDraft, setNotificationDraft] = useState({});
+  const [notificationError, setNotificationError] = useState("");
   const [notificationNotice, setNotificationNotice] = useState("");
-  const [selectedChildId, setSelectedChildId] = useState(() => preferences.selectedChildId || data.children?.[0]?.id || "");
+  const [selectedChildId, setSelectedChildId] = useState("");
   const fileInput = useRef(null);
 
-  if (!config || !data) return null;
+  useEffect(() => {
+    let active = true;
+    userProfileApi.find().then((response) => {
+      if (!active) return;
+      if (response.role !== role) throw new Error("Доступ до цього профілю відсутній.");
+      const profile = mapProfileResponse(response);
+      setData(profile);
+      setPhone(profile.personal.phone || "");
+      setNotificationDraft(profile.notifications);
+      setSelectedChildId(profile.children[0]?.id || "");
+      setLoadError("");
+    }).catch((error) => {
+      if (active) setLoadError(error.message || "Не вдалося завантажити профіль.");
+    });
+    return () => { active = false; };
+  }, [role, reloadKey]);
 
-  const persist = (next) => {
-    setPreferences(next);
-    writeProfilePreferences(role, next);
-  };
+  if (!config) return null;
+
+  const avatar = data?.avatarVersion != null ? userProfileApi.avatarUrl(data.avatarVersion) : "";
 
   const handleAvatar = async (event) => {
     const file = event.target.files?.[0];
@@ -134,46 +146,86 @@ export function UserProfilePage({ role }) {
     }
 
     try {
-      const dataUrl = await readAvatar(file);
-      persist({ ...preferences, avatar: dataUrl });
+      setPending("avatar");
+      await readAvatar(file);
+      const response = await userProfileApi.uploadAvatar(file);
+      setData(mapProfileResponse(response));
       setAvatarNotice("Фото профілю оновлено.");
     } catch (error) {
       setAvatarError(error.message || "Не вдалося обробити зображення.");
+    } finally {
+      setPending("");
     }
   };
 
-  const removeAvatar = () => {
-    persist({ ...preferences, avatar: "" });
+  const removeAvatar = async () => {
+    setPending("avatar");
     setAvatarError("");
-    setAvatarNotice("Фото профілю видалено.");
+    setAvatarNotice("");
+    try {
+      await userProfileApi.deleteAvatar();
+      setData((current) => ({ ...current, avatarVersion: null }));
+      setAvatarNotice("Фото профілю видалено.");
+    } catch (error) {
+      setAvatarError(error.message || "Не вдалося видалити фото.");
+    } finally {
+      setPending("");
+    }
   };
 
-  const savePhone = (event) => {
+  const savePhone = async (event) => {
     event.preventDefault();
     const error = validatePhone(phone);
     setPhoneError(error);
     setPhoneNotice("");
     if (error) return;
     const normalized = normalizePhone(phone);
-    const next = { ...preferences, phone: normalized };
-    setPhone(normalized);
-    persist(next);
-    setPhoneNotice("Номер телефону збережено.");
+    setPending("phone");
+    try {
+      const response = await userProfileApi.updatePhone(normalized);
+      const profile = mapProfileResponse(response);
+      setData(profile);
+      setPhone(profile.personal.phone);
+      setPhoneNotice("Номер телефону збережено.");
+    } catch (requestError) {
+      setPhoneError(requestError.message || "Не вдалося зберегти номер телефону.");
+    } finally {
+      setPending("");
+    }
   };
 
-  const saveNotifications = () => {
-    persist({ ...preferences, notifications: notificationDraft });
-    setNotificationNotice("Налаштування сповіщень збережено.");
+  const saveNotifications = async () => {
+    setPending("notifications");
+    setNotificationError("");
+    setNotificationNotice("");
+    try {
+      const response = await userProfileApi.updateNotifications(notificationDraft);
+      const profile = mapProfileResponse(response);
+      setData(profile);
+      setNotificationDraft(profile.notifications);
+      setNotificationNotice("Налаштування сповіщень збережено.");
+    } catch (error) {
+      setNotificationError(error.message || "Не вдалося зберегти налаштування.");
+    } finally {
+      setPending("");
+    }
   };
 
   const selectChild = (childId) => {
     setSelectedChildId(childId);
-    persist({ ...preferences, selectedChildId: childId });
   };
+
+  if (!data) {
+    return <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      {loadError
+        ? <div className="max-w-md text-center"><Alert>{loadError}</Alert><Button type="button" className="mt-4" onClick={() => setReloadKey((value) => value + 1)}>Спробувати ще раз</Button></div>
+        : <p role="status" className="text-sm text-slate-500">Завантаження профілю…</p>}
+    </div>;
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
-      <TopBar config={config} data={data} avatar={preferences.avatar} />
+      <TopBar config={config} data={data} avatar={avatar} />
       <Navigation config={config} compact />
 
       <div className="flex flex-1">
@@ -189,7 +241,8 @@ export function UserProfilePage({ role }) {
               <ProfileSummary
                 role={role}
                 data={data}
-                avatar={preferences.avatar}
+                avatar={avatar}
+                busy={pending === "avatar"}
                 fileInput={fileInput}
                 avatarError={avatarError}
                 avatarNotice={avatarNotice}
@@ -205,6 +258,7 @@ export function UserProfilePage({ role }) {
                   phone={phone}
                   phoneError={phoneError}
                   phoneNotice={phoneNotice}
+                  busy={pending === "phone"}
                   onPhoneChange={(value) => { setPhone(value); setPhoneError(""); setPhoneNotice(""); }}
                   onPhoneSave={savePhone}
                 />
@@ -216,6 +270,8 @@ export function UserProfilePage({ role }) {
                   options={notificationOptions[role]}
                   settings={notificationDraft}
                   notice={notificationNotice}
+                  error={notificationError}
+                  busy={pending === "notifications"}
                   onChange={(key) => {
                     setNotificationDraft((current) => ({ ...current, [key]: !current[key] }));
                     setNotificationNotice("");
@@ -233,7 +289,7 @@ export function UserProfilePage({ role }) {
   );
 }
 
-function ProfileSummary({ data, avatar, fileInput, avatarError, avatarNotice, onAvatarChange, onRemoveAvatar }) {
+function ProfileSummary({ data, avatar, busy, fileInput, avatarError, avatarNotice, onAvatarChange, onRemoveAvatar }) {
   return (
     <Card className="rounded-lg px-4 py-5 sm:px-6">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
@@ -248,11 +304,11 @@ function ProfileSummary({ data, avatar, fileInput, avatarError, avatarNotice, on
         <div className="sm:text-right">
             <div className="flex flex-wrap gap-2 sm:justify-end">
               <input ref={fileInput} type="file" accept="image/jpeg,image/png" onChange={onAvatarChange} className="sr-only" aria-label="Оберіть фото профілю" />
-              <Button type="button" onClick={() => fileInput.current?.click()} className="h-9 rounded-md px-3 text-xs">
+              <Button type="button" disabled={busy} onClick={() => fileInput.current?.click()} className="h-9 rounded-md px-3 text-xs">
                 <Camera className="h-4 w-4" aria-hidden="true" />Змінити фото
               </Button>
               {avatar ? (
-                <Button type="button" variant="ghost" onClick={onRemoveAvatar} className="h-9 rounded-md border border-red-200 bg-white px-3 text-xs text-red-600 hover:bg-red-50">
+                <Button type="button" variant="ghost" disabled={busy} onClick={onRemoveAvatar} className="h-9 rounded-md border border-red-200 bg-white px-3 text-xs text-red-600 hover:bg-red-50">
                   <Trash2 className="h-4 w-4" aria-hidden="true" />Видалити
                 </Button>
               ) : null}
@@ -266,14 +322,14 @@ function ProfileSummary({ data, avatar, fileInput, avatarError, avatarNotice, on
   );
 }
 
-function PersonalInformation({ className, role, data, phone, phoneError, phoneNotice, onPhoneChange, onPhoneSave }) {
+function PersonalInformation({ className, role, data, phone, phoneError, phoneNotice, busy, onPhoneChange, onPhoneSave }) {
   const studentFields = [
     ["Ім’я", data.personal.firstName],
     ["Прізвище", data.personal.lastName],
     ["По батькові", data.personal.patronymic || "Не вказано"],
     ["Логін", data.personal.login],
-    ["Email батьків", data.personal.email || "Не прив’язано"],
-    ["Телефон батьків", data.personal.phone || "Не прив’язано"],
+    ["Email батьків", data.personal.parentEmail || "Не прив’язано"],
+    ["Телефон батьків", data.personal.parentPhone || "Не прив’язано"],
   ];
   const accountFields = [
     ["Ім’я", data.personal.firstName],
@@ -294,7 +350,7 @@ function PersonalInformation({ className, role, data, phone, phoneError, phoneNo
               <Phone className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" aria-hidden="true" />
               <Input id={`${role.toLowerCase()}-phone`} type="tel" value={phone} onChange={(event) => onPhoneChange(event.target.value)} className={cn("pl-10", phoneError && "border-red-400")} autoComplete="tel" />
             </div>
-            <Button type="submit" className="h-10 rounded-md px-4 text-xs"><Save className="h-4 w-4" aria-hidden="true" />Зберегти</Button>
+            <Button type="submit" disabled={busy} className="h-10 rounded-md px-4 text-xs"><Save className="h-4 w-4" aria-hidden="true" />Зберегти</Button>
           </div>
           {phoneError ? <p className="mt-2 text-[0.7rem] font-medium text-red-600" role="alert">{phoneError}</p> : null}
           {phoneNotice ? <SuccessMessage>{phoneNotice}</SuccessMessage> : null}
@@ -339,7 +395,7 @@ function TagList({ label, values }) {
     <div>
       <p className="text-[0.7rem] font-semibold text-slate-400">{label}</p>
       <div className="mt-2 flex flex-wrap gap-2">
-        {values.map((value) => <span key={value} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[0.76rem] font-semibold text-slate-700">{value}</span>)}
+        {values.length ? values.map((value) => <span key={value} className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[0.76rem] font-semibold text-slate-700">{value}</span>) : <span className="text-[0.76rem] text-slate-500">Не призначено</span>}
       </div>
     </div>
   );
@@ -347,6 +403,7 @@ function TagList({ label, values }) {
 
 function LinkedChildInformation({ className, children, selectedChildId, onSelect }) {
   const selectedChild = children.find((child) => child.id === selectedChildId) || children[0];
+  if (!selectedChild) return <Section className={className} title="Пов’язана дитина" icon={GraduationCap}><p className="text-sm text-slate-500">Дитину ще не прив’язано до профілю.</p></Section>;
   return (
     <Section className={className} title="Пов’язана дитина" icon={GraduationCap}>
       <label htmlFor="profile-child" className="block border-b border-slate-200 pb-5">
@@ -371,7 +428,7 @@ function LinkedChildInformation({ className, children, selectedChildId, onSelect
   );
 }
 
-function NotificationSettings({ className, options, settings, notice, onChange, onSave }) {
+function NotificationSettings({ className, options, settings, notice, error, busy, onChange, onSave }) {
   return (
     <Section className={className} title="Налаштування сповіщень" icon={Bell}>
       <div className="divide-y divide-slate-100">
@@ -389,9 +446,10 @@ function NotificationSettings({ className, options, settings, notice, onChange, 
           );
         })}
       </div>
+      {error ? <Alert>{error}</Alert> : null}
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
         <div>{notice ? <SuccessMessage className="mt-0">{notice}</SuccessMessage> : null}</div>
-        <Button type="button" onClick={onSave} className="h-9 rounded-md px-3 text-xs"><Save className="h-4 w-4" aria-hidden="true" />Зберегти</Button>
+        <Button type="button" disabled={busy} onClick={onSave} className="h-9 rounded-md px-3 text-xs"><Save className="h-4 w-4" aria-hidden="true" />Зберегти</Button>
       </div>
     </Section>
   );
@@ -405,16 +463,25 @@ function PasswordSettings({ className }) {
   const [visibility, setVisibility] = useState({ current: false, password: false, confirmation: false });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
   const strength = useMemo(() => getPasswordStrength(form.password), [form.password]);
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault();
     const nextError = validatePasswordChange(form.current, form.password, form.confirmation);
     setError(nextError);
     setNotice("");
     if (nextError) return;
-    setForm({ current: "", password: "", confirmation: "" });
-    setNotice("Пароль успішно змінено.");
+    setBusy(true);
+    try {
+      await userProfileApi.changePassword(form.current, form.password);
+      setForm({ current: "", password: "", confirmation: "" });
+      setNotice("Пароль успішно змінено.");
+    } catch (requestError) {
+      setError(requestError.message || "Не вдалося змінити пароль.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const setValue = (key, value) => {
@@ -442,7 +509,7 @@ function PasswordSettings({ className }) {
         {error ? <Alert>{error}</Alert> : null}
         {notice ? <SuccessMessage>{notice}</SuccessMessage> : null}
         <div className="flex justify-end pt-1">
-          <Button type="submit" className="h-10 rounded-md px-4 text-xs"><KeyRound className="h-4 w-4" aria-hidden="true" />Змінити пароль</Button>
+          <Button type="submit" disabled={busy} className="h-10 rounded-md px-4 text-xs"><KeyRound className="h-4 w-4" aria-hidden="true" />Змінити пароль</Button>
         </div>
       </form>
     </Section>
@@ -519,7 +586,7 @@ function TopBar({ config, data, avatar }) {
       <a href={`#${config.homeRoute}`} className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна"><GraduationCap className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" strokeWidth={2.4} aria-hidden="true" /><span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">Електронний щоденник</span></a>
       <div className="flex items-center gap-1.5 sm:gap-4">
         <NotificationButton />
-        <div className="hidden items-center gap-3 bg-slate-50 px-3 py-1.5 sm:flex"><div className="text-right leading-tight"><div className="max-w-[190px] truncate text-[0.78rem] font-bold">{config.displayName}</div><div className="text-[0.7rem] text-slate-500">{data.roleLabel}</div></div><Avatar avatar={avatar} initials={data.initials} /></div>
+        <div className="hidden items-center gap-3 bg-slate-50 px-3 py-1.5 sm:flex"><div className="text-right leading-tight"><div className="max-w-[190px] truncate text-[0.78rem] font-bold">{formatShortName({ firstName: data.personal.firstName, lastName: data.personal.lastName })}</div><div className="text-[0.7rem] text-slate-500">{data.roleLabel}</div></div><Avatar avatar={avatar} initials={data.initials} /></div>
         <button type="button" onClick={logout} className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[0.82rem] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900"><LogOut className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Вийти</span></button>
       </div>
     </header>
@@ -552,10 +619,7 @@ function readAvatar(file) {
     const image = new Image();
     image.onload = () => {
       URL.revokeObjectURL(objectUrl);
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ""));
-      reader.onerror = () => reject(new Error("Не вдалося прочитати файл зображення."));
-      reader.readAsDataURL(file);
+      resolve();
     };
     image.onerror = () => {
       URL.revokeObjectURL(objectUrl);

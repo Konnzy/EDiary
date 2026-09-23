@@ -787,7 +787,7 @@ function StatusDialog({ user, nextStatus, onClose, onCompleted }) {
         <div className="flex items-start justify-between gap-4"><div><h2 id="user-status-title" className="text-[1.05rem] font-bold text-slate-950">{action.title}</h2><p className="mt-1 text-[0.8rem] text-slate-500">{user.login} · {roleLabels[user.role]}</p></div><button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Закрити"><X className="h-4 w-4" /></button></div>
         <p className="mt-5 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-[0.8rem] leading-5 text-slate-600">{action.description}</p>
         {error ? <div className="mt-4"><Alert>{error}</Alert></div> : null}
-        <div className="mt-6 flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} className="h-10 rounded-md px-4">Скасувати</Button><Button type="button" onClick={submit} disabled={isSubmitting} className={cn("h-10 rounded-md px-4", action.color)}>{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}{action.button}</Button></div>
+        <div className="mt-6 flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} className="h-10 rounded-md border border-slate-300 bg-white px-4">Скасувати</Button><Button type="button" onClick={submit} disabled={isSubmitting} className={cn("h-10 rounded-md px-4", action.color)}>{isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}{action.button}</Button></div>
       </section>
     </div>
   );

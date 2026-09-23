@@ -4,6 +4,7 @@ import com.ediary.backend.common.dto.PageResponse;
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.registration.dto.request.CreateRegistrationRequest;
 import com.ediary.backend.registration.dto.response.RegistrationDecisionResponse;
+import com.ediary.backend.registration.dto.response.RegistrationNotificationFeedResponse;
 import com.ediary.backend.registration.dto.response.RegistrationOptionResponse;
 import com.ediary.backend.registration.dto.response.RegistrationOptionsResponse;
 import com.ediary.backend.registration.dto.response.RegistrationRequestResponse;
@@ -28,6 +29,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -115,6 +117,7 @@ public class RegistrationRequestService {
         List<RegistrationOptionResponse> classes = schoolClassRepository
             .findAllByAcademicYearValueOrderByNumberAscLetterAsc(currentAcademicYear())
             .stream()
+            .filter(schoolClass -> !schoolClass.isDraft())
             .map(item -> new RegistrationOptionResponse(item.getId(), item.getDisplayName()))
             .toList();
         List<RegistrationOptionResponse> subjects = subjectRepository
@@ -144,12 +147,43 @@ public class RegistrationRequestService {
         return PageResponse.from(requests.map(mapper::toResponse));
     }
 
+    @Transactional(readOnly = true)
+    public RegistrationNotificationFeedResponse findNotificationFeed() {
+        int limit = 5;
+        List<RegistrationRequest> pending = registrationRequestRepository.findAllByStatus(
+            RegistrationStatus.PENDING,
+            PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt"))
+        ).getContent();
+
+        List<RegistrationRequestResponse> items = new ArrayList<>(limit);
+        pending.stream().map(mapper::toResponse).forEach(items::add);
+
+        int remaining = limit - items.size();
+        if (remaining > 0) {
+            registrationRequestRepository.findAllByStatusNot(
+                RegistrationStatus.PENDING,
+                PageRequest.of(0, remaining, Sort.by(Sort.Direction.DESC, "reviewedAt"))
+            ).stream().map(mapper::toResponse).forEach(items::add);
+        }
+
+        return new RegistrationNotificationFeedResponse(
+            registrationRequestRepository.countByStatus(RegistrationStatus.PENDING),
+            List.copyOf(items)
+        );
+    }
+
     @Transactional
     public RegistrationDecisionResponse approve(Long requestId, String reviewerLogin, String requestedLogin) {
         RegistrationRequest request = findPendingForUpdate(requestId);
         AppUser reviewer = requireActiveAdministrator(reviewerLogin);
         if (request.getRequestedRole() == UserRole.STUDENT) {
-            ensureCurrentClass(request.getRequestedClass());
+            SchoolClass schoolClass = schoolClassRepository.findByIdForUpdate(request.getRequestedClass().getId())
+                .orElseThrow(() -> new ApplicationException(
+                    HttpStatus.CONFLICT,
+                    "CLASS_NOT_FOUND",
+                    "Обраний клас більше не існує"
+                ));
+            ensureCurrentClass(schoolClass);
         }
         String login = normalizeLogin(requestedLogin);
         AccountProvisioningResult account = accountCreationService.createFrom(request, login);
@@ -244,7 +278,7 @@ public class RegistrationRequestService {
         if (classId == null || subjectId != null) {
             throw invalidRoleDetails();
         }
-        SchoolClass schoolClass = schoolClassRepository.findById(classId)
+        SchoolClass schoolClass = schoolClassRepository.findByIdForUpdate(classId)
             .orElseThrow(() -> new ApplicationException(
                 HttpStatus.BAD_REQUEST,
                 "CLASS_NOT_FOUND",
@@ -260,6 +294,13 @@ public class RegistrationRequestService {
                 HttpStatus.CONFLICT,
                 "CLASS_ACADEMIC_YEAR_MISMATCH",
                 "Обраний клас не належить до поточного навчального року"
+            );
+        }
+        if (schoolClass.isDraft()) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "CLASS_TEACHER_REQUIRED",
+                "До класу можна зараховувати учнів після призначення класного керівника"
             );
         }
     }

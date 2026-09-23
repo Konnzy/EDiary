@@ -4,6 +4,7 @@ import com.ediary.backend.common.dto.PageResponse;
 import com.ediary.backend.registration.dto.request.ApproveRegistrationRequest;
 import com.ediary.backend.registration.dto.request.RejectRegistrationRequest;
 import com.ediary.backend.registration.dto.response.RegistrationDecisionResponse;
+import com.ediary.backend.registration.dto.response.RegistrationNotificationFeedResponse;
 import com.ediary.backend.registration.dto.response.RegistrationRequestResponse;
 import com.ediary.backend.registration.entity.RegistrationStatus;
 import com.ediary.backend.registration.service.RegistrationRequestService;
@@ -34,6 +35,11 @@ public class AdminRegistrationRequestController {
         @RequestParam(defaultValue = "20") int size
     ) {
         return registrationRequestService.findAll(status, page, size);
+    }
+
+    @GetMapping("/notifications")
+    public RegistrationNotificationFeedResponse notifications() {
+        return registrationRequestService.findNotificationFeed();
     }
 
     @PostMapping("/{requestId}/approve")

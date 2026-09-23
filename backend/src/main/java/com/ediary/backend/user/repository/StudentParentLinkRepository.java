@@ -17,6 +17,9 @@ public interface StudentParentLinkRepository extends JpaRepository<StudentParent
 
     boolean existsByParent_User_Id(Long userId);
 
+    @EntityGraph(attributePaths = "parent.user")
+    List<StudentParentLink> findAllByStudent_IdOrderByPrimaryContactDesc(Long studentId);
+
     @EntityGraph(attributePaths = {"student.user", "student.schoolClass"})
     @Query("""
         select link from StudentParentLink link

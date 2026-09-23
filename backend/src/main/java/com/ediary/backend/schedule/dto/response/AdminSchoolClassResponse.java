@@ -9,6 +9,7 @@ public record AdminSchoolClassResponse(
     String classTeacherName,
     long studentCount,
     String academicYear,
-    boolean editable
+    boolean editable,
+    String status
 ) {
 }

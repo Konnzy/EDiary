@@ -18,6 +18,7 @@ import com.ediary.backend.schedule.repository.StudentClassMembershipRepository;
 import com.ediary.backend.user.entity.AppUser;
 import com.ediary.backend.user.entity.StudentProfile;
 import com.ediary.backend.user.entity.TeacherProfile;
+import com.ediary.backend.user.entity.UserStatus;
 import com.ediary.backend.user.repository.StudentProfileRepository;
 import com.ediary.backend.user.repository.TeacherProfileRepository;
 import java.util.Optional;
@@ -71,6 +72,7 @@ class AdminSchoolClassServiceTest {
         assertThat(response.number()).isEqualTo(7);
         assertThat(response.letter()).isEqualTo("Б");
         assertThat(response.limit()).isEqualTo(AdminSchoolClassService.CLASS_CAPACITY);
+        assertThat(response.status()).isEqualTo("DRAFT");
         verify(schoolClassRepository).saveAndFlush(any(SchoolClass.class));
     }
 
@@ -117,6 +119,7 @@ class AdminSchoolClassServiceTest {
     @Test
     void rejectsStudentWhenClassHasReachedFixedCapacity() {
         SchoolClass schoolClass = schoolClass(9L);
+        schoolClass.setClassTeacher(new TeacherProfile());
         when(schoolClassRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(schoolClass));
         when(membershipRepository.countBySchoolClassIdAndActiveTrue(9L))
             .thenReturn((long) AdminSchoolClassService.CLASS_CAPACITY);
@@ -125,6 +128,66 @@ class AdminSchoolClassServiceTest {
             .isInstanceOf(ApplicationException.class)
             .satisfies(error -> assertThat(((ApplicationException) error).getCode())
                 .isEqualTo("SCHOOL_CLASS_IS_FULL"));
+    }
+
+    @Test
+    void rejectsStudentAssignmentToDraftClass() {
+        when(schoolClassRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(schoolClass(9L)));
+
+        assertThatThrownBy(() -> service.addStudent(9L, 14L))
+            .isInstanceOf(ApplicationException.class)
+            .satisfies(error -> assertThat(((ApplicationException) error).getCode())
+                .isEqualTo("CLASS_TEACHER_REQUIRED"));
+        verify(studentProfileRepository, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    void assigningTeacherActivatesDraftClass() {
+        SchoolClass schoolClass = schoolClass(9L);
+        TeacherProfile teacher = new TeacherProfile();
+        teacher.setId(12L);
+        teacher.setName("Олена");
+        teacher.setSurname("Коваленко");
+        AppUser teacherUser = new AppUser();
+        teacherUser.setStatus(UserStatus.ACTIVE);
+        teacher.setUser(teacherUser);
+        when(schoolClassRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(schoolClass));
+        when(teacherProfileRepository.findById(12L)).thenReturn(Optional.of(teacher));
+        when(schoolClassRepository.saveAndFlush(schoolClass)).thenReturn(schoolClass);
+
+        var response = service.update(9L, new SaveSchoolClassRequest(9, "А", 12L, "2026/2027"));
+
+        assertThat(response.status()).isEqualTo("ACTIVE");
+        assertThat(response.classTeacherId()).isEqualTo(12L);
+    }
+
+    @Test
+    void allowsRemovingAssignedTeacherWhenClassHasNoActiveStudents() {
+        SchoolClass schoolClass = schoolClass(9L);
+        schoolClass.setClassTeacher(new TeacherProfile());
+        when(schoolClassRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(schoolClass));
+        when(schoolClassRepository.saveAndFlush(schoolClass)).thenReturn(schoolClass);
+
+        var response = service.update(
+            9L, new SaveSchoolClassRequest(9, "А", null, "2026/2027")
+        );
+
+        assertThat(response.status()).isEqualTo("DRAFT");
+        assertThat(response.classTeacherId()).isNull();
+    }
+
+    @Test
+    void keepsAssignedTeacherWhileClassHasActiveStudents() {
+        SchoolClass schoolClass = schoolClass(9L);
+        schoolClass.setClassTeacher(new TeacherProfile());
+        when(schoolClassRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(schoolClass));
+        when(membershipRepository.countBySchoolClassIdAndActiveTrue(9L)).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.update(
+            9L, new SaveSchoolClassRequest(9, "А", null, "2026/2027")
+        )).isInstanceOf(ApplicationException.class)
+            .satisfies(error -> assertThat(((ApplicationException) error).getCode())
+                .isEqualTo("CLASS_TEACHER_REQUIRED"));
     }
 
     @Test
@@ -156,8 +219,23 @@ class AdminSchoolClassServiceTest {
 
         service.delete(9L);
 
+        verify(membershipRepository).deleteBySchoolClassIdAndActiveFalse(9L);
+        verify(membershipRepository).flush();
         verify(schoolClassRepository).delete(schoolClass);
         verify(schoolClassRepository).flush();
+    }
+
+    @Test
+    void deletesEmptyClassAfterCleaningInactiveMembershipHistory() {
+        SchoolClass schoolClass = schoolClass(9L);
+        when(schoolClassRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(schoolClass));
+        when(membershipRepository.deleteBySchoolClassIdAndActiveFalse(9L)).thenReturn(2L);
+
+        service.delete(9L);
+
+        verify(membershipRepository).deleteBySchoolClassIdAndActiveFalse(9L);
+        verify(membershipRepository).flush();
+        verify(schoolClassRepository).delete(schoolClass);
     }
 
     @Test
@@ -165,7 +243,7 @@ class AdminSchoolClassServiceTest {
         SchoolClass schoolClass = schoolClass(9L);
         schoolClass.setClassTeacher(new TeacherProfile());
         when(schoolClassRepository.findByIdForUpdate(9L)).thenReturn(Optional.of(schoolClass));
-        when(membershipRepository.countBySchoolClassId(9L)).thenReturn(1L);
+        when(membershipRepository.countBySchoolClassIdAndActiveTrue(9L)).thenReturn(1L);
         when(schoolClassRepository.hasSchedule(9L)).thenReturn(true);
         when(schoolClassRepository.hasRegistrationRequests(9L)).thenReturn(true);
 

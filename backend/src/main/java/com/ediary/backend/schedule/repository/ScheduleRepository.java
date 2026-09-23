@@ -29,6 +29,21 @@ public interface ScheduleRepository extends JpaRepository<ScheduleEntry, Long> {
         """)
     List<TeacherClassAssignment> findActiveTeacherClassAssignments();
 
+    @Query("""
+        select distinct entry.teacher.id as teacherId,
+            entry.schoolClass.number as classNumber,
+            entry.schoolClass.letter as classLetter
+        from ScheduleEntry entry
+        where entry.teacher.id = :teacherId
+            and entry.academicYear = :academicYear
+            and entry.active = true
+        order by entry.teacher.id, entry.schoolClass.number, entry.schoolClass.letter
+        """)
+    List<TeacherClassAssignment> findActiveTeacherClassAssignmentsForYear(
+        @Param("teacherId") Long teacherId,
+        @Param("academicYear") String academicYear
+    );
+
     boolean existsByTeacher_User_Id(Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

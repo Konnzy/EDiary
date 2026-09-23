@@ -21,7 +21,8 @@ import { PrivacyPolicyPage } from "@/pages/PrivacyPolicy/PrivacyPolicyPage.jsx";
 import { UserSchedulePage } from "@/pages/Schedule/UserSchedulePage.jsx";
 import { UserSubjectsPage } from "@/pages/Subjects/UserSubjectsPage.jsx";
 import { UserProfilePage } from "@/pages/Profile/UserProfilePage.jsx";
-import { ApiError, authApi } from "@/lib/api.js";
+import { ApiError, authApi, userProfileApi } from "@/lib/api.js";
+import { CurrentUserContext } from "@/lib/currentUser.jsx";
 import { ThemeToggle } from "@/components/ThemeToggle.jsx";
 import { RouteAccessToast } from "@/components/RouteAccessToast.jsx";
 import { showRouteAccessNotice } from "@/lib/routeAccessNotice.js";
@@ -40,6 +41,8 @@ const homeRoutes = {
 
 function ProtectedRoute({ allowedRole, loginRoute, children }) {
   const [checking, setChecking] = useState(true);
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -56,7 +59,15 @@ function ProtectedRoute({ allowedRole, loginRoute, children }) {
           return;
         }
 
+        setSession(session);
         setChecking(false);
+        if (session.role !== "ADMIN") {
+          userProfileApi.find().then((details) => {
+            if (active && details.role === session.role) setProfile(details);
+          }).catch(() => {
+            // Keep the account login visible if profile data is temporarily unavailable.
+          });
+        }
       })
       .catch((error) => {
         if (!active) return;
@@ -80,7 +91,7 @@ function ProtectedRoute({ allowedRole, loginRoute, children }) {
     );
   }
 
-  return children;
+  return <CurrentUserContext.Provider value={{ session, profile, setProfile }}>{children}</CurrentUserContext.Provider>;
 }
 
 function AppContent() {

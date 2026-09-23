@@ -25,6 +25,13 @@ const filters = [
 
 const roleLabels = { STUDENT: "Учень", PARENT: "Батьки", TEACHER: "Вчитель" };
 const statusLabels = { PENDING: "Перевірка", APPROVED: "Схвалено", REJECTED: "Відхилено" };
+const requestFilterKey = "admin-request-status-filter";
+
+function initialStatus() {
+  const savedStatus = window.sessionStorage.getItem(requestFilterKey);
+  window.sessionStorage.removeItem(requestFilterKey);
+  return filters.some((filter) => filter.value === savedStatus) ? savedStatus : "PENDING";
+}
 
 function requestContext(request) {
   if (request.role === "PARENT" && request.requestedStudent) {
@@ -35,7 +42,7 @@ function requestContext(request) {
 }
 
 export function AdminRequestsPage() {
-  const [status, setStatus] = useState("PENDING");
+  const [status, setStatus] = useState(initialStatus);
   const [page, setPage] = useState(0);
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,10 +73,17 @@ export function AdminRequestsPage() {
     setNotice("");
   };
 
+  useEffect(() => {
+    const handleFilter = (event) => changeStatus(event.detail?.status || "");
+    window.addEventListener("admin-request-filter", handleFilter);
+    return () => window.removeEventListener("admin-request-filter", handleFilter);
+  }, []);
+
   const handleDecisionCompleted = async (message) => {
     setDialog(null);
     setNotice(message);
     await loadRequests();
+    window.dispatchEvent(new Event("registration-requests-updated"));
   };
 
   return (

@@ -41,4 +41,10 @@ public class UserNotificationSettings {
 
     @Column(name = "homework_status_email_enabled", nullable = false)
     private boolean homeworkStatusEmailEnabled = true;
+
+    @Column(name = "message_email_enabled", nullable = false)
+    private boolean messageEmailEnabled = true;
+
+    @Column(name = "schedule_change_email_enabled", nullable = false)
+    private boolean scheduleChangeEmailEnabled = true;
 }

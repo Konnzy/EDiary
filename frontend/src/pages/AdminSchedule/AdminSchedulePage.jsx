@@ -352,7 +352,9 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
               {loadingClasses ? <option value="">Завантаження...</option> : null}
               {!loadingClasses && classes.length === 0 ? <option value="">Класи не знайдено</option> : null}
               {classes.map((schoolClass) => (
-                <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.number}-{schoolClass.letter}</option>
+                <option key={schoolClass.id} value={schoolClass.id}>
+                  {schoolClass.number}-{schoolClass.letter}{schoolClass.status === "DRAFT" ? " · Чернетка" : ""}
+                </option>
               ))}
             </select>
           </SelectField>
@@ -395,7 +397,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
               type="button"
               variant="ghost"
               onClick={() => setCopyDialogOpen(true)}
-              disabled={!selectedClassId || loadingSchedule || savingSchedule}
+              disabled={!selectedClassId || selectedClass?.status === "DRAFT" || loadingSchedule || savingSchedule}
               className="h-10 rounded-md border border-slate-300 bg-white px-4 text-xs"
             >
               <Copy className="h-4 w-4" aria-hidden="true" />
@@ -406,7 +408,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
               type="button"
               variant="ghost"
               onClick={() => setClearDialogOpen(true)}
-              disabled={!selectedClassId || loadingSchedule || savingSchedule || lessonCount === 0}
+              disabled={!selectedClassId || selectedClass?.status === "DRAFT" || loadingSchedule || savingSchedule || lessonCount === 0}
               className="h-10 rounded-md border border-red-300 bg-white px-4 text-xs text-red-600 hover:border-red-400 hover:bg-red-50 hover:text-red-700"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -421,7 +423,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
               <Button
                 type="button"
                 onClick={saveSchedule}
-                disabled={!selectedClassId || loadingSchedule || savingSchedule || !dirty}
+                disabled={!selectedClassId || selectedClass?.status === "DRAFT" || loadingSchedule || savingSchedule || !dirty}
                 className="h-10 w-full rounded-md px-4 text-xs"
               >
                 <Save className="h-4 w-4" aria-hidden="true" />
@@ -432,6 +434,12 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
         </div>
       </Card>
 
+      {selectedClass?.status === "DRAFT" ? (
+        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[0.82rem] text-amber-800">
+          Призначте класного керівника, щоб складати розклад для цього класу.
+        </p>
+      ) : null}
+
       {error ? <Alert className="mt-4">{error}</Alert> : null}
       {success ? (
         <div role="status" className="mt-4 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-3 text-[0.82rem] font-medium text-emerald-700">
@@ -439,7 +447,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
         </div>
       ) : null}
 
-      <div className={cn("mt-5 overflow-x-auto pb-3 transition-opacity", loadingSchedule && "pointer-events-none opacity-50")} aria-busy={loadingSchedule}>
+      <fieldset disabled={selectedClass?.status === "DRAFT"} className={cn("mt-5 min-w-0 overflow-x-auto pb-3 transition-opacity", loadingSchedule && "pointer-events-none opacity-50")} aria-busy={loadingSchedule}>
         <div className="grid min-w-[1180px] grid-cols-5 gap-4">
           {weekdays.map((day) => (
             <DayColumn
@@ -454,7 +462,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
             />
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {lessonDialog ? (
         <LessonDialog

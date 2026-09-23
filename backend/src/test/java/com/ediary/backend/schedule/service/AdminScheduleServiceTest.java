@@ -75,6 +75,7 @@ class AdminScheduleServiceTest {
         SchoolClass schoolClass = new SchoolClass();
         schoolClass.setId(1L);
         schoolClass.setAcademicYear(academicYear("2026/2027"));
+        schoolClass.setClassTeacher(new TeacherProfile());
         Subject subject = new Subject();
         subject.setId(2L);
         subject.setTitle("Математика");
@@ -115,6 +116,7 @@ class AdminScheduleServiceTest {
         SchoolClass schoolClass = new SchoolClass();
         schoolClass.setId(1L);
         schoolClass.setAcademicYear(academicYear("2026/2027"));
+        schoolClass.setClassTeacher(new TeacherProfile());
         Subject subject = new Subject();
         subject.setId(2L);
         TeacherProfile teacher = activeTeacher(3L, subject);
@@ -222,6 +224,7 @@ class AdminScheduleServiceTest {
         SchoolClass schoolClass = new SchoolClass();
         schoolClass.setId(1L);
         schoolClass.setAcademicYear(academicYear("2026/2027"));
+        schoolClass.setClassTeacher(new TeacherProfile());
         ScheduleEntry entry = new ScheduleEntry();
         entry.setId(11L);
         entry.setSchoolClass(schoolClass);

@@ -132,6 +132,7 @@ export function AdminClassDetailsPage({ classId }) {
             onRemove={(student) => setDialog({ type: "remove", student })}
             onViewLearningData={setJournalPreviewStudent}
             editable={schoolClass.editable}
+            draft={schoolClass.status === "DRAFT"}
           />
         </>
       ) : null}
@@ -168,7 +169,31 @@ function ClassBreadcrumb({ classId, className }) {
 
 function ClassSummary({ schoolClass, studentCount }) {
   const scheduleHref = `#admin/schedule?classId=${schoolClass.id}&academicYear=${encodeURIComponent(schoolClass.academicYear)}`;
-  return <section aria-label="Інформація про клас" className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6"><dl className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4"><Info label="Класний керівник" value={schoolClass.classTeacherName || "Не призначено"} /><Info label="Кількість учнів" value={`${studentCount} / ${CLASS_CAPACITY}`} /><Info label="Максимальна місткість" value={`${CLASS_CAPACITY} учнів`} /><Info label="Статус класу" value={<span className={`inline-flex rounded-full border px-3 py-1 text-xs ${schoolClass.editable ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>{schoolClass.editable ? "Активний" : "Архівний"}</span>} /></dl><a href={scheduleHref} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950"><CalendarDays className="h-4 w-4" />Переглянути розклад класу<ChevronRight className="h-4 w-4" /></a></section>;
+  const statuses = {
+    ACTIVE: { label: "Активний", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+    DRAFT: { label: "Чернетка", className: "border-amber-200 bg-amber-50 text-amber-800" },
+    ARCHIVED: { label: "Архівний", className: "border-slate-200 bg-slate-50 text-slate-600" },
+  };
+  const status = statuses[schoolClass.status] || statuses.ARCHIVED;
+  return (
+    <section aria-label="Інформація про клас" className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
+      <dl className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        <Info label="Класний керівник" value={schoolClass.classTeacherName || "Не призначено"} />
+        <Info label="Кількість учнів" value={`${studentCount} / ${CLASS_CAPACITY}`} />
+        <Info label="Максимальна місткість" value={`${CLASS_CAPACITY} учнів`} />
+        <Info label="Статус класу" value={<span className={`inline-flex rounded-full border px-3 py-1 text-xs ${status.className}`}>{status.label}</span>} />
+      </dl>
+      {schoolClass.status === "DRAFT" ? (
+        <p className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Призначте класного керівника, щоб клас став активним і до нього можна було додавати учнів та розклад.
+        </p>
+      ) : (
+        <a href={scheduleHref} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950">
+          <CalendarDays className="h-4 w-4" />Переглянути розклад класу<ChevronRight className="h-4 w-4" />
+        </a>
+      )}
+    </section>
+  );
 }
 
 function Info({ label, value }) {
@@ -179,9 +204,44 @@ function SuccessNotice({ children }) {
   return <div role="status" className="mt-5 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4 shrink-0" />{children}</div>;
 }
 
-function StudentsSection({ students, visibleStudents, query, onQueryChange, onAdd, onTransfer, onRemove, onViewLearningData, editable }) {
+function StudentsSection({ students, visibleStudents, query, onQueryChange, onAdd, onTransfer, onRemove, onViewLearningData, editable, draft }) {
   const full = students.length >= CLASS_CAPACITY;
-  return <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5"><h2 className="text-base font-bold">Учні класу <span className="ml-2 font-normal text-slate-400">{students.length}</span></h2>{editable ? <Button onClick={onAdd} disabled={full} title={full ? "У класі немає вільних місць" : "Додати учня"} className="h-10 rounded-md"><Plus className="h-4 w-4" />Додати учня</Button> : <span className="text-xs text-slate-500">Архівний склад, лише перегляд</span>}</div><div className="border-b border-slate-100 p-5"><div className="relative max-w-lg"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><Input aria-label="Пошук учнів за ПІБ або логіном" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Пошук за ПІБ або логіном" className="pl-10" /></div>{full ? <p className="mt-3 text-xs text-amber-700">У класі немає вільних місць.</p> : null}</div>{visibleStudents.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500"><tr><th className="px-5 py-3 font-medium">Учень</th><th className="px-5 py-3 font-medium">Статус учня</th><th className="px-5 py-3 text-right font-medium">Дії</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleStudents.map((student) => <StudentRow key={student.id} student={student} editable={editable} onViewLearningData={() => onViewLearningData(student)} onTransfer={() => onTransfer(student)} onRemove={() => onRemove(student)} />)}</tbody></table></div> : <div className="py-12 text-center text-sm text-slate-500"><Users className="mx-auto mb-3 h-7 w-7 text-slate-300" />{query ? "Учнів за цим запитом не знайдено." : "У класі поки немає учнів."}</div>}</section>;
+  return (
+    <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5">
+        <h2 className="text-base font-bold">Учні класу <span className="ml-2 font-normal text-slate-400">{students.length}</span></h2>
+        {editable && !draft ? (
+          <Button onClick={onAdd} disabled={full} title={full ? "У класі немає вільних місць" : "Додати учня"} className="h-10 rounded-md">
+            <Plus className="h-4 w-4" />Додати учня
+          </Button>
+        ) : <span className="text-xs text-slate-500">{draft ? "Спочатку призначте класного керівника" : "Архівний склад, лише перегляд"}</span>}
+      </div>
+      <div className="border-b border-slate-100 p-5">
+        <div className="relative max-w-lg">
+          <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+          <Input aria-label="Пошук учнів за ПІБ або логіном" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Пошук за ПІБ або логіном" className="pl-10" />
+        </div>
+        {full ? <p className="mt-3 text-xs text-amber-700">У класі немає вільних місць.</p> : null}
+      </div>
+      {visibleStudents.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+              <tr><th className="px-5 py-3 font-medium">Учень</th><th className="px-5 py-3 font-medium">Статус учня</th><th className="px-5 py-3 text-right font-medium">Дії</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {visibleStudents.map((student) => <StudentRow key={student.id} student={student} editable={editable} onViewLearningData={() => onViewLearningData(student)} onTransfer={() => onTransfer(student)} onRemove={() => onRemove(student)} />)}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="py-12 text-center text-sm text-slate-500">
+          <Users className="mx-auto mb-3 h-7 w-7 text-slate-300" />
+          {query ? "Учнів за цим запитом не знайдено." : "У класі поки немає учнів."}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function StudentRow({ student, onViewLearningData, onTransfer, onRemove, editable }) {
@@ -257,7 +317,7 @@ function MembershipDialog({ dialog, schoolClass, classes, onClose, onConfirm }) 
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   };
 
-  const otherClasses = classes.filter((item) => item.id !== schoolClass.id);
+  const otherClasses = classes.filter((item) => item.id !== schoolClass.id && item.status === "ACTIVE");
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" onMouseDown={(event) => event.target === event.currentTarget && !submitting && onClose()}><section ref={panel} tabIndex={-1} onKeyDown={onKeyDown} role="dialog" aria-modal="true" aria-labelledby="membership-title" className="max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto rounded-lg border border-slate-200 bg-white p-5 shadow-2xl outline-none sm:p-6"><div className="flex items-start justify-between gap-4"><div><h2 id="membership-title" className="text-base font-bold">{adding ? "Додати учня" : removing ? "Вилучити з класу" : "Перевести до іншого класу"}</h2><p className="mt-1 text-xs leading-5 text-slate-500">Клас {schoolClass.number}-{schoolClass.letter}, місткість {CLASS_CAPACITY} учнів.</p></div><button type="button" onClick={onClose} disabled={submitting} aria-label="Закрити" className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-50"><X className="h-5 w-5" /></button></div><form onSubmit={submit} className="mt-5 space-y-4">{!adding ? <p className="text-sm leading-6 text-slate-600">{dialog.student.fullName}</p> : null}{removing ? <p className="rounded-md border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">Підтвердьте вилучення учня зі складу класу. Обліковий запис, статус та навчальні дані учня залишаться в системі.</p> : adding ? <AddStudentChooser query={query} onQueryChange={setQuery} selected={selected} onSelect={setSelected} students={candidates} loading={loadingCandidates} /> : <ClassChooser classes={otherClasses} selected={selected} onSelect={setSelected} />}{!adding && !removing ? <p className="text-xs leading-5 text-slate-500">Після підтвердження зміниться лише клас учня. Обліковий запис, статус та навчальні дані збережуться.</p> : null}{error ? <Alert>{error}</Alert> : null}<div className="flex flex-wrap justify-end gap-2 pt-2"><Button type="button" variant="ghost" onClick={onClose} disabled={submitting} className={outlinedButton}>Скасувати</Button><Button type="submit" disabled={submitting || (!removing && !selected)} className={`h-9 rounded-md text-xs ${removing ? "border border-red-600 bg-red-600 text-white hover:bg-red-500" : ""}`}>{submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{adding ? "Додати учня" : removing ? "Підтвердити вилучення" : "Підтвердити переведення"}</Button></div></form></section></div>;
 }

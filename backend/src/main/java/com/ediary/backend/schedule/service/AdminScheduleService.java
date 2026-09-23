@@ -108,6 +108,13 @@ public class AdminScheduleService {
         SaveScheduleRequest request
     ) {
         SchoolClass schoolClass = requirePeriodForUpdate(classId, academicYear, week);
+        if (schoolClass.isDraft()) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "CLASS_TEACHER_REQUIRED",
+                "Спочатку призначте класного керівника, щоб складати розклад"
+            );
+        }
         Map<Slot, SaveScheduleLessonRequest> requestedBySlot = validateUniqueSlots(request.lessons());
 
         Set<Long> subjectIds = request.lessons().stream()

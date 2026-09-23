@@ -33,6 +33,8 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Long> 
 
     Optional<SchoolClass> findByClassTeacherId(Long teacherId);
 
+    List<SchoolClass> findAllByClassTeacherIdOrderByNumberAscLetterAsc(Long teacherId);
+
     @Query(value = "SELECT EXISTS (SELECT 1 FROM schedule WHERE class_id = :classId)", nativeQuery = true)
     boolean hasSchedule(@Param("classId") Long classId);
 

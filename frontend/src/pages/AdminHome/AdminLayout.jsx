@@ -1,3 +1,4 @@
+import { useContext, useEffect, useState } from "react";
 import {
   BookOpen,
   CalendarDays,
@@ -10,15 +11,13 @@ import {
   Users,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
-import { NotificationButton } from "@/components/NotificationButton.jsx";
-import { adminAuthApi } from "@/lib/api.js";
+import { AdminRequestNotifications } from "@/components/AdminRequestNotifications.jsx";
+import { Alert } from "@/components/ui/alert.jsx";
+import { adminAuthApi, adminUsersApi } from "@/lib/api.js";
+import { CurrentUserContext } from "@/lib/currentUser.jsx";
 import { isGuardedActionBlocked } from "@/lib/navigationGuard.js";
 import { cn } from "@/lib/utils.js";
-
-const admin = {
-  name: "Олена Ткаченко",
-  role: "Адміністратор",
-};
+import { AdminSelfDialog } from "@/pages/AdminHome/AdminSelfDialog.jsx";
 
 const navigationItems = [
   { label: "Головна", icon: Home, route: "admin/home" },
@@ -68,6 +67,42 @@ export function AdminLayout({ activeItem, title, subtitle, breadcrumb, actions, 
 }
 
 function TopBar() {
+  const currentUser = useContext(CurrentUserContext);
+  const [account, setAccount] = useState(null);
+  const [accountError, setAccountError] = useState("");
+  const [selfDialogOpen, setSelfDialogOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    adminUsersApi.findMe().then((result) => {
+      if (active) {
+        setAccount(result);
+        setAccountError("");
+      }
+    }).catch((error) => {
+      if (active) setAccountError(error.message || "Не вдалося завантажити дані адміністратора.");
+    });
+    return () => { active = false; };
+  }, []);
+
+  const openSelfDialog = async () => {
+    setSelfDialogOpen(true);
+    if (!account) {
+      try {
+        setAccount(await adminUsersApi.findMe());
+        setAccountError("");
+      } catch (error) {
+        setAccountError(error.message || "Не вдалося завантажити дані адміністратора.");
+      }
+    }
+  };
+
+  const saveSelf = (updated, loginChanged) => {
+    setAccount(updated);
+    setSelfDialogOpen(false);
+    if (loginChanged) window.location.hash = "admin";
+  };
+
   const performLogout = async () => {
     try {
       await adminAuthApi.logout();
@@ -95,15 +130,22 @@ function TopBar() {
       </a>
 
       <div className="flex items-center gap-1.5 sm:gap-4">
-        <NotificationButton />
+        <AdminRequestNotifications />
 
-        <div className="hidden items-center gap-3 rounded-sm bg-slate-50 px-3 py-1.5 sm:flex">
-          <div className="text-right leading-tight">
-            <div className="text-[0.78rem] font-bold text-slate-800">{admin.name}</div>
-            <div className="text-[0.7rem] text-slate-500">{admin.role}</div>
-          </div>
+        <button
+          type="button"
+          onClick={openSelfDialog}
+          aria-label="Редагувати дані адміністратора"
+          className="inline-flex items-center gap-3 rounded-md bg-slate-50 px-2 py-1.5 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 sm:px-3"
+        >
+          <span className="hidden text-right leading-tight sm:block">
+            <span className="block max-w-[190px] truncate text-[0.78rem] font-bold text-slate-800">
+              {account ? `${account.lastName} ${account.firstName}` : currentUser?.session?.login || "Адміністратор"}
+            </span>
+            <span className="block text-[0.7rem] text-slate-500">Адміністратор</span>
+          </span>
           <UserRound className="h-8 w-8 text-slate-900" strokeWidth={1.8} aria-hidden="true" />
-        </div>
+        </button>
 
         <button
           type="button"
@@ -114,6 +156,27 @@ function TopBar() {
           <span className="hidden sm:inline">Вийти</span>
         </button>
       </div>
+      {selfDialogOpen && account ? (
+        <AdminSelfDialog account={account} onClose={() => setSelfDialogOpen(false)} onSaved={saveSelf} />
+      ) : null}
+      {selfDialogOpen && !account ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4"
+          role="presentation"
+          onMouseDown={(event) => event.target === event.currentTarget && setSelfDialogOpen(false)}
+        >
+          <section role="dialog" aria-modal="true" aria-label="Дані адміністратора" className="w-full max-w-[420px] rounded-lg bg-white p-5 shadow-2xl">
+            <p className="font-bold">Дані адміністратора</p>
+            {accountError ? <div className="mt-4"><Alert>{accountError}</Alert></div> : (
+              <p role="status" className="mt-4 text-sm text-slate-500">Завантаження даних…</p>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setSelfDialogOpen(false)} className="rounded-md border border-slate-300 px-3 py-2 text-sm">Закрити</button>
+              {accountError ? <button type="button" onClick={openSelfDialog} className="rounded-md bg-slate-900 px-3 py-2 text-sm text-white">Повторити</button> : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </header>
   );
 }

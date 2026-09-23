@@ -11,13 +11,11 @@ import {
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
+import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Card, CardContent, CardHeader } from "@/components/ui/card.jsx";
 import { authApi } from "@/lib/api.js";
-import { userIdentities } from "@/lib/userIdentity.js";
 import { cn } from "@/lib/utils.js";
 import { formatToday, useTodaySchedule } from "@/hooks/useTodaySchedule.js";
-
-const student = userIdentities.STUDENT;
 
 const navigationItems = [
   { label: "Головна", icon: Home, active: true, route: "student" },
@@ -179,13 +177,7 @@ function TopBar() {
       <div className="flex items-center gap-1.5 sm:gap-4">
         <NotificationButton hasUnread={hasUnreadNotifications} />
 
-        <div className="hidden items-center gap-3 rounded-sm bg-slate-50 px-3 py-1.5 sm:flex">
-          <div className="text-right leading-tight">
-            <div className="text-[0.78rem] font-bold text-slate-800">{student.displayName}</div>
-            <div className="text-[0.7rem] text-slate-500">{student.roleLabel}</div>
-          </div>
-          <UserRound className="h-8 w-8 text-slate-900" strokeWidth={1.8} aria-hidden="true" />
-        </div>
+        <CurrentUserBadge />
 
         <button
           type="button"

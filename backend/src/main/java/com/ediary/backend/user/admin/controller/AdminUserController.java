@@ -35,6 +35,11 @@ public class AdminUserController {
 
     private final AdminUserService adminUserService;
 
+    @GetMapping("/me")
+    public AdminUserResponse me(Authentication authentication) {
+        return adminUserService.findCurrent(authentication.getName());
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AdminUserCreationResponse create(@Valid @RequestBody CreateAdminUserRequest request) {

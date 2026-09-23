@@ -32,7 +32,7 @@ async function request(path, { method = "GET", body, csrf = false } = {}) {
   }
 
   const headers = { Accept: "application/json" };
-  if (body !== undefined) {
+  if (body !== undefined && !(body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
   if (csrfToken && csrf) {
@@ -45,7 +45,7 @@ async function request(path, { method = "GET", body, csrf = false } = {}) {
       method,
       credentials: "include",
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
     });
   } catch {
     throw new ApiError("Сервер тимчасово недоступний. Спробуйте пізніше.");
@@ -87,6 +87,22 @@ export const authApi = {
   logout: () => request("/auth/logout", { method: "POST", csrf: true }),
 };
 
+export const userProfileApi = {
+  find: () => request("/users/me"),
+  updatePhone: (phone) => request("/users/me/phone", { method: "PATCH", body: { phone }, csrf: true }),
+  updateNotifications: (settings) => request("/users/me/notifications", { method: "PUT", body: settings, csrf: true }),
+  changePassword: (currentPassword, newPassword) => request("/users/me/password", {
+    method: "POST", body: { currentPassword, newPassword }, csrf: true,
+  }),
+  avatarUrl: (version) => `${API_BASE_URL}/users/me/avatar?v=${version}`,
+  uploadAvatar: (file) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request("/users/me/avatar", { method: "POST", body, csrf: true });
+  },
+  deleteAvatar: () => request("/users/me/avatar", { method: "DELETE", csrf: true }),
+};
+
 export const parentApi = {
   findChildren: () => request("/parent/children"),
   findChild: (studentId) => request(`/parent/children/${studentId}`),
@@ -115,6 +131,7 @@ export const adminAuthApi = {
 };
 
 export const adminRegistrationApi = {
+  findNotifications: () => request("/admin/registration-requests/notifications"),
   findAll: ({ status, page = 0, size = 20 } = {}) => {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
     if (status) params.set("status", status);
@@ -133,6 +150,7 @@ export const adminRegistrationApi = {
 };
 
   export const adminUsersApi = {
+  findMe: () => request("/admin/users/me"),
   create: (payload) => request("/admin/users", {
     method: "POST",
     body: payload,

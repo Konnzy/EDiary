@@ -12,9 +12,19 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleOversizedUpload(
+        MaxUploadSizeExceededException exception,
+        HttpServletRequest request
+    ) {
+        return response(HttpStatus.PAYLOAD_TOO_LARGE, "AVATAR_TOO_LARGE",
+            "Розмір зображення не має перевищувати 5 МБ", Map.of(), request);
+    }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorResponse> handleAccessDenied(

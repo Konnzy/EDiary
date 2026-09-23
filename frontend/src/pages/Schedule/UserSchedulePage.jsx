@@ -15,10 +15,10 @@ import {
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
+import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Alert } from "@/components/ui/alert.jsx";
 import { ApiError, authApi, parentApi, scheduleApi } from "@/lib/api.js";
 import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
-import { userIdentities } from "@/lib/userIdentity.js";
 import { cn } from "@/lib/utils.js";
 import { findNextLesson, timeToMinutes } from "@/pages/Schedule/nextLesson.js";
 
@@ -45,8 +45,6 @@ const roleConfig = {
   STUDENT: {
     homeRoute: "student",
     scheduleRoute: "student/schedule",
-    profileName: userIdentities.STUDENT.displayName,
-    roleLabel: userIdentities.STUDENT.roleLabel,
     subtitle: "Розклад занять вашого класу",
     navigation: [
       { label: "Головна", icon: Home, route: "student" },
@@ -59,8 +57,6 @@ const roleConfig = {
   PARENT: {
     homeRoute: "parent",
     scheduleRoute: "parent/schedule",
-    profileName: userIdentities.PARENT.displayName,
-    roleLabel: userIdentities.PARENT.roleLabel,
     subtitle: "Розклад занять обраної дитини",
     navigation: [
       { label: "Головна", icon: Home, route: "parent" },
@@ -73,8 +69,6 @@ const roleConfig = {
   TEACHER: {
     homeRoute: "teacher",
     scheduleRoute: "teacher/schedule",
-    profileName: userIdentities.TEACHER.displayName,
-    roleLabel: userIdentities.TEACHER.roleLabel,
     subtitle: "Ваші уроки за класами та предметами",
     navigation: teacherNavigationItems,
   },
@@ -526,10 +520,7 @@ function TopBar({ config }) {
       </a>
       <div className="flex items-center gap-1.5 sm:gap-4">
         <NotificationButton />
-        <div className="hidden items-center gap-3 bg-slate-50 px-3 py-1.5 sm:flex">
-          <div className="text-right leading-tight"><div className="text-[0.78rem] font-bold">{config.profileName}</div><div className="text-[0.7rem] text-slate-500">{config.roleLabel}</div></div>
-          <UserRound className="h-8 w-8" strokeWidth={1.8} aria-hidden="true" />
-        </div>
+        <CurrentUserBadge />
         <button type="button" onClick={logout} className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[0.82rem] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
           <LogOut className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Вийти</span>
         </button>

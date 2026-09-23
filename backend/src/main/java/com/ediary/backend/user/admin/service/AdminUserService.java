@@ -139,6 +139,15 @@ public class AdminUserService {
     }
 
     @Transactional(readOnly = true)
+    public AdminUserResponse findCurrent(String login) {
+        AppUser user = userRepository.findByLoginIgnoreCase(login)
+            .orElseThrow(() -> new ApplicationException(
+                HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "Користувача не знайдено"
+            ));
+        return toResponse(user);
+    }
+
+    @Transactional(readOnly = true)
     public PageResponse<AdminUserResponse> findAll(
         String query,
         UserRole role,
@@ -682,7 +691,7 @@ public class AdminUserService {
             if (input.classId() == null || input.subjectId() != null) {
                 throw invalidRoleDetails();
             }
-            SchoolClass schoolClass = schoolClassRepository.findById(input.classId())
+            SchoolClass schoolClass = schoolClassRepository.findByIdForUpdate(input.classId())
                 .orElseThrow(() -> new ApplicationException(
                     HttpStatus.BAD_REQUEST,
                     "CLASS_NOT_FOUND",
@@ -696,6 +705,13 @@ public class AdminUserService {
                     HttpStatus.CONFLICT,
                     "CLASS_ACADEMIC_YEAR_MISMATCH",
                     "Обраний клас не належить до поточного навчального року"
+                );
+            }
+            if (schoolClass.isDraft()) {
+                throw new ApplicationException(
+                    HttpStatus.CONFLICT,
+                    "CLASS_TEACHER_REQUIRED",
+                    "До класу можна зараховувати учнів після призначення класного керівника"
                 );
             }
             return schoolClass;

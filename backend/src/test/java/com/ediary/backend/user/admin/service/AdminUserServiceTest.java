@@ -24,6 +24,7 @@ import com.ediary.backend.schedule.repository.SubjectRepository;
 import com.ediary.backend.user.admin.dto.CreateAdminUserRequest;
 import com.ediary.backend.user.admin.dto.UpdateAdminUserRequest;
 import com.ediary.backend.user.entity.AppUser;
+import com.ediary.backend.user.entity.AdministratorProfile;
 import com.ediary.backend.user.entity.ParentProfile;
 import com.ediary.backend.user.entity.StudentProfile;
 import com.ediary.backend.user.entity.UserRole;
@@ -91,6 +92,27 @@ class AdminUserServiceTest {
 
     private AdminUserService service;
 
+    @Test
+    void findsCurrentAdministratorByLogin() {
+        AppUser user = new AppUser();
+        user.setId(10L);
+        user.setLogin("admin.test");
+        user.setEmail("admin@example.com");
+        user.setRole(UserRole.ADMIN);
+        AdministratorProfile profile = new AdministratorProfile();
+        profile.setName("Олена");
+        profile.setSurname("Ткаченко");
+        when(userRepository.findByLoginIgnoreCase("admin.test")).thenReturn(Optional.of(user));
+        when(administratorProfileRepository.findByUser_Id(10L)).thenReturn(Optional.of(profile));
+
+        var result = service.findCurrent("admin.test");
+
+        assertThat(result.login()).isEqualTo("admin.test");
+        assertThat(result.firstName()).isEqualTo("Олена");
+        assertThat(result.lastName()).isEqualTo("Ткаченко");
+        assertThat(result.role()).isEqualTo(UserRole.ADMIN);
+    }
+
     @BeforeEach
     void setUp() {
         service = new AdminUserService(
@@ -128,7 +150,8 @@ class AdminUserServiceTest {
         AcademicYear academicYear = new AcademicYear();
         academicYear.setValue("2025/2026");
         schoolClass.setAcademicYear(academicYear);
-        when(schoolClassRepository.findById(5L)).thenReturn(Optional.of(schoolClass));
+        schoolClass.setClassTeacher(new com.ediary.backend.user.entity.TeacherProfile());
+        when(schoolClassRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(schoolClass));
         when(temporaryPasswordGenerator.generate()).thenReturn("Temp!Password234");
         when(parentLinkCodeService.generateUnique()).thenReturn(
             new ParentLinkCodeService.GeneratedParentLinkCode("A7K9-M2P4", "code-hash")

@@ -11,16 +11,15 @@ import {
   Plus,
   Save,
   Trash2,
-  UserRound,
   X,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
+import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { authApi } from "@/lib/api.js";
 import { allowRouteNavigation, registerNavigationGuard } from "@/lib/navigationGuard.js";
 import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
-import { userIdentities } from "@/lib/userIdentity.js";
 import { cn } from "@/lib/utils.js";
 import {
   calculateAverage,
@@ -715,10 +714,7 @@ function TeacherTopBar({ onLogout }) {
       </a>
       <div className="flex items-center gap-1.5 sm:gap-4">
         <NotificationButton />
-        <div className="hidden items-center gap-3 bg-slate-50 px-3 py-1.5 sm:flex">
-          <div className="text-right leading-tight"><div className="text-[0.78rem] font-bold">{userIdentities.TEACHER.displayName}</div><div className="text-[0.7rem] text-slate-500">{userIdentities.TEACHER.roleLabel}</div></div>
-          <UserRound className="h-8 w-8" strokeWidth={1.8} aria-hidden="true" />
-        </div>
+        <CurrentUserBadge />
         <button type="button" onClick={onLogout} className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[0.82rem] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Вийти</span></button>
       </div>
     </header>

@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.registration.dto.request.CreateRegistrationRequest;
+import com.ediary.backend.registration.dto.response.RegistrationRequestResponse;
 import com.ediary.backend.registration.entity.RegistrationRequest;
 import com.ediary.backend.registration.entity.RegistrationStatus;
 import com.ediary.backend.registration.event.RegistrationApprovedEvent;
@@ -30,6 +32,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +40,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class RegistrationRequestServiceTest {
@@ -90,13 +95,14 @@ class RegistrationRequestServiceTest {
         AcademicYear academicYear = new AcademicYear();
         academicYear.setValue("2025/2026");
         schoolClass.setAcademicYear(academicYear);
+        schoolClass.setClassTeacher(new com.ediary.backend.user.entity.TeacherProfile());
 
         when(userRepository.existsByEmailIgnoreCase("student@example.com")).thenReturn(false);
         when(registrationRequestRepository.existsByEmailIgnoreCaseAndStatus(
             "student@example.com",
             RegistrationStatus.PENDING
         )).thenReturn(false);
-        when(schoolClassRepository.findById(5L)).thenReturn(Optional.of(schoolClass));
+        when(schoolClassRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(schoolClass));
         when(registrationRequestRepository.saveAndFlush(any(RegistrationRequest.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -127,6 +133,49 @@ class RegistrationRequestServiceTest {
     }
 
     @Test
+    void rejectsStudentRequestForDraftClass() {
+        SchoolClass schoolClass = new SchoolClass();
+        AcademicYear academicYear = new AcademicYear();
+        academicYear.setValue("2025/2026");
+        schoolClass.setAcademicYear(academicYear);
+        when(userRepository.existsByEmailIgnoreCase("student@example.com")).thenReturn(false);
+        when(registrationRequestRepository.existsByEmailIgnoreCaseAndStatus(
+            "student@example.com", RegistrationStatus.PENDING
+        )).thenReturn(false);
+        when(schoolClassRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(schoolClass));
+
+        assertThatThrownBy(() -> service.submit(studentRequest()))
+            .isInstanceOf(ApplicationException.class)
+            .satisfies(error -> assertThat(((ApplicationException) error).getCode())
+                .isEqualTo("CLASS_TEACHER_REQUIRED"));
+        verify(registrationRequestRepository, never()).saveAndFlush(any(RegistrationRequest.class));
+    }
+
+    @Test
+    void notificationFeedPrioritizesPendingRequestsAndFillsRemainingSlotsWithRecentDecisions() {
+        RegistrationRequest pending = mock(RegistrationRequest.class);
+        RegistrationRequest reviewed = mock(RegistrationRequest.class);
+        RegistrationRequestResponse pendingResponse = mock(RegistrationRequestResponse.class);
+        RegistrationRequestResponse reviewedResponse = mock(RegistrationRequestResponse.class);
+        when(registrationRequestRepository.findAllByStatus(
+            org.mockito.ArgumentMatchers.eq(RegistrationStatus.PENDING),
+            any(Pageable.class)
+        )).thenReturn(new PageImpl<>(List.of(pending)));
+        when(registrationRequestRepository.findAllByStatusNot(
+            org.mockito.ArgumentMatchers.eq(RegistrationStatus.PENDING),
+            any(Pageable.class)
+        )).thenReturn(new PageImpl<>(List.of(reviewed)));
+        when(registrationRequestRepository.countByStatus(RegistrationStatus.PENDING)).thenReturn(7L);
+        when(mapper.toResponse(pending)).thenReturn(pendingResponse);
+        when(mapper.toResponse(reviewed)).thenReturn(reviewedResponse);
+
+        var result = service.findNotificationFeed();
+
+        assertThat(result.pendingCount()).isEqualTo(7);
+        assertThat(result.items()).containsExactly(pendingResponse, reviewedResponse);
+    }
+
+    @Test
     void submitsParentRequestForStudentResolvedByLinkCode() {
         StudentProfile student = new StudentProfile();
         student.setId(12L);
@@ -146,7 +195,7 @@ class RegistrationRequestServiceTest {
         assertThat(requestCaptor.getValue().getRequestedStudent()).isSameAs(student);
         assertThat(requestCaptor.getValue().getRequestedClass()).isNull();
         verify(parentLinkCodeService).requireActiveStudent("A7K9-M2P4");
-        verify(schoolClassRepository, never()).findById(any());
+        verify(schoolClassRepository, never()).findByIdForUpdate(any());
     }
 
     @Test
@@ -203,9 +252,11 @@ class RegistrationRequestServiceTest {
     @Test
     void approvalCreatesAccountAndPublishesCredentialsOnlyAfterDecisionIsStored() {
         SchoolClass schoolClass = new SchoolClass();
+        schoolClass.setId(5L);
         AcademicYear academicYear = new AcademicYear();
         academicYear.setValue("2025/2026");
         schoolClass.setAcademicYear(academicYear);
+        schoolClass.setClassTeacher(new com.ediary.backend.user.entity.TeacherProfile());
         RegistrationRequest request = new RegistrationRequest(
             "Даніл",
             "Холоденко",
@@ -227,6 +278,7 @@ class RegistrationRequestServiceTest {
         createdUser.setLogin("st23456789");
 
         when(registrationRequestRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(request));
+        when(schoolClassRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(schoolClass));
         when(userRepository.findByLoginIgnoreCase("admin")).thenReturn(Optional.of(reviewer));
         when(accountCreationService.createFrom(request, "student.petrenko"))
             .thenReturn(new AccountProvisioningResult(createdUser, "Temp!Password234", "A7K9-M2P4"));

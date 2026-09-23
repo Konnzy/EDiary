@@ -142,12 +142,22 @@ public class AdminSchoolClassService {
 
     @Transactional
     public AdminSchoolClassResponse update(Long classId, SaveSchoolClassRequest input) {
-        SchoolClass schoolClass = requireClass(classId);
+        SchoolClass schoolClass = requireClassForUpdate(classId);
         ensureEditable(schoolClass);
         String letter = normalizeRequiredLetter(input.letter());
         ensureSameAcademicYear(schoolClass, input.academicYear());
         ensureUniqueClass(schoolClass.getAcademicYear().getValue(), input.number(), letter, classId);
         long studentCount = membershipRepository.countBySchoolClassIdAndActiveTrue(classId);
+        if (input.classTeacherId() == null && !schoolClass.isDraft()) {
+            List<String> blockers = findClassRelations(schoolClass);
+            if (!blockers.isEmpty()) {
+                throw new ApplicationException(
+                    HttpStatus.CONFLICT,
+                    "CLASS_TEACHER_REQUIRED",
+                    "Не можна прибрати класного керівника: " + String.join(", ", blockers)
+                );
+            }
+        }
         apply(schoolClass, input, letter);
         SchoolClass saved = schoolClassRepository.saveAndFlush(schoolClass);
         return toResponse(saved, studentCount);
@@ -165,6 +175,8 @@ public class AdminSchoolClassService {
                 "Клас не можна видалити: " + String.join(", ", blockers)
             );
         }
+        membershipRepository.deleteBySchoolClassIdAndActiveFalse(classId);
+        membershipRepository.flush();
         schoolClassRepository.delete(schoolClass);
         schoolClassRepository.flush();
     }
@@ -203,6 +215,7 @@ public class AdminSchoolClassService {
     public AdminClassStudentResponse addStudent(Long classId, Long studentId) {
         SchoolClass targetClass = requireClassForUpdate(classId);
         ensureEditable(targetClass);
+        ensureActive(targetClass);
         ensureHasCapacity(targetClass);
         StudentProfile student = requireStudentForUpdate(studentId);
         if (membershipRepository.findByStudentIdAndSchoolClassAcademicYearValueAndActiveTrue(
@@ -234,6 +247,7 @@ public class AdminSchoolClassService {
         SchoolClass sourceClass = requireClassForUpdate(sourceClassId);
         ensureEditable(sourceClass);
         ensureEditable(targetClass);
+        ensureActive(targetClass);
         if (!sourceClass.getAcademicYear().getValue().equals(targetClass.getAcademicYear().getValue())) {
             throw new ApplicationException(
                 HttpStatus.CONFLICT,
@@ -280,20 +294,36 @@ public class AdminSchoolClassService {
 
     private List<String> findDeletionBlockers(SchoolClass schoolClass) {
         List<String> blockers = new ArrayList<>();
-        Long classId = schoolClass.getId();
         if (schoolClass.getClassTeacher() != null) {
             blockers.add("призначено класного керівника");
         }
-        if (membershipRepository.countBySchoolClassId(classId) > 0) {
+        Long classId = schoolClass.getId();
+        if (membershipRepository.countBySchoolClassIdAndActiveTrue(classId) > 0
+            || studentProfileRepository.countBySchoolClassId(classId) > 0) {
             blockers.add("до класу зараховано учнів");
         }
+        addOperationalRelationBlockers(blockers, classId);
+        return blockers;
+    }
+
+    private List<String> findClassRelations(SchoolClass schoolClass) {
+        List<String> blockers = new ArrayList<>();
+        Long classId = schoolClass.getId();
+        if (membershipRepository.countBySchoolClassIdAndActiveTrue(classId) > 0
+            || studentProfileRepository.countBySchoolClassId(classId) > 0) {
+            blockers.add("до класу зараховано учнів");
+        }
+        addOperationalRelationBlockers(blockers, classId);
+        return blockers;
+    }
+
+    private void addOperationalRelationBlockers(List<String> blockers, Long classId) {
         if (schoolClassRepository.hasSchedule(classId)) {
             blockers.add("для класу створено розклад");
         }
         if (schoolClassRepository.hasRegistrationRequests(classId)) {
             blockers.add("клас використано в реєстраційних заявках");
         }
-        return blockers;
     }
 
     private SchoolClass requireClass(Long classId) {
@@ -405,6 +435,16 @@ public class AdminSchoolClassService {
         }
     }
 
+    private void ensureActive(SchoolClass schoolClass) {
+        if (schoolClass.isDraft()) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "CLASS_TEACHER_REQUIRED",
+                "Спочатку призначте класного керівника, щоб зараховувати учнів"
+            );
+        }
+    }
+
     private void ensureSameAcademicYear(SchoolClass schoolClass, String requestedYear) {
         if (!schoolClass.getAcademicYear().getValue().equals(requestedYear)) {
             throw new ApplicationException(
@@ -436,7 +476,10 @@ public class AdminSchoolClassService {
             teacher == null ? null : fullName(teacher),
             studentCount,
             schoolClass.getAcademicYear().getValue(),
+            currentAcademicYear().equals(schoolClass.getAcademicYear().getValue()),
             currentAcademicYear().equals(schoolClass.getAcademicYear().getValue())
+                ? schoolClass.isDraft() ? "DRAFT" : "ACTIVE"
+                : "ARCHIVED"
         );
     }
 

@@ -29,6 +29,9 @@ public interface RegistrationRequestRepository extends JpaRepository<Registratio
     @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})
     Page<RegistrationRequest> findAllByStatus(RegistrationStatus status, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})
+    Page<RegistrationRequest> findAllByStatusNot(RegistrationStatus status, Pageable pageable);
+
     @Override
     @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})
     Page<RegistrationRequest> findAll(Pageable pageable);
