@@ -22,7 +22,7 @@ public class GlobalExceptionHandler {
         MaxUploadSizeExceededException exception,
         HttpServletRequest request
     ) {
-        return response(HttpStatus.PAYLOAD_TOO_LARGE, "AVATAR_TOO_LARGE",
+        return response(HttpStatus.CONTENT_TOO_LARGE, "AVATAR_TOO_LARGE",
             "Розмір зображення не має перевищувати 5 МБ", Map.of(), request);
     }
 
