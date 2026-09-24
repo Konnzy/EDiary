@@ -431,7 +431,7 @@ function CreateUserDialog({ onClose, onCompleted }) {
         <form onSubmit={submit} className="mt-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <CreateField label="Роль" error={errors.role}>
-              <select value={form.role} onChange={(event) => update("role", event.target.value)} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.82rem] text-slate-700 outline-none focus:border-slate-500">
+              <select value={form.role} onChange={(event) => update("role", event.target.value)} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.82rem] text-slate-700 outline-hidden focus:border-slate-500">
                 <option value="STUDENT">Учень</option>
                 <option value="TEACHER">Вчитель</option>
                 <option value="PARENT">Батьки</option>
@@ -469,7 +469,7 @@ function CreateUserDialog({ onClose, onCompleted }) {
             </CreateField>
             {form.role === "STUDENT" ? (
               <CreateField label="Клас" error={errors.classId}>
-                <select value={form.classId} onChange={(event) => update("classId", event.target.value)} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.82rem] text-slate-700 outline-none focus:border-slate-500">
+                <select value={form.classId} onChange={(event) => update("classId", event.target.value)} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.82rem] text-slate-700 outline-hidden focus:border-slate-500">
                   <option value="">Оберіть клас</option>
                   {options.classes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
@@ -477,7 +477,7 @@ function CreateUserDialog({ onClose, onCompleted }) {
             ) : null}
             {form.role === "TEACHER" ? (
               <CreateField label="Предмет" error={errors.subjectId}>
-                <select value={form.subjectId} onChange={(event) => update("subjectId", event.target.value)} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.82rem] text-slate-700 outline-none focus:border-slate-500">
+                <select value={form.subjectId} onChange={(event) => update("subjectId", event.target.value)} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.82rem] text-slate-700 outline-hidden focus:border-slate-500">
                   <option value="">Оберіть предмет</option>
                   {options.subjects.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
@@ -530,7 +530,7 @@ function FilterSelect({ label, value, options, onChange }) {
   return (
     <label className="sr-only">
       {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 min-w-[150px] rounded-md border border-slate-200 bg-white px-3 text-[0.78rem] font-semibold text-slate-600 outline-none transition-colors hover:border-slate-300 focus:border-slate-500">
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 min-w-[150px] rounded-md border border-slate-200 bg-white px-3 text-[0.78rem] font-semibold text-slate-600 outline-hidden transition-colors hover:border-slate-300 focus:border-slate-500">
         {options.map((option) => <option key={option.value || "all"} value={option.value}>{option.label}</option>)}
       </select>
     </label>
@@ -575,7 +575,7 @@ function MobileList({ users, onChangeStatus, onEdit, onResetPassword, onDelete }
 }
 
 function UserActions({ user, onChangeStatus, onEdit, onResetPassword, onDelete, alignRight = false }) {
-  const actionClass = "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[0.71rem] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2";
+  const actionClass = "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[0.71rem] font-bold transition-colors focus-visible:outline-hidden focus-visible:ring-2";
   return (
     <div className={cn("flex flex-wrap gap-2", alignRight && "justify-end")}>
       <button type="button" onClick={() => onEdit(user)} className={cn(actionClass, "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-400")}><Pencil className="h-3.5 w-3.5" />Редагувати</button>
@@ -664,7 +664,7 @@ function EditUserDialog({ user, onClose, onCompleted }) {
               <Input value={form.login} onChange={(event) => update("login", formatLogin(event.target.value))} maxLength={50} autoComplete="off" autoCapitalize="none" spellCheck={false} />
             </CreateField>
             <CreateField label="Роль" error={errors.role}>
-              <select value={form.role} onChange={(event) => update("role", event.target.value)} disabled={user.role === "ADMIN"} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.82rem] text-slate-700 outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">
+              <select value={form.role} onChange={(event) => update("role", event.target.value)} disabled={user.role === "ADMIN"} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.82rem] text-slate-700 outline-hidden focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">
                 {user.role === "ADMIN" ? <option value="ADMIN">Адміністратор</option> : null}
                 <option value="STUDENT">Учень</option>
                 <option value="TEACHER">Вчитель</option>

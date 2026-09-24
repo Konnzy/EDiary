@@ -345,7 +345,7 @@ function SelectField({ label, value, onChange, children }) {
     <label className="block min-w-0">
       <span className="mb-2 block text-[0.74rem] font-semibold text-slate-600">{label}</span>
       <span className="relative block">
-        <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.8rem] font-semibold text-slate-700 outline-none transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
+        <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.8rem] font-semibold text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
           {children}
         </select>
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
@@ -466,7 +466,7 @@ function GradeCell({ grade, onClick }) {
         {gradeValue || attendanceLabel || <Plus className="h-4 w-4 opacity-0 transition-opacity group-hover/cell:opacity-100" aria-hidden="true" />}
         {gradeValue && attendanceLabel ? (
           <span className={cn(
-            "absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded px-1 text-[0.52rem] font-bold leading-4 shadow-sm",
+            "absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded px-1 text-[0.52rem] font-bold leading-4 shadow-xs",
             attendanceStatus === "ABSENT" && "bg-red-100 text-red-700",
             attendanceStatus === "EXCUSED" && "bg-sky-100 text-sky-700",
             attendanceStatus === "RELEASED" && "bg-amber-100 text-amber-700",
@@ -502,7 +502,7 @@ function LessonDetailsDialog({ date, className, subject, initialValue, onClose, 
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="lesson-details-title" className="w-full max-w-[560px] rounded-lg border border-slate-200 bg-white p-5 shadow-2xl outline-none sm:p-6">
+      <section ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="lesson-details-title" className="w-full max-w-[560px] rounded-lg border border-slate-200 bg-white p-5 shadow-2xl outline-hidden sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="lesson-details-title" className="text-lg font-bold text-slate-900">Дані уроку</h2>
@@ -524,7 +524,7 @@ function LessonDetailsDialog({ date, className, subject, initialValue, onClose, 
               min={date}
               disabled={!form.homework.trim()}
               onChange={(event) => setForm((current) => ({ ...current, homeworkDeadline: event.target.value }))}
-              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.8rem] font-medium text-slate-700 outline-none transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.8rem] font-medium text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             />
           </label>
           <div className="flex justify-end pt-1">
@@ -540,7 +540,7 @@ function TextAreaField({ label, value, onChange, ...props }) {
   return (
     <label className="block">
       <span className="mb-2 block text-[0.74rem] font-semibold text-slate-600">{label}</span>
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} className="w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2.5 text-[0.8rem] leading-5 text-slate-800 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200" {...props} />
+      <textarea value={value} onChange={(event) => onChange(event.target.value)} className="w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2.5 text-[0.8rem] leading-5 text-slate-800 outline-hidden transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200" {...props} />
     </label>
   );
 }
@@ -650,7 +650,7 @@ function GradePopover({ editor, initialValue, lesson, onClose, onSave, onDelete 
             </div>
           </div>
         ) : null}
-        <textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={3} maxLength={200} placeholder="Коментар до оцінки" className="mt-3 w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.76rem] leading-5 text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200" />
+        <textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={3} maxLength={200} placeholder="Коментар до оцінки" className="mt-3 w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.76rem] leading-5 text-slate-800 outline-hidden placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200" />
         {error ? <p className="mt-2 text-[0.7rem] text-red-600">{error}</p> : null}
         <div className="mt-3 flex items-center justify-end gap-2">
           {initialValue ? <button type="button" onClick={onDelete} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-red-300 bg-white px-3 text-[0.72rem] font-semibold text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" />Видалити</button> : null}
@@ -681,7 +681,7 @@ function UnsavedJournalDialog({ className, subject, period, onClose, onDiscard, 
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/45 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="unsaved-journal-title" className="w-full max-w-[560px] rounded-lg border border-slate-200 bg-white p-5 shadow-2xl outline-none sm:p-6">
+      <section ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="unsaved-journal-title" className="w-full max-w-[560px] rounded-lg border border-slate-200 bg-white p-5 shadow-2xl outline-hidden sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="unsaved-journal-title" className="text-lg font-bold text-slate-900">Є незбережені зміни</h2>

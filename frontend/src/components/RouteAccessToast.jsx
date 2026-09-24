@@ -55,7 +55,7 @@ export function RouteAccessToast() {
             <button
               type="button"
               onClick={() => setNotice(null)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-400"
               aria-label="Закрити повідомлення"
             >
               <X className="h-4 w-4" aria-hidden="true" />

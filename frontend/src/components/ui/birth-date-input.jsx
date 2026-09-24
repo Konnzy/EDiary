@@ -88,7 +88,7 @@ export function BirthDateInput({
       <button
         type="button"
         onClick={openPicker}
-        className="absolute left-0 top-0 z-10 flex h-10 w-10 items-center justify-center rounded-l-md text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+        className="absolute left-0 top-0 z-10 flex h-10 w-10 items-center justify-center rounded-l-md text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
         aria-label="Обрати дату народження в календарі"
         title="Обрати дату в календарі"
       >

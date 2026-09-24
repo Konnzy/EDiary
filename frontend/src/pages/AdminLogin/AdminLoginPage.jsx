@@ -204,7 +204,7 @@ export function AdminLoginPage() {
               <div className="mt-8 flex justify-center">
                 <a
                   href="#login"
-                  className="inline-flex items-center gap-4 text-[0.9rem] font-medium text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="inline-flex items-center gap-4 text-[0.9rem] font-medium text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <ArrowLeft className="h-5 w-5" aria-hidden="true" />
                   Повернутися до входу

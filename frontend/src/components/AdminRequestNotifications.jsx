@@ -88,7 +88,7 @@ export function AdminRequestNotifications() {
       <button
         type="button"
         onClick={toggle}
-        className="relative flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:h-10 sm:w-10"
+        className="relative flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:h-10 sm:w-10"
         aria-label={feed.pendingCount ? `Заявки: ${feed.pendingCount} очікують рішення` : "Події заявок"}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -175,7 +175,7 @@ function NotificationItem({ item, onNavigate }) {
   const fullName = [item.lastName, item.firstName, item.patronymic].filter(Boolean).join(" ");
 
   return (
-    <a href="#admin/requests" onClick={onNavigate} className="flex gap-3 border-b border-slate-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400">
+    <a href="#admin/requests" onClick={onNavigate} className="flex gap-3 border-b border-slate-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-slate-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400">
       <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ring-1 ring-inset", content.iconClass)}>
         <Icon className="h-4 w-4" aria-hidden="true" />
       </span>

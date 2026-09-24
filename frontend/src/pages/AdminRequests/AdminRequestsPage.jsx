@@ -102,7 +102,7 @@ export function AdminRequestsPage() {
                 onClick={() => changeStatus(filter.value)}
                 className={cn(
                   "h-9 shrink-0 rounded px-3 text-[0.78rem] font-bold transition-colors",
-                  status === filter.value ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+                  status === filter.value ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800",
                 )}
                 aria-pressed={status === filter.value}
               >
@@ -195,8 +195,8 @@ function DecisionButtons({ request, onDecision, alignRight = false }) {
   }
   return (
     <div className={cn("flex gap-2", alignRight && "justify-end")}>
-      <button type="button" onClick={() => onDecision({ type: "approve", request })} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 text-[0.72rem] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200 transition-colors hover:bg-emerald-100 hover:ring-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" title="Схвалити заявку"><Check className="h-3.5 w-3.5" aria-hidden="true" />Схвалити</button>
-      <button type="button" onClick={() => onDecision({ type: "reject", request })} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-rose-50 px-2.5 text-[0.72rem] font-bold text-rose-700 ring-1 ring-inset ring-rose-200 transition-colors hover:bg-rose-100 hover:ring-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500" title="Відхилити заявку"><X className="h-3.5 w-3.5" aria-hidden="true" />Відхилити</button>
+      <button type="button" onClick={() => onDecision({ type: "approve", request })} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 text-[0.72rem] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200 transition-colors hover:bg-emerald-100 hover:ring-emerald-300 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500" title="Схвалити заявку"><Check className="h-3.5 w-3.5" aria-hidden="true" />Схвалити</button>
+      <button type="button" onClick={() => onDecision({ type: "reject", request })} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-rose-50 px-2.5 text-[0.72rem] font-bold text-rose-700 ring-1 ring-inset ring-rose-200 transition-colors hover:bg-rose-100 hover:ring-rose-300 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500" title="Відхилити заявку"><X className="h-3.5 w-3.5" aria-hidden="true" />Відхилити</button>
     </div>
   );
 }
@@ -274,7 +274,7 @@ function DecisionDialog({ type, request, onClose, onCompleted }) {
         ) : (
           <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-[0.78rem] leading-5 text-slate-600">Заявник отримає повідомлення з указаною причиною відхилення.</div>
         )}
-        {!isApproval ? <div className="mt-5"><label htmlFor="rejection-reason" className="text-[0.8rem] font-semibold text-slate-700">Причина відхилення</label><textarea id="rejection-reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={4} className="mt-2 w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.82rem] text-slate-800 outline-none transition-colors focus:border-slate-500" placeholder="Вкажіть, які дані потрібно уточнити" /></div> : null}
+        {!isApproval ? <div className="mt-5"><label htmlFor="rejection-reason" className="text-[0.8rem] font-semibold text-slate-700">Причина відхилення</label><textarea id="rejection-reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} rows={4} className="mt-2 w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.82rem] text-slate-800 outline-hidden transition-colors focus:border-slate-500" placeholder="Вкажіть, які дані потрібно уточнити" /></div> : null}
         {error ? <div className="mt-4"><Alert>{error}</Alert></div> : null}
         <div className="mt-6 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} className="h-10 rounded-md border border-slate-300 bg-white px-4 text-slate-600 hover:border-slate-400 hover:bg-slate-50">Скасувати</Button>

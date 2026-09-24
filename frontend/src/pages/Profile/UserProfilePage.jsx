@@ -409,7 +409,7 @@ function LinkedChildInformation({ className, children, selectedChildId, onSelect
       <label htmlFor="profile-child" className="block border-b border-slate-200 pb-5">
         <span className="text-[0.72rem] font-semibold text-slate-500">Оберіть дитину</span>
         <span className="relative mt-2 block">
-          <select id="profile-child" value={selectedChild.id} onChange={(event) => onSelect(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-10 text-[0.82rem] font-semibold text-slate-700 outline-none transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
+          <select id="profile-child" value={selectedChild.id} onChange={(event) => onSelect(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-10 text-[0.82rem] font-semibold text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
             {children.map((child) => <option key={child.id} value={child.id}>{child.fullName} · {child.className}</option>)}
           </select>
           <ChevronDown className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-slate-400" aria-hidden="true" />
@@ -557,8 +557,8 @@ function Section({ className, title, icon: Icon, children }) {
 
 function Toggle({ checked, onChange, label }) {
   return (
-    <button type="button" role="switch" aria-checked={checked} aria-label={label} onClick={onChange} className={cn("relative h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2", checked ? "border-slate-800 bg-slate-800" : "border-slate-300 bg-slate-200")}>
-      <span className={cn("absolute top-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white shadow-sm transition-transform", checked ? "translate-x-[21px]" : "translate-x-0.5")}>
+    <button type="button" role="switch" aria-checked={checked} aria-label={label} onClick={onChange} className={cn("relative h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2", checked ? "border-slate-800 bg-slate-800" : "border-slate-300 bg-slate-200")}>
+      <span className={cn("absolute top-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white shadow-xs transition-transform", checked ? "translate-x-[21px]" : "translate-x-0.5")}>
         {checked ? <Check className="h-3 w-3 text-slate-700" aria-hidden="true" /> : null}
       </span>
     </button>

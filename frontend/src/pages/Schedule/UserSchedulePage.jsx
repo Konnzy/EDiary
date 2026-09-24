@@ -324,7 +324,7 @@ function ScheduleFilters({ role, academicYear, week, children, studentId, nextLe
               onClick={() => onWeekChange(value)}
               className={cn(
                 "rounded text-[0.76rem] font-semibold transition-colors",
-                week === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+                week === value ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800",
               )}
               aria-pressed={week === value}
             >
@@ -353,7 +353,7 @@ function SelectField({ label, value, onChange, children }) {
     <label className="block">
       <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">{label}</span>
       <span className="relative block">
-        <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.8rem] font-semibold text-slate-700 outline-none hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
+        <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.8rem] font-semibold text-slate-700 outline-hidden hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
           {children}
         </select>
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />

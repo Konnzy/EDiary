@@ -158,7 +158,7 @@ export function LoginForm() {
               </div>
               <a
                 href="#forgot-password"
-                className="text-[0.82rem] font-medium text-slate-500 underline-offset-4 transition-all duration-200 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="text-[0.82rem] font-medium text-slate-500 underline-offset-4 transition-all duration-200 hover:text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 Забули пароль?
               </a>
@@ -182,7 +182,7 @@ export function LoginForm() {
               Ще не маєте акаунту?{" "}
               <a
                 href="#request-registration"
-                className="font-semibold text-slate-700 underline-offset-4 transition-all duration-200 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="font-semibold text-slate-700 underline-offset-4 transition-all duration-200 hover:text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 Подати заявку
               </a>

@@ -221,7 +221,7 @@ function SubjectControls({
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12 xl:items-end">
         {role === "PARENT" ? (
           <SelectField label="Дитина" htmlFor="subjects-child" className="xl:col-span-2">
-            <select id="subjects-child" value={studentId} onChange={(event) => onStudentChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-none transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
+            <select id="subjects-child" value={studentId} onChange={(event) => onStudentChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
               {children.length ? children.map((child) => (
                 <option key={child.studentId} value={child.studentId}>{child.firstName} {child.lastName}{child.className ? ` · ${child.className}` : ""}</option>
               )) : <option value="">Немає прив’язаних дітей</option>}
@@ -230,13 +230,13 @@ function SubjectControls({
         ) : null}
 
         <SelectField label="Предмет" htmlFor="subjects-subject" className="xl:col-span-3">
-          <select id="subjects-subject" value={subjectId} onChange={(event) => onSubjectChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-none transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
+          <select id="subjects-subject" value={subjectId} onChange={(event) => onSubjectChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
             {subjectProgress.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </SelectField>
 
         <SelectField label="Навчальний рік" htmlFor="subjects-academic-year" className="xl:col-span-2">
-          <select id="subjects-academic-year" value={academicYear} onChange={(event) => onAcademicYearChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-none transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
+          <select id="subjects-academic-year" value={academicYear} onChange={(event) => onAcademicYearChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
             {academicYears.map((item) => <option key={item} value={item}>{item} н. р.</option>)}
           </select>
         </SelectField>
@@ -283,7 +283,7 @@ function PeriodField({ value, options, onChange, className }) {
       <div className="grid h-10 grid-cols-[40px_minmax(0,1fr)_40px] overflow-hidden rounded-md border border-slate-300 bg-white">
         <button type="button" onClick={() => selectByOffset(-1)} disabled={currentIndex <= 0} className="flex items-center justify-center border-r border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:cursor-default disabled:opacity-30" aria-label="Попередній період"><ChevronLeft className="h-4 w-4" aria-hidden="true" /></button>
         <span className="relative min-w-0">
-          <select id="subjects-period" value={value} onChange={(event) => onChange(event.target.value)} className="h-full w-full appearance-none bg-white px-3 pr-8 text-center text-[0.78rem] font-semibold text-slate-800 outline-none" aria-labelledby="subjects-period-label">
+          <select id="subjects-period" value={value} onChange={(event) => onChange(event.target.value)} className="h-full w-full appearance-none bg-white px-3 pr-8 text-center text-[0.78rem] font-semibold text-slate-800 outline-hidden" aria-labelledby="subjects-period-label">
             {options.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" aria-hidden="true" />

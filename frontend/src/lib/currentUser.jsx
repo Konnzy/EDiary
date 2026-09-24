@@ -13,7 +13,7 @@ export function CurrentUserBadge() {
   const initials = profile ? profileInitials(profile) : session.login.slice(0, 2).toUpperCase();
 
   return (
-    <a href={`#${session.role.toLowerCase()}/profile`} aria-label="Відкрити профіль" className="hidden min-w-0 items-center gap-3 rounded-md bg-slate-50 px-3 py-1.5 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 sm:flex">
+    <a href={`#${session.role.toLowerCase()}/profile`} aria-label="Відкрити профіль" className="hidden min-w-0 items-center gap-3 rounded-md bg-slate-50 px-3 py-1.5 transition-colors hover:bg-slate-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 sm:flex">
       <div className="min-w-0 text-right leading-tight">
         <div className="max-w-[190px] truncate text-[0.78rem] font-bold text-slate-800">{shortName}</div>
         <div className="text-[0.7rem] text-slate-500">{roleLabels[session.role]}</div>

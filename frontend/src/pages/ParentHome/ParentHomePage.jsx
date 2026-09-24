@@ -196,7 +196,7 @@ function ChildSelector({ children, value, onChange }) {
     <section className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] sm:flex-row sm:items-center sm:px-5" aria-label="Вибір дитини">
       <label htmlFor="parent-child-selector" className="shrink-0 text-[0.8rem] font-bold text-slate-700">Перегляд даних:</label>
       <div className="relative w-full sm:max-w-[310px]">
-        <select id="parent-child-selector" value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-10 text-[0.82rem] font-semibold text-slate-700 outline-none transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
+        <select id="parent-child-selector" value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-10 text-[0.82rem] font-semibold text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
           {!value ? <option value="" disabled>Оберіть дитину</option> : null}
           {children.map((child) => (
             <option key={child.studentId} value={child.studentId}>{child.firstName} {child.lastName}{child.className ? ` · ${child.className}` : ""}</option>
@@ -233,7 +233,7 @@ function LinkChildModal({ code, error, isSubmitting, onChange, onClose, onSubmit
             autoFocus
             aria-invalid={Boolean(error)}
             aria-describedby={error ? "parent-link-code-error" : undefined}
-            className={cn("mt-2 h-11 w-full rounded-md border bg-white px-3 text-[0.9rem] font-semibold uppercase tracking-[0.08em] text-slate-800 outline-none transition-colors focus:ring-2", error ? "border-red-300 focus:border-red-400 focus:ring-red-100" : "border-slate-300 focus:border-slate-500 focus:ring-slate-200")}
+            className={cn("mt-2 h-11 w-full rounded-md border bg-white px-3 text-[0.9rem] font-semibold uppercase tracking-[0.08em] text-slate-800 outline-hidden transition-colors focus:ring-2", error ? "border-red-300 focus:border-red-400 focus:ring-red-100" : "border-slate-300 focus:border-slate-500 focus:ring-slate-200")}
           />
           {error ? <p id="parent-link-code-error" className="mt-2 text-[0.76rem] text-red-600">{error}</p> : null}
 

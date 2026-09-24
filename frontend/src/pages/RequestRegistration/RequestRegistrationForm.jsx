@@ -423,7 +423,7 @@ export function RequestRegistrationForm() {
                     value={form.role}
                     onChange={(event) => updateField("role", event.target.value)}
                     className={cn(
-                      "flex h-10 w-full appearance-none rounded-md border border-slate-300/85 bg-slate-50/40 px-3 py-2 pr-10 text-[0.82rem] text-slate-800 shadow-[inset_0_1px_1px_rgba(15,23,42,0.03)] transition-all duration-200 hover:border-slate-400/70 focus:border-primary/45 focus:bg-white focus:outline-none focus:shadow-glow",
+                      "flex h-10 w-full appearance-none rounded-md border border-slate-300/85 bg-slate-50/40 px-3 py-2 pr-10 text-[0.82rem] text-slate-800 shadow-[inset_0_1px_1px_rgba(15,23,42,0.03)] transition-all duration-200 hover:border-slate-400/70 focus:border-primary/45 focus:bg-white focus:outline-hidden focus:shadow-glow",
                       !form.role && "text-slate-500",
                       showErrors && errors.role && "border-red-400 bg-red-50/30",
                     )}
@@ -488,7 +488,7 @@ export function RequestRegistrationForm() {
                           value={form.classSubject}
                           onChange={(event) => updateField("classSubject", event.target.value)}
                           className={cn(
-                            "flex h-10 w-full appearance-none rounded-md border border-slate-300/85 bg-slate-50/40 px-3 py-2 pr-10 text-[0.82rem] text-slate-800 shadow-[inset_0_1px_1px_rgba(15,23,42,0.03)] transition-all duration-200 hover:border-slate-400/70 focus:border-primary/45 focus:bg-white focus:outline-none focus:shadow-glow",
+                            "flex h-10 w-full appearance-none rounded-md border border-slate-300/85 bg-slate-50/40 px-3 py-2 pr-10 text-[0.82rem] text-slate-800 shadow-[inset_0_1px_1px_rgba(15,23,42,0.03)] transition-all duration-200 hover:border-slate-400/70 focus:border-primary/45 focus:bg-white focus:outline-hidden focus:shadow-glow",
                             !form.classSubject && "text-slate-500",
                             showErrors && errors.classSubject && "border-red-400 bg-red-50/30",
                           )}
@@ -523,7 +523,7 @@ export function RequestRegistrationForm() {
                   </label>
                   <a
                     href="#terms-of-use"
-                    className="text-[0.82rem] font-medium text-slate-800 underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="text-[0.82rem] font-medium text-slate-800 underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     умовами користування
                   </a>
@@ -535,7 +535,7 @@ export function RequestRegistrationForm() {
                   </label>
                   <a
                     href="#privacy-policy"
-                    className="text-[0.82rem] font-medium text-slate-800 underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="text-[0.82rem] font-medium text-slate-800 underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     політикою конфіденційності
                   </a>
@@ -562,7 +562,7 @@ export function RequestRegistrationForm() {
             Вже маєте акаунт?{" "}
             <a
               href="#login"
-              className="font-semibold text-slate-800 underline-offset-4 transition-all duration-200 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="font-semibold text-slate-800 underline-offset-4 transition-all duration-200 hover:text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               Увійти
             </a>

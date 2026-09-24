@@ -347,7 +347,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
                 if (nextClassId !== selectedClassId) requestContextChange(() => setSelectedClassId(nextClassId));
               }}
               disabled={loadingClasses}
-              className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-none hover:border-slate-400 focus:border-slate-500 disabled:opacity-60"
+              className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-hidden hover:border-slate-400 focus:border-slate-500 disabled:opacity-60"
             >
               {loadingClasses ? <option value="">Завантаження...</option> : null}
               {!loadingClasses && classes.length === 0 ? <option value="">Класи не знайдено</option> : null}
@@ -366,7 +366,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
                 const nextYear = event.target.value;
                 if (nextYear !== selectedYear) requestContextChange(() => changeAcademicYear(nextYear));
               }}
-              className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-none hover:border-slate-400 focus:border-slate-500"
+              className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-hidden hover:border-slate-400 focus:border-slate-500"
             >
               {academicYears.map((year) => <option key={year} value={year}>{year} н. р.</option>)}
               <option value="__add_year__">+ Додати навчальний рік</option>
@@ -383,7 +383,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
                   onClick={() => item !== week && requestContextChange(() => setWeek(item))}
                   className={cn(
                     "min-w-[140px] rounded px-4 text-[0.78rem] font-semibold transition-colors",
-                    week === item ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+                    week === item ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800",
                   )}
                 >
                   {item === 1 ? "Перший тиждень" : "Другий тиждень"}
@@ -646,7 +646,7 @@ function CopyScheduleDialog({ currentWeek, currentSchedule, classId, academicYea
 function WeekSelect({ value, onChange }) {
   return (
     <span className="relative block">
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.78rem] font-medium text-slate-700 outline-none hover:border-slate-400 focus:border-slate-500">
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.78rem] font-medium text-slate-700 outline-hidden hover:border-slate-400 focus:border-slate-500">
         <option value={1}>Перший тиждень</option>
         <option value={2}>Другий тиждень</option>
       </select>
@@ -707,7 +707,7 @@ function DayColumn({ day, lessons, openMenu, onToggleMenu, onAdd, onEdit, onDele
               key={`${day.id}-${lessonNumber}`}
               type="button"
               onClick={() => onAdd(lessonNumber)}
-              className="flex h-[154px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50/50 text-[0.78rem] font-semibold text-slate-400 transition-colors hover:border-slate-500 hover:bg-white hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              className="flex h-[154px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50/50 text-[0.78rem] font-semibold text-slate-400 transition-colors hover:border-slate-500 hover:bg-white hover:text-slate-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-400"
             >
               <Plus className="mb-2 h-4 w-4" aria-hidden="true" />
               Додати урок
@@ -840,7 +840,7 @@ function LessonDialog({ dialog, onClose, onSave }) {
 
         <FormField label="Предмет">
           <div className="relative">
-            <select value={form.subjectId || ""} onChange={(event) => selectSubject(event.target.value)} disabled={isLoadingOptions} autoFocus className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-none hover:border-slate-400 focus:border-slate-500 disabled:bg-slate-50 disabled:opacity-60">
+            <select value={form.subjectId || ""} onChange={(event) => selectSubject(event.target.value)} disabled={isLoadingOptions} autoFocus className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-hidden hover:border-slate-400 focus:border-slate-500 disabled:bg-slate-50 disabled:opacity-60">
               <option value="">{isLoadingOptions ? "Завантаження..." : "Оберіть предмет"}</option>
               {subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}
             </select>
@@ -850,7 +850,7 @@ function LessonDialog({ dialog, onClose, onSave }) {
 
         <FormField label="Учитель">
           <div className="relative">
-            <select value={form.teacherId || ""} onChange={(event) => selectTeacher(event.target.value)} disabled={!form.subjectId || isLoadingOptions || availableTeachers.length === 0} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-none hover:border-slate-400 focus:border-slate-500 disabled:bg-slate-50 disabled:text-slate-400">
+            <select value={form.teacherId || ""} onChange={(event) => selectTeacher(event.target.value)} disabled={!form.subjectId || isLoadingOptions || availableTeachers.length === 0} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-hidden hover:border-slate-400 focus:border-slate-500 disabled:bg-slate-50 disabled:text-slate-400">
               <option value="">{!form.subjectId ? "Спочатку оберіть предмет" : availableTeachers.length ? "Оберіть учителя" : "Для предмета немає активних учителів"}</option>
               {availableTeachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}
             </select>
@@ -935,7 +935,7 @@ function DialogActions({ onClose, submitLabel, disabled = false }) {
 function ModalFrame({ title, subtitle, onClose, alert = false, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section role={alert ? "alertdialog" : "dialog"} aria-modal="true" aria-labelledby="schedule-dialog-title" onKeyDown={(event) => event.key === "Escape" && onClose()} className="max-h-[calc(100dvh-2rem)] w-full max-w-[480px] overflow-y-auto rounded-lg border border-slate-200 bg-white p-5 shadow-2xl outline-none sm:p-6">
+      <section role={alert ? "alertdialog" : "dialog"} aria-modal="true" aria-labelledby="schedule-dialog-title" onKeyDown={(event) => event.key === "Escape" && onClose()} className="max-h-[calc(100dvh-2rem)] w-full max-w-[480px] overflow-y-auto rounded-lg border border-slate-200 bg-white p-5 shadow-2xl outline-hidden sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div><h2 id="schedule-dialog-title" className="text-base font-bold text-slate-950">{title}</h2><p className="mt-1 text-xs text-slate-500">{subtitle}</p></div>
           <button type="button" onClick={onClose} aria-label="Закрити" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>

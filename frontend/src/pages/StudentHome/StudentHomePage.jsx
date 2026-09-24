@@ -165,7 +165,7 @@ function TopBar() {
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white px-4 sm:px-5 lg:px-6">
       <a
         href="#student"
-        className="inline-flex min-w-0 items-center gap-2 text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="inline-flex min-w-0 items-center gap-2 text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         aria-label="Електронний щоденник - головна"
       >
         <GraduationCap className="h-7 w-7 shrink-0 text-slate-900 sm:h-8 sm:w-8" strokeWidth={2.4} aria-hidden="true" />
@@ -182,7 +182,7 @@ function TopBar() {
         <button
           type="button"
           onClick={handleLogout}
-          className="inline-flex h-9 items-center gap-2 rounded-md px-2 text-[0.82rem] font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:h-10 sm:px-3"
+          className="inline-flex h-9 items-center gap-2 rounded-md px-2 text-[0.82rem] font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:h-10 sm:px-3"
         >
           <LogOut className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Вийти</span>
@@ -209,7 +209,7 @@ function MobileNavigation() {
               disabled={!item.route}
               onClick={() => { if (item.route) window.location.hash = item.route; }}
               className={cn(
-                "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-1 text-[0.82rem] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-[480px]:gap-2 min-[480px]:px-2",
+                "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-1 text-[0.82rem] font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-[480px]:gap-2 min-[480px]:px-2",
                 item.active
                   ? "bg-slate-100 text-slate-900"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
@@ -241,7 +241,7 @@ function Sidebar() {
               disabled={!item.route}
               onClick={() => { if (item.route) window.location.hash = item.route; }}
               className={cn(
-                "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.82rem] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.82rem] font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 item.active
                   ? "bg-slate-100 text-slate-900"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",

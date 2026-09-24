@@ -167,7 +167,7 @@ export function AdminClassesPage() {
               <select
                 value={number}
                 onChange={(event) => setNumber(event.target.value)}
-                className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-none transition-colors hover:border-slate-400 focus:border-slate-500"
+                className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500"
                 aria-label="Фільтр за паралеллю класу"
               >
                 <option value="">Усі паралелі</option>
@@ -180,7 +180,7 @@ export function AdminClassesPage() {
                 value={selectedYear}
                 onChange={(event) => changeAcademicYear(event.target.value)}
                 disabled={isLoadingYears}
-                className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-none transition-colors hover:border-slate-400 focus:border-slate-500"
+                className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500"
                 aria-label="Навчальний рік"
               >
                 {!selectedYear ? <option value="">{isLoadingYears ? "Завантаження..." : "Навчальний рік не налаштовано"}</option> : null}
@@ -251,7 +251,7 @@ function ClassCard({ schoolClass }) {
   return (
     <a
       href={`#admin/classes/${schoolClass.id}`}
-      className="group min-h-[170px] rounded-lg border border-slate-200 bg-white p-5 text-left shadow-[0_10px_35px_-30px_rgba(15,23,42,0.55)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-[0_18px_42px_-28px_rgba(15,23,42,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+      className="group min-h-[170px] rounded-lg border border-slate-200 bg-white p-5 text-left shadow-[0_10px_35px_-30px_rgba(15,23,42,0.55)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-[0_18px_42px_-28px_rgba(15,23,42,0.35)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
       aria-label={`Відкрити клас ${schoolClass.number}-${schoolClass.letter}`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -383,7 +383,7 @@ export function ClassDialog({ schoolClass, academicYear, onClose, onSaved }) {
                 value={form.classTeacherId}
                 onChange={(event) => update("classTeacherId", event.target.value)}
                 disabled={isLoadingOptions}
-                className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-none disabled:opacity-60"
+                className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-hidden disabled:opacity-60"
               >
                 <option value="">Не призначено (чернетка)</option>
                 {visibleTeachers.map((teacher) => {
@@ -455,7 +455,7 @@ function AcademicYearDialog({ years, onClose, onCreate }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section role="dialog" aria-modal="true" aria-labelledby="class-year-dialog-title" onKeyDown={(event) => event.key === "Escape" && onClose()} className="w-full max-w-[440px] rounded-lg border border-slate-200 bg-white p-5 shadow-2xl outline-none sm:p-6">
+      <section role="dialog" aria-modal="true" aria-labelledby="class-year-dialog-title" onKeyDown={(event) => event.key === "Escape" && onClose()} className="w-full max-w-[440px] rounded-lg border border-slate-200 bg-white p-5 shadow-2xl outline-hidden sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="class-year-dialog-title" className="text-[1.05rem] font-bold text-slate-950">Додати навчальний рік</h2>

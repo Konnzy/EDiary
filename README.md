@@ -7,16 +7,16 @@
 
 ```text
 EDiary/
-|-- frontend/   # React, Vite, Tailwind CSS
-|-- backend/    # Java 21, Spring Boot, Hibernate, PostgreSQL
+|-- frontend/   # React 19.2, Vite 8.3, Tailwind CSS 4.3, ECMAScript 2025
+|-- backend/    # Java 25, Spring Boot 4.1.1, Hibernate 7.4.10.Final, PostgreSQL 18.3
 `-- README.md
 ```
 
 ## Вимоги
 
-- Java 21;
+- Java 25;
 - Maven 3.9+ або Maven Wrapper;
-- PostgreSQL 16+;
+- PostgreSQL 18.3;
 - Node.js 24 LTS та npm 11+;
 - SMTP-сервер для надсилання результатів розгляду заявок.
 
