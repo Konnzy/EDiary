@@ -13,6 +13,32 @@ function display(value, fallback = "Не вказано") {
   return value || fallback;
 }
 
+export function formatPhoneForDisplay(value) {
+  if (!value) return value;
+  const digits = value.replace(/\D/g, "");
+  let subscriberNumber;
+
+  if (digits.startsWith("380")) {
+    subscriberNumber = digits.slice(3);
+  } else if (digits.length === 10 && digits.startsWith("0")) {
+    subscriberNumber = digits.slice(1);
+  } else if (digits.length === 9) {
+    subscriberNumber = digits;
+  } else {
+    return value;
+  }
+
+  const groups = [2, 3, 2, 2];
+  const parts = [];
+  let offset = 0;
+  for (const size of groups) {
+    if (offset >= subscriberNumber.length) break;
+    parts.push(subscriberNumber.slice(offset, offset + size));
+    offset += size;
+  }
+  return [`+380`, ...parts].join(" ");
+}
+
 export function mapProfileResponse(response) {
   const { role, firstName, lastName, patronymic, login, email, phone, education, professional, children } = response;
   return {
@@ -23,16 +49,16 @@ export function mapProfileResponse(response) {
     avatarVersion: response.avatarVersion,
     notifications: response.notifications,
     personal: {
-      firstName, lastName, patronymic, login, email, phone,
+      firstName, lastName, patronymic, login, email, phone: formatPhoneForDisplay(phone),
       parentEmail: education?.parentEmail,
-      parentPhone: education?.parentPhone,
+      parentPhone: formatPhoneForDisplay(education?.parentPhone),
     },
     education: education && {
       className: display(education.className, "Не призначено"),
       registeredAt: formatDate(response.registeredAt),
       teacherName: display(education.teacherName),
       teacherEmail: display(education.teacherEmail),
-      teacherPhone: display(education.teacherPhone),
+      teacherPhone: display(formatPhoneForDisplay(education.teacherPhone)),
     },
     professional: professional && {
       position: professional.position,
@@ -48,7 +74,7 @@ export function mapProfileResponse(response) {
       className: display(child.className, "Не призначено"),
       teacherName: display(child.teacherName),
       teacherEmail: display(child.teacherEmail),
-      teacherPhone: display(child.teacherPhone),
+      teacherPhone: display(formatPhoneForDisplay(child.teacherPhone)),
     })) || [],
   };
 }
