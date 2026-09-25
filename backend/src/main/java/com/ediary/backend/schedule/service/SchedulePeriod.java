@@ -5,17 +5,17 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 
-final class SchedulePeriod {
+public final class SchedulePeriod {
 
     private SchedulePeriod() {
     }
 
-    static String academicYear(LocalDate date) {
+    public static String academicYear(LocalDate date) {
         int startYear = date.getMonthValue() >= 9 ? date.getYear() : date.getYear() - 1;
         return startYear + "/" + (startYear + 1);
     }
 
-    static int weekNumber(LocalDate date) {
+    public static int weekNumber(LocalDate date) {
         int startYear = date.getMonthValue() >= 9 ? date.getYear() : date.getYear() - 1;
         LocalDate firstCycleMonday = LocalDate.of(startYear, 9, 1)
             .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));

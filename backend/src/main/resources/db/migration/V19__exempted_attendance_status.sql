@@ -1,0 +1,1 @@
+ALTER TYPE enum_attendance_status ADD VALUE IF NOT EXISTS 'EXEMPTED';

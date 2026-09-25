@@ -20,23 +20,26 @@ import {
   Minus,
   Target,
   User,
-  UserRound,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Alert } from "@/components/ui/alert.jsx";
 import { Card } from "@/components/ui/card.jsx";
-import { ApiError, authApi, parentApi } from "@/lib/api.js";
+import { ApiError, authApi, parentApi, subjectsApi } from "@/lib/api.js";
 import { cn } from "@/lib/utils.js";
 import {
-  academicYears,
   getGradeForecast,
   getPeriodOptions,
   getSubjectPeriodView,
   getSubjectStats,
-  subjectProgress,
 } from "./subjectProgressModel.js";
+
+const workTypeLabels = {
+  CLASSWORK: "Класна робота", HOMEWORK: "Домашня робота", INDEPENDENT: "Самостійна робота",
+  CONTROL: "Контрольна робота", PRACTICAL: "Практична робота", LABORATORY: "Лабораторна робота", THEMATIC: "Тематична",
+  SEMESTER: "Семестрова", YEAR: "Річна",
+};
 
 const tabs = [
   { id: "grades", label: "Оцінки" },
@@ -47,14 +50,15 @@ const tabs = [
 const attendanceLabels = {
   PRESENT: { label: "Присутній", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
   ABSENT: { label: "Відсутній", className: "bg-red-50 text-red-600 ring-red-200" },
-  EXCUSED: { label: "Поважна причина", className: "bg-sky-50 text-sky-700 ring-sky-200" },
-  RELEASED: { label: "Звільнений", className: "bg-amber-50 text-amber-700 ring-amber-200" },
+  EXCUSED_ABSENCE: { label: "Поважна причина", className: "bg-sky-50 text-sky-700 ring-sky-200" },
+  LATE: { label: "Запізнився", className: "bg-amber-50 text-amber-700 ring-amber-200" },
+  EXEMPTED: { label: "Звільнений від заняття", className: "bg-violet-50 text-violet-700 ring-violet-200" },
 };
 
 const homeworkLabels = {
-  ACTIVE: { label: "Призначено", className: "bg-sky-50 text-sky-700 ring-sky-200" },
+  ASSIGNED: { label: "Призначено", className: "bg-sky-50 text-sky-700 ring-sky-200" },
   COMPLETED: { label: "Виконано", className: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
-  COMPLETED_LATE: { label: "Виконано із запізненням", className: "bg-amber-50 text-amber-700 ring-amber-200" },
+  SUBMITTED_LATE: { label: "Виконано із запізненням", className: "bg-amber-50 text-amber-700 ring-amber-200" },
   OVERDUE: { label: "Прострочено", className: "bg-red-50 text-red-600 ring-red-200" },
 };
 
@@ -87,13 +91,16 @@ const roleConfig = {
 
 export function UserSubjectsPage({ role }) {
   const config = roleConfig[role];
-  const [subjectId, setSubjectId] = useState(subjectProgress[0].id);
-  const [academicYear, setAcademicYear] = useState(academicYears[0]);
-  const [period, setPeriod] = useState("2026-09");
+  const [subjectId, setSubjectId] = useState("");
+  const [academicYear, setAcademicYear] = useState("");
+  const [academicYears, setAcademicYears] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [period, setPeriod] = useState("YEAR");
   const [activeTab, setActiveTab] = useState("grades");
   const [children, setChildren] = useState([]);
   const [studentId, setStudentId] = useState("");
   const [loadingChildren, setLoadingChildren] = useState(role === "PARENT");
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -114,9 +121,35 @@ export function UserSubjectsPage({ role }) {
     return () => { active = false; };
   }, [role]);
 
+  useEffect(() => {
+    if (role === "PARENT" && !studentId) return undefined;
+    let active = true;
+    setLoadingSubjects(true);
+    setError("");
+    const load = role === "PARENT" ? subjectsApi.parent(studentId, academicYear) : subjectsApi.student(academicYear);
+    load.then((result) => {
+      if (!active) return;
+      setAcademicYears([...new Set([result.currentAcademicYear, ...(result.academicYears || [])].filter(Boolean))]);
+      if (!academicYear) setAcademicYear(result.currentAcademicYear || result.academicYears?.[0] || "");
+      const items = (result.subjects || []).map((item) => ({
+        ...item,
+        grades: item.grades.map((grade) => ({
+          ...grade,
+          grade: grade.score,
+          workType: workTypeLabels[grade.workType] || grade.workType,
+        })),
+      }));
+      setSubjects(items);
+      setSubjectId((current) => items.some((item) => String(item.id) === String(current)) ? current : String(items[0]?.id || ""));
+    }).catch((requestError) => {
+      if (active) setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити предмети.");
+    }).finally(() => { if (active) setLoadingSubjects(false); });
+    return () => { active = false; };
+  }, [role, studentId, academicYear]);
+
   const subject = useMemo(
-    () => subjectProgress.find((item) => item.id === subjectId) || subjectProgress[0],
-    [subjectId],
+    () => subjects.find((item) => String(item.id) === String(subjectId)) || null,
+    [subjects, subjectId],
   );
   const periodOptions = useMemo(() => getPeriodOptions(academicYear), [academicYear]);
   const periodSubject = useMemo(
@@ -147,8 +180,8 @@ export function UserSubjectsPage({ role }) {
               </header>
 
               {error ? <Alert>{error}</Alert> : null}
-              {loadingChildren ? <LoadingState /> : null}
-              {!loadingChildren && !error ? (
+              {loadingChildren || loadingSubjects ? <LoadingState /> : null}
+              {!loadingChildren && !loadingSubjects && !error ? (
                 <>
                   <SubjectControls
                     role={role}
@@ -156,7 +189,9 @@ export function UserSubjectsPage({ role }) {
                     studentId={studentId}
                     subjectId={subjectId}
                     subject={subject}
+                    subjects={subjects}
                     academicYear={academicYear}
+                    academicYears={academicYears}
                     period={period}
                     periodOptions={periodOptions}
                     onStudentChange={setStudentId}
@@ -169,7 +204,8 @@ export function UserSubjectsPage({ role }) {
                   />
 
                   {!canShowContent ? <EmptyChildren /> : null}
-                  {canShowContent ? (
+                  {canShowContent && !subject ? <EmptyPeriodData message="Для вибраного навчального року предметів поки немає" /> : null}
+                  {canShowContent && subject ? (
                     <>
                       <SummaryCards tab={activeTab} stats={stats} forecast={forecast} />
                       <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)]">
@@ -208,7 +244,9 @@ function SubjectControls({
   studentId,
   subjectId,
   subject,
+  subjects,
   academicYear,
+  academicYears,
   period,
   periodOptions,
   onStudentChange,
@@ -231,7 +269,7 @@ function SubjectControls({
 
         <SelectField label="Предмет" htmlFor="subjects-subject" className="xl:col-span-3">
           <select id="subjects-subject" value={subjectId} onChange={(event) => onSubjectChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
-            {subjectProgress.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            {subjects.length ? subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>) : <option value="">Немає предметів</option>}
           </select>
         </SelectField>
 
@@ -250,7 +288,7 @@ function SubjectControls({
 
         <div className={cn("min-w-0", role === "PARENT" ? "xl:col-span-2" : "xl:col-span-3")}>
           <p className="text-[0.72rem] font-semibold text-slate-500">Викладач</p>
-          <p className="mt-2 truncate text-[0.82rem] font-bold text-slate-800">{subject.teacher}</p>
+          <p className="mt-2 truncate text-[0.82rem] font-bold text-slate-800">{subject?.teacher || "Не призначено"}</p>
           <p className="mt-1 text-[0.7rem] text-slate-400">{academicYear} н. р.</p>
         </div>
       </div>
@@ -299,7 +337,7 @@ function SummaryCards({ tab, stats, forecast }) {
     ? [
       { label: "Кількість пропущених уроків", value: stats.missed, icon: CalendarDays, tone: "slate" },
       { label: "Пропущено уроків", value: `${stats.missedPercent}%`, icon: CircleAlert, tone: stats.missedPercent > 20 ? "red" : "slate" },
-      { label: "Відвідано уроків", value: `${stats.attended} із ${stats.totalLessons}`, icon: CheckCircle2, tone: "emerald" },
+      { label: "Відвідано уроків", value: `${stats.attended} із ${stats.countedLessons}`, icon: CheckCircle2, tone: "emerald" },
     ]
     : tab === "homework"
       ? [
@@ -409,11 +447,11 @@ function GradesPanel({ subject, stats }) {
         <table className="w-full min-w-[680px] table-fixed border-collapse text-left">
           <colgroup><col className="w-[16%]" /><col className="w-[30%]" /><col className="w-[14%]" /><col className="w-[40%]" /></colgroup>
           <thead className="bg-slate-50"><tr className="border-b border-slate-200 text-[0.7rem] font-bold text-slate-500"><th className="border-r border-slate-200 px-4 py-3">Дата</th><th className="border-r border-slate-200 px-4 py-3">Тип роботи</th><th className="border-r border-slate-200 px-4 py-3 text-center">Оцінка</th><th className="px-4 py-3">Коментар учителя</th></tr></thead>
-          <tbody>{subject.grades.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{item.date}</td><td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.workType}</td><td className="border-r border-slate-100 px-4 py-3.5 text-center"><GradeBadge value={item.grade} /></td><td className="px-4 py-3.5 text-slate-500">{item.comment || "—"}</td></tr>)}</tbody>
+          <tbody>{subject.grades.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.date)}</td><td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.workType}</td><td className="border-r border-slate-100 px-4 py-3.5 text-center"><GradeBadge value={item.grade} /></td><td className="px-4 py-3.5 text-slate-500">{item.comment || "—"}</td></tr>)}</tbody>
         </table>
       </div>
       <div className="mt-4 space-y-3 md:hidden">
-        {subject.grades.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-[0.7rem] font-medium text-slate-400">{item.date}</p><h3 className="mt-1 text-[0.82rem] font-bold text-slate-800">{item.workType}</h3></div><GradeBadge value={item.grade} /></div><p className="mt-3 text-[0.74rem] leading-5 text-slate-500">{item.comment || "Без коментаря"}</p></article>)}
+        {subject.grades.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.date)}</p><h3 className="mt-1 text-[0.82rem] font-bold text-slate-800">{item.workType}</h3></div><GradeBadge value={item.grade} /></div><p className="mt-3 text-[0.74rem] leading-5 text-slate-500">{item.comment || "Без коментаря"}</p></article>)}
       </div>
     </>
   );
@@ -439,7 +477,7 @@ function AttendancePanel({ subject }) {
               const status = attendanceLabels[item.status];
               return (
                 <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0">
-                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{item.date}</td>
+                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.date)}</td>
                   <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.topic}</td>
                   <td className="px-4 py-3.5 text-center"><StatusBadge status={status} /></td>
                 </tr>
@@ -455,7 +493,7 @@ function AttendancePanel({ subject }) {
             <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <time className="text-[0.7rem] font-medium text-slate-400">{item.date}</time>
+                  <time className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.date)}</time>
                   <h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.topic}</h3>
                 </div>
                 <StatusBadge status={status} />
@@ -489,8 +527,8 @@ function HomeworkPanel({ subject }) {
               const status = homeworkLabels[item.status];
               return (
                 <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0">
-                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{item.assignedDate}</td>
-                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{item.dueDate || "—"}</td>
+                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.assignedDate)}</td>
+                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.dueDate) || "—"}</td>
                   <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.title}</td>
                   <td className="px-4 py-3.5 text-center"><StatusBadge status={status} /></td>
                 </tr>
@@ -506,7 +544,7 @@ function HomeworkPanel({ subject }) {
             <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[0.7rem] font-medium text-slate-400">{item.assignedDate} · до {item.dueDate || "без терміну"}</p>
+                  <p className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.assignedDate)} · до {formatDate(item.dueDate) || "без терміну"}</p>
                   <h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.title}</h3>
                 </div>
                 <StatusBadge status={status} />
@@ -602,4 +640,10 @@ function countLabel(count, one, few, many) {
   const mod10 = count % 10;
   const word = mod100 >= 11 && mod100 <= 14 ? many : mod10 === 1 ? one : mod10 >= 2 && mod10 <= 4 ? few : many;
   return `${count} ${word}`;
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  return `${day}.${month}.${year}`;
 }

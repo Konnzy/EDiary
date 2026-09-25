@@ -1,135 +1,10 @@
-export const subjectProgress = [
-  {
-    id: "mathematics",
-    name: "Математика",
-    teacher: "Коваленко Олександр Іванович",
-    previousAverage: 8.4,
-    grades: [
-      { id: 1, date: "17.09.2026", workType: "Самостійна робота", grade: 10, comment: "Добре засвоєно рівняння" },
-      { id: 2, date: "14.09.2026", workType: "Домашня робота", grade: 9, comment: "" },
-      { id: 3, date: "10.09.2026", workType: "Контрольна робота", grade: 8, comment: "Звернути увагу на останню задачу" },
-      { id: 4, date: "07.09.2026", workType: "Класна робота", grade: 10, comment: "" },
-      { id: 5, date: "03.09.2026", workType: "Домашня робота", grade: 9, comment: "" },
-      { id: "m-2026-05", date: "25.05.2026", workType: "Підсумкова контрольна", grade: 9, comment: "" },
-      { id: "m-2026-03", date: "12.03.2026", workType: "Самостійна робота", grade: 8, comment: "" },
-      { id: "m-2025-12", date: "15.12.2025", workType: "Контрольна робота", grade: 9, comment: "Стабільний результат" },
-      { id: "m-2025-09", date: "20.09.2025", workType: "Класна робота", grade: 8, comment: "" },
-      { id: "m-2025-05", date: "22.05.2025", workType: "Підсумкова контрольна", grade: 8, comment: "" },
-      { id: "m-2024-12", date: "18.12.2024", workType: "Контрольна робота", grade: 7, comment: "" },
-      { id: "m-2024-09", date: "24.09.2024", workType: "Самостійна робота", grade: 8, comment: "" },
-    ],
-    attendance: [
-      { id: 1, date: "17.09.2026", topic: "Квадратні рівняння", status: "PRESENT" },
-      { id: 2, date: "14.09.2026", topic: "Формула коренів квадратного рівняння", status: "PRESENT" },
-      { id: 3, date: "10.09.2026", topic: "Контрольна робота", status: "ABSENT" },
-      { id: 4, date: "07.09.2026", topic: "Неповні квадратні рівняння", status: "PRESENT" },
-      { id: 5, date: "03.09.2026", topic: "Повторення лінійних рівнянь", status: "EXCUSED" },
-      { id: 6, date: "01.09.2026", topic: "Вступний урок", status: "PRESENT" },
-      { id: "ma-2026-05", date: "25.05.2026", topic: "Підсумкове повторення", status: "PRESENT" },
-      { id: "ma-2026-03", date: "12.03.2026", topic: "Системи рівнянь", status: "ABSENT" },
-      { id: "ma-2025-12", date: "15.12.2025", topic: "Контрольна робота", status: "PRESENT" },
-      { id: "ma-2025-09", date: "20.09.2025", topic: "Функції", status: "PRESENT" },
-      { id: "ma-2025-05", date: "22.05.2025", topic: "Підсумкова контрольна", status: "PRESENT" },
-      { id: "ma-2024-12", date: "18.12.2024", topic: "Лінійні рівняння", status: "EXCUSED" },
-    ],
-    homework: [
-      { id: 1, assignedDate: "17.09.2026", dueDate: "21.09.2026", title: "§ 8, № 124–129", status: "ACTIVE" },
-      { id: 2, assignedDate: "14.09.2026", dueDate: "17.09.2026", title: "§ 7, № 108–112", status: "COMPLETED_LATE" },
-      { id: 3, assignedDate: "10.09.2026", dueDate: "14.09.2026", title: "Повторити формули скороченого множення", status: "OVERDUE" },
-      { id: 4, assignedDate: "07.09.2026", dueDate: "10.09.2026", title: "§ 6, № 91–96", status: "COMPLETED" },
-      { id: "mh-2026-05", assignedDate: "20.05.2026", dueDate: "25.05.2026", title: "Підготуватися до підсумкової контрольної", status: "COMPLETED" },
-      { id: "mh-2025-12", assignedDate: "10.12.2025", dueDate: "15.12.2025", title: "Повторити теми I семестру", status: "COMPLETED" },
-      { id: "mh-2025-05", assignedDate: "18.05.2025", dueDate: "22.05.2025", title: "Завдання для підсумкового повторення", status: "COMPLETED" },
-    ],
-  },
-  {
-    id: "ukrainian",
-    name: "Українська мова",
-    teacher: "Іваненко Наталія Сергіївна",
-    previousAverage: 9.1,
-    grades: [
-      { id: 1, date: "16.09.2026", workType: "Диктант", grade: 10, comment: "" },
-      { id: 2, date: "11.09.2026", workType: "Класна робота", grade: 11, comment: "Вдалий письмовий аналіз" },
-      { id: 3, date: "09.09.2026", workType: "Домашня робота", grade: 10, comment: "" },
-      { id: 4, date: "04.09.2026", workType: "Самостійна робота", grade: 9, comment: "" },
-      { id: "u-2026-05", date: "26.05.2026", workType: "Підсумковий диктант", grade: 10, comment: "" },
-      { id: "u-2025-12", date: "17.12.2025", workType: "Контрольний твір", grade: 9, comment: "" },
-      { id: "u-2025-09", date: "23.09.2025", workType: "Самостійна робота", grade: 10, comment: "" },
-      { id: "u-2025-05", date: "21.05.2025", workType: "Підсумкова робота", grade: 9, comment: "" },
-      { id: "u-2024-12", date: "16.12.2024", workType: "Диктант", grade: 9, comment: "" },
-    ],
-    attendance: [
-      { id: 1, date: "16.09.2026", topic: "Складнопідрядне речення", status: "PRESENT" },
-      { id: 2, date: "11.09.2026", topic: "Засоби зв’язку частин речення", status: "PRESENT" },
-      { id: 3, date: "09.09.2026", topic: "Види складних речень", status: "PRESENT" },
-      { id: 4, date: "04.09.2026", topic: "Повторення синтаксису", status: "RELEASED" },
-    ],
-    homework: [
-      { id: 1, assignedDate: "16.09.2026", dueDate: "21.09.2026", title: "Вправа 48, скласти схеми речень", status: "ACTIVE" },
-      { id: 2, assignedDate: "11.09.2026", dueDate: "16.09.2026", title: "Вправа 42", status: "COMPLETED" },
-      { id: 3, assignedDate: "09.09.2026", dueDate: "11.09.2026", title: "Опрацювати § 5", status: "COMPLETED" },
-    ],
-  },
-  {
-    id: "geography",
-    name: "Географія",
-    teacher: "Бойко Віталій Сергійович",
-    previousAverage: 8.8,
-    grades: [
-      { id: 1, date: "15.09.2026", workType: "Практична робота", grade: 8, comment: "Додати умовні позначення" },
-      { id: 2, date: "08.09.2026", workType: "Усне опитування", grade: 9, comment: "" },
-      { id: 3, date: "01.09.2026", workType: "Класна робота", grade: 8, comment: "" },
-      { id: "g-2026-05", date: "19.05.2026", workType: "Підсумкова робота", grade: 9, comment: "" },
-      { id: "g-2025-12", date: "16.12.2025", workType: "Практична робота", grade: 8, comment: "" },
-      { id: "g-2025-09", date: "22.09.2025", workType: "Усне опитування", grade: 9, comment: "" },
-      { id: "g-2025-05", date: "20.05.2025", workType: "Контрольна робота", grade: 8, comment: "" },
-      { id: "g-2024-12", date: "12.12.2024", workType: "Практична робота", grade: 8, comment: "" },
-    ],
-    attendance: [
-      { id: 1, date: "15.09.2026", topic: "Топографічні карти", status: "PRESENT" },
-      { id: 2, date: "08.09.2026", topic: "Географічні координати", status: "ABSENT" },
-      { id: 3, date: "01.09.2026", topic: "Україна на карті Європи", status: "PRESENT" },
-    ],
-    homework: [
-      { id: 1, assignedDate: "15.09.2026", dueDate: "22.09.2026", title: "Нанести об’єкти на контурну карту", status: "ACTIVE" },
-      { id: 2, assignedDate: "08.09.2026", dueDate: "15.09.2026", title: "§ 3, запитання 1–5", status: "OVERDUE" },
-    ],
-  },
-  {
-    id: "logic",
-    name: "Логіка",
-    teacher: "Коваленко Олександр Іванович",
-    previousAverage: 10,
-    grades: [
-      { id: 1, date: "18.09.2026", workType: "Практична робота", grade: 11, comment: "" },
-      { id: 2, date: "11.09.2026", workType: "Класна робота", grade: 10, comment: "" },
-      { id: 3, date: "04.09.2026", workType: "Самостійна робота", grade: 11, comment: "Високий рівень аргументації" },
-      { id: "l-2026-05", date: "22.05.2026", workType: "Підсумкова робота", grade: 10, comment: "" },
-      { id: "l-2025-12", date: "19.12.2025", workType: "Практична робота", grade: 11, comment: "" },
-      { id: "l-2025-09", date: "25.09.2025", workType: "Самостійна робота", grade: 10, comment: "" },
-      { id: "l-2025-05", date: "23.05.2025", workType: "Підсумкова робота", grade: 10, comment: "" },
-      { id: "l-2024-12", date: "13.12.2024", workType: "Практична робота", grade: 9, comment: "" },
-    ],
-    attendance: [
-      { id: 1, date: "18.09.2026", topic: "Логічні операції", status: "PRESENT" },
-      { id: 2, date: "11.09.2026", topic: "Таблиці істинності", status: "PRESENT" },
-      { id: 3, date: "04.09.2026", topic: "Поняття висловлювання", status: "PRESENT" },
-    ],
-    homework: [
-      { id: 1, assignedDate: "18.09.2026", dueDate: "25.09.2026", title: "Побудувати таблиці істинності для 5 виразів", status: "ACTIVE" },
-      { id: 2, assignedDate: "11.09.2026", dueDate: "18.09.2026", title: "Завдання 7–12", status: "COMPLETED" },
-    ],
-  },
-];
-
-export const academicYears = ["2026/2027", "2025/2026", "2024/2025"];
-
 const monthNames = [
   "Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень",
   "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень",
 ];
 
 export function getPeriodOptions(academicYear) {
+  if (!academicYear) return [{ value: "YEAR", label: "Увесь навчальний рік" }];
   const startYear = Number(academicYear.split("/")[0]);
   const monthOption = (year, month) => ({
     value: `${year}-${String(month).padStart(2, "0")}`,
@@ -146,6 +21,7 @@ export function getPeriodOptions(academicYear) {
 }
 
 export function getSubjectPeriodView(subject, academicYear, period) {
+  if (!subject) return null;
   const filterByDate = (items, dateKey) => items.filter((item) => dateMatchesPeriod(item[dateKey], academicYear, period));
   const grades = filterByDate(subject.grades, "date");
   const previous = previousPeriod(academicYear, period);
@@ -159,11 +35,12 @@ export function getSubjectPeriodView(subject, academicYear, period) {
     grades,
     attendance: filterByDate(subject.attendance, "date"),
     homework: filterByDate(subject.homework, "assignedDate"),
-    previousAverage: calculatedPreviousAverage ?? (academicYear === academicYears[0] && period === "2026-09" ? subject.previousAverage : null),
+    previousAverage: calculatedPreviousAverage,
   };
 }
 
 export function getGradeForecast(subject, academicYear, period) {
+  if (!subject) return { thematic: null, semester: null, annual: null };
   const yearView = getSubjectPeriodView(subject, academicYear, "YEAR");
   const selectedView = getSubjectPeriodView(subject, academicYear, period);
   const referenceGrades = selectedView.grades.length ? selectedView.grades : yearView.grades;
@@ -201,20 +78,23 @@ export function calculateAverage(grades) {
 }
 
 export function getSubjectStats(subject) {
+  if (!subject) return null;
   const average = calculateAverage(subject.grades);
   const delta = average === null || subject.previousAverage === null || subject.previousAverage === undefined
     ? null
     : Math.round((average - subject.previousAverage) * 10) / 10;
-  const missed = subject.attendance.filter((item) => item.status !== "PRESENT").length;
-  const missedPercent = subject.attendance.length
-    ? Math.round((missed / subject.attendance.length) * 100)
-    : 0;
-  const activeHomework = subject.homework.filter((item) => item.status === "ACTIVE").length;
-  const overdueHomework = subject.homework.filter((item) => item.status === "OVERDUE").length;
-  const attended = subject.attendance.filter((item) => item.status === "PRESENT").length;
+  const missed = subject.attendance.filter((item) => ["ABSENT", "EXCUSED_ABSENCE"].includes(item.status)).length;
+  const exempted = subject.attendance.filter((item) => item.status === "EXEMPTED").length;
   const totalLessons = subject.attendance.length;
-  const completedHomework = subject.homework.filter((item) => ["COMPLETED", "COMPLETED_LATE"].includes(item.status)).length;
-  const completedLateHomework = subject.homework.filter((item) => item.status === "COMPLETED_LATE").length;
+  const countedLessons = totalLessons - exempted;
+  const missedPercent = countedLessons
+    ? Math.round((missed / countedLessons) * 100)
+    : 0;
+  const activeHomework = subject.homework.filter((item) => item.status === "ASSIGNED").length;
+  const overdueHomework = subject.homework.filter((item) => item.status === "OVERDUE").length;
+  const attended = subject.attendance.filter((item) => ["PRESENT", "LATE"].includes(item.status)).length;
+  const completedHomework = subject.homework.filter((item) => ["COMPLETED", "SUBMITTED_LATE"].includes(item.status)).length;
+  const completedLateHomework = subject.homework.filter((item) => item.status === "SUBMITTED_LATE").length;
 
   return {
     average,
@@ -223,6 +103,8 @@ export function getSubjectStats(subject) {
     missedPercent,
     attended,
     totalLessons,
+    countedLessons,
+    exempted,
     activeHomework,
     overdueHomework,
     completedHomework,
@@ -231,6 +113,7 @@ export function getSubjectStats(subject) {
 }
 
 function dateMatchesPeriod(value, academicYear, period) {
+  if (!value || !academicYear) return false;
   const { year, month } = parseDate(value);
   const startYear = Number(academicYear.split("/")[0]);
   const inAcademicYear = (year === startYear && month >= 9) || (year === startYear + 1 && month <= 8);
@@ -257,7 +140,7 @@ function previousPeriod(academicYear, period) {
 }
 
 function parseDate(value) {
-  const [, month, year] = value.split(".").map(Number);
+  const [year, month] = value.split("-").map(Number);
   return { year, month };
 }
 
@@ -267,8 +150,7 @@ function monthPeriod(value) {
 }
 
 function dateValue(value) {
-  const [day, month, year] = value.split(".").map(Number);
-  return new Date(year, month - 1, day).getTime();
+  return Date.parse(`${value}T12:00:00`);
 }
 
 function forecastGrade(average) {

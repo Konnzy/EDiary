@@ -13,6 +13,19 @@ import org.springframework.data.repository.query.Param;
 
 public interface ScheduleRepository extends JpaRepository<ScheduleEntry, Long> {
 
+    @EntityGraph(attributePaths = {"subject", "teacher.user", "schoolClass", "schoolClass.academicYear"})
+    @Query("select entry from ScheduleEntry entry where lower(entry.teacher.user.login) = lower(:login) and entry.academicYear = :academicYear")
+    List<ScheduleEntry> findJournalAssignmentsForTeacher(
+        @Param("login") String login,
+        @Param("academicYear") String academicYear
+    );
+
+    @EntityGraph(attributePaths = {"subject", "teacher", "schoolClass"})
+    List<ScheduleEntry> findAllBySchoolClassIdAndAcademicYearAndActiveTrue(
+        Long classId,
+        String academicYear
+    );
+
     interface TeacherClassAssignment {
         Long getTeacherId();
         Integer getClassNumber();

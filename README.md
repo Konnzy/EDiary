@@ -25,6 +25,19 @@ EDiary/
 Flyway автоматично виконує міграції з `backend/src/main/resources/db/migration`.
 Hibernate працює в режимі `validate` і не змінює схему самостійно.
 
+Для локального запуску PostgreSQL через Docker виконайте команди з кореня проєкту:
+
+```powershell
+docker compose up -d db
+docker compose ps
+```
+
+Compose запускає PostgreSQL 18 на `localhost:5432`, створює БД `ediary` і
+користувача `ediary`. Ці облікові дані призначені лише для локальної розробки;
+їх можна перевизначити змінними `EDIARY_DB_NAME`, `EDIARY_DB_USERNAME` та
+`EDIARY_DB_PASSWORD`. Дані зберігаються в Docker volume `ediary_postgres_data`.
+Щоб зупинити БД, не видаляючи дані, виконайте `docker compose down`.
+
 Перед запуском backend задайте підключення до БД:
 
 ```powershell

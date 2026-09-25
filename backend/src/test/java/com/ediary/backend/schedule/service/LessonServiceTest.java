@@ -114,6 +114,19 @@ class LessonServiceTest {
     }
 
     @Test
+    void rejectsNewLessonDuringVacation() {
+        LocalDate vacationDate = LocalDate.of(2026, 10, 26);
+        ScheduleEntry schedule = schedule("teacher.one", 1, Weekday.MONDAY);
+        when(scheduleRepository.findByIdForLessonCreation(10L)).thenReturn(Optional.of(schedule));
+
+        assertThatThrownBy(() -> service.openForTeacher("teacher.one", 10L, vacationDate))
+            .isInstanceOf(ApplicationException.class)
+            .satisfies(error -> assertThat(((ApplicationException) error).getCode())
+                .isEqualTo("SCHOOL_VACATION"));
+        verify(lessonRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void completesLessonAndNormalizesTopic() {
         Lesson lesson = lesson(schedule("teacher.one", 1, Weekday.MONDAY), LessonStatus.PLANNED);
         when(lessonRepository.findForTeacher(20L, "teacher.one")).thenReturn(Optional.of(lesson));

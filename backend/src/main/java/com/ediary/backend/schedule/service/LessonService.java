@@ -126,6 +126,13 @@ public class LessonService {
         if (!schedule.getAcademicYear().equals(SchedulePeriod.academicYear(date))) {
             throw invalidDate();
         }
+        if (SchoolVacationCalendar.isVacation(date)) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "SCHOOL_VACATION",
+                "На канікулах уроки не проводяться"
+            );
+        }
         if (schedule.getWeekNumber() != SchedulePeriod.weekNumber(date)) {
             throw invalidDate();
         }

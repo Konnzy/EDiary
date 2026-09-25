@@ -125,6 +125,28 @@ export const scheduleApi = {
   },
 };
 
+export const teacherJournalApi = {
+  options: (academicYear) => request(`/teacher/journal/options${academicYear ? `?${new URLSearchParams({ academicYear })}` : ""}`),
+  find: ({ classId, subjectId, month }) => request(`/teacher/journal?${new URLSearchParams({ classId, subjectId, month })}`),
+  saveLesson: (scheduleId, date, body) => request(`/teacher/journal/lessons/schedule/${scheduleId}?${new URLSearchParams({ date })}`, {
+    method: "PUT", body, csrf: true,
+  }),
+  saveCell: (lessonId, studentId, body) => request(`/teacher/journal/lessons/${lessonId}/students/${studentId}`, {
+    method: "PUT", body, csrf: true,
+  }),
+  markAllPresent: (scheduleId, date) => request(`/teacher/journal/lessons/schedule/${scheduleId}/attendance?${new URLSearchParams({ date })}`, {
+    method: "PUT", csrf: true,
+  }),
+  clearAttendance: (lessonId) => request(`/teacher/journal/lessons/${lessonId}/attendance`, {
+    method: "DELETE", csrf: true,
+  }),
+};
+
+export const subjectsApi = {
+  student: (academicYear) => request(`/student/subjects${academicYear ? `?${new URLSearchParams({ academicYear })}` : ""}`),
+  parent: (studentId, academicYear) => request(`/parent/children/${studentId}/subjects${academicYear ? `?${new URLSearchParams({ academicYear })}` : ""}`),
+};
+
 export const adminAuthApi = {
   login: (payload) => request("/auth/admin/login", { method: "POST", body: payload, csrf: true }),
   logout: () => request("/auth/admin/logout", { method: "POST", csrf: true }),

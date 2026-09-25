@@ -1,5 +1,6 @@
 package com.ediary.backend.schedule.entity;
 
+import com.ediary.backend.journal.entity.LessonWorkType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -47,6 +48,10 @@ public class Lesson {
 
     @Column(name = "lesson_topic", length = 200)
     private String topic;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lesson_work_type", nullable = false, length = 24)
+    private LessonWorkType workType = LessonWorkType.CLASSWORK;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)

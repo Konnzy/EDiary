@@ -1,86 +1,33 @@
-export const JOURNAL_STORAGE_KEY = "ediary.teacher-journal.prototype.v1";
-
 export const workTypes = [
-  { value: "CLASSWORK", label: "Класна робота", shortLabel: "КР" },
-  { value: "CONTROL", label: "Контрольна робота", shortLabel: "Контр." },
-  { value: "HOMEWORK", label: "Домашня робота", shortLabel: "ДР" },
-  { value: "INDEPENDENT", label: "Самостійна робота", shortLabel: "СР" },
-  { value: "PRACTICAL", label: "Практична робота", shortLabel: "ПР" },
-  { value: "LABORATORY", label: "Лабораторна робота", shortLabel: "ЛР" },
-  { value: "THEMATIC", label: "Тематична", shortLabel: "Тем." },
+  { value: "CLASSWORK", label: "Класна робота" },
+  { value: "CONTROL", label: "Контрольна робота" },
+  { value: "HOMEWORK", label: "Домашня робота" },
+  { value: "INDEPENDENT", label: "Самостійна робота" },
+  { value: "PRACTICAL", label: "Практична робота" },
+  { value: "LABORATORY", label: "Лабораторна робота" },
+  { value: "THEMATIC", label: "Тематична" },
+  { value: "SEMESTER", label: "Семестрова" },
+  { value: "YEAR", label: "Річна" },
 ];
 
 export const homeworkStatuses = [
-  { value: "ACTIVE", label: "Призначено" },
+  { value: "", label: "Не вказано" },
+  { value: "ASSIGNED", label: "Призначено" },
   { value: "OVERDUE", label: "Прострочено" },
   { value: "COMPLETED", label: "Виконано" },
-  { value: "COMPLETED_LATE", label: "Із запізненням" },
+  { value: "SUBMITTED_LATE", label: "Із запізненням" },
 ];
 
-export const periods = [
-  { value: "2026-09", label: "Вересень 2026" },
-  { value: "2026-10", label: "Жовтень 2026" },
-  { value: "2026-11", label: "Листопад 2026" },
-];
-
-export const journalClasses = [
-  {
-    id: "9-a",
-    label: "9-А",
-    students: [
-      { id: "bondarenko", name: "Бондаренко Марія" },
-      { id: "ivanenko", name: "Іваненко Артем" },
-      { id: "ivanov", name: "Іванов Валерій" },
-      { id: "petrenko", name: "Петренко Іван" },
-      { id: "shevchenko", name: "Шевченко Софія" },
-    ],
-    subjects: [
-      { id: "mathematics", label: "Математика", weekdays: [1, 4] },
-      { id: "logic", label: "Логіка", weekdays: [3] },
-    ],
-  },
-  {
-    id: "9-b",
-    label: "9-Б",
-    students: [
-      { id: "boiko", name: "Бойко Максим" },
-      { id: "koval", name: "Коваль Анна" },
-      { id: "melnyk", name: "Мельник Данило" },
-      { id: "tkachenko", name: "Ткаченко Олена" },
-    ],
-    subjects: [
-      { id: "mathematics", label: "Математика", weekdays: [2, 5] },
-      { id: "informatics", label: "Інформатика", weekdays: [4] },
-    ],
-  },
-];
+export function normalizeLessonForm(lesson) {
+  return {
+    workType: workTypes.some((type) => type.value === lesson?.workType) ? lesson.workType : "CLASSWORK",
+    topic: lesson?.topic ?? "",
+    homework: lesson?.homework ?? "",
+    homeworkDeadline: lesson?.homeworkDeadline ?? "",
+  };
+}
 
 const weekdayLabels = ["Неділя", "Понеділок", "Вівторок", "Середа", "Четвер", "П'ятниця", "Субота"];
-
-export function contextKey(classId, subjectId, period) {
-  return `${classId}:${subjectId}:${period}`;
-}
-
-export function lessonKey(context, date) {
-  return `${context}:${date}`;
-}
-
-export function gradeKey(context, studentId, date) {
-  return `${context}:${studentId}:${date}`;
-}
-
-export function lessonDates(period, weekdays) {
-  const [year, month] = period.split("-").map(Number);
-  const result = [];
-  const date = new Date(year, month - 1, 1, 12);
-  while (date.getMonth() === month - 1) {
-    if (weekdays.includes(date.getDay())) {
-      result.push(toDateId(date));
-    }
-    date.setDate(date.getDate() + 1);
-  }
-  return result;
-}
 
 export function dateParts(dateId) {
   const date = new Date(`${dateId}T12:00:00`);
@@ -89,155 +36,4 @@ export function dateParts(dateId) {
     day: String(date.getDate()).padStart(2, "0"),
     month: String(date.getMonth() + 1).padStart(2, "0"),
   };
-}
-
-export function calculateAverage(state, context, studentId, dates) {
-  const values = dates
-    .map((date) => normalizeGradeEntry(state.grades[gradeKey(context, studentId, date)])?.grade)
-    .filter((value) => /^\d+$/.test(value))
-    .map(Number);
-  if (!values.length) return "—";
-  return (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1);
-}
-
-export function createInitialJournalState() {
-  const context = contextKey("9-a", "mathematics", "2026-09");
-  const dates = lessonDates("2026-09", [1, 4]);
-  const grades = {};
-  const sample = [
-    ["bondarenko", [10, 11, 9, 10]],
-    ["ivanenko", [8, 9, "Н", 10]],
-    ["ivanov", [7, 8, 8, 9]],
-    ["petrenko", [11, 12, 10, 11]],
-    ["shevchenko", [9, 10, 11, 10]],
-  ];
-  for (const [studentId, values] of sample) {
-    values.forEach((value, index) => {
-      const legacyStatus = value === "Н" ? "ABSENT" : "PRESENT";
-      grades[gradeKey(context, studentId, dates[index])] = {
-        grade: /^\d+$/.test(String(value)) ? String(value) : "",
-        attendanceStatus: legacyStatus,
-        homeworkStatus: index === 0
-          ? "COMPLETED"
-          : index === 1 && studentId === "ivanov"
-            ? "COMPLETED_LATE"
-            : "",
-        comment: "",
-      };
-    });
-  }
-
-  return {
-    grades,
-    lessons: {
-      [lessonKey(context, dates[0])]: {
-        workType: "CLASSWORK",
-        topic: "Повторення дій з раціональними числами",
-        homework: "Повторити правила, вправи 12-16",
-        homeworkDeadline: "2026-09-07",
-      },
-      [lessonKey(context, dates[1])]: {
-        workType: "INDEPENDENT",
-        topic: "Лінійні рівняння з однією змінною",
-        homework: "Параграф 2, вправи 38, 40",
-        homeworkDeadline: "2026-09-10",
-      },
-      [lessonKey(context, dates[2])]: {
-        workType: "CLASSWORK",
-        topic: "Розв'язування текстових задач",
-        homework: "Вправи 51-54",
-        homeworkDeadline: "2026-09-14",
-      },
-      [lessonKey(context, dates[3])]: {
-        workType: "CONTROL",
-        topic: "Контрольна робота з теми «Лінійні рівняння»",
-        homework: "",
-        homeworkDeadline: "",
-      },
-    },
-  };
-}
-
-export function readJournalState() {
-  if (typeof window === "undefined") return createInitialJournalState();
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(JOURNAL_STORAGE_KEY));
-    if (parsed && typeof parsed.grades === "object" && typeof parsed.lessons === "object") {
-      return {
-        ...parsed,
-        grades: Object.fromEntries(
-          Object.entries(parsed.grades).map(([key, entry]) => [key, normalizeGradeEntry(entry)]),
-        ),
-        lessons: Object.fromEntries(
-          Object.entries(parsed.lessons).map(([key, entry]) => [key, normalizeLessonEntry(entry)]),
-        ),
-      };
-    }
-  } catch {
-    // Use the initial prototype when local data is malformed.
-  }
-  return createInitialJournalState();
-}
-
-export function normalizeGradeEntry(entry) {
-  if (!entry || typeof entry !== "object") return null;
-  if ("grade" in entry || "attendanceStatus" in entry) {
-    return {
-      grade: /^([1-9]|1[0-2])$/.test(String(entry.grade || "")) ? String(entry.grade) : "",
-      attendanceStatus: ["PRESENT", "ABSENT", "EXCUSED", "RELEASED"].includes(entry.attendanceStatus)
-        ? entry.attendanceStatus
-        : "PRESENT",
-      homeworkStatus: homeworkStatuses.some((item) => item.value === entry.homeworkStatus)
-        ? entry.homeworkStatus
-        : "",
-      comment: typeof entry.comment === "string" ? entry.comment : "",
-    };
-  }
-
-  const legacyValue = String(entry.value || "");
-  return {
-    grade: /^([1-9]|1[0-2])$/.test(legacyValue) ? legacyValue : "",
-    attendanceStatus: legacyValue === "Н" ? "ABSENT" : legacyValue === "Зв." ? "RELEASED" : "PRESENT",
-    homeworkStatus: "",
-    comment: typeof entry.comment === "string" ? entry.comment : "",
-  };
-}
-
-export function normalizeLessonEntry(entry) {
-  if (!entry || typeof entry !== "object") {
-    return { workType: "CLASSWORK", topic: "", homework: "", homeworkDeadline: "" };
-  }
-  return {
-    workType: workTypes.some((item) => item.value === entry.workType) ? entry.workType : "CLASSWORK",
-    topic: typeof entry.topic === "string" ? entry.topic : "",
-    homework: typeof entry.homework === "string" ? entry.homework : "",
-    homeworkDeadline: /^\d{4}-\d{2}-\d{2}$/.test(entry.homeworkDeadline || "")
-      ? entry.homeworkDeadline
-      : "",
-  };
-}
-
-export function resolveHomeworkStatus(entry, lesson, referenceDate = new Date()) {
-  if (!lesson?.homework?.trim()) return "";
-  if (homeworkStatuses.some((item) => item.value === entry?.homeworkStatus)) {
-    return entry.homeworkStatus;
-  }
-  if (lesson.homeworkDeadline) {
-    const endOfDeadline = new Date(`${lesson.homeworkDeadline}T23:59:59`);
-    if (endOfDeadline < referenceDate) return "OVERDUE";
-  }
-  return "ACTIVE";
-}
-
-export function writeJournalState(state) {
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(JOURNAL_STORAGE_KEY, JSON.stringify(state));
-  }
-}
-
-function toDateId(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }

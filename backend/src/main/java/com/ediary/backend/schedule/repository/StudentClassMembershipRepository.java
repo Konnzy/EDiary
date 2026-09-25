@@ -14,6 +14,13 @@ public interface StudentClassMembershipRepository extends JpaRepository<StudentC
 
     long deleteBySchoolClassIdAndActiveFalse(Long classId);
 
+    boolean existsByStudentIdAndSchoolClassId(Long studentId, Long classId);
+
+    @EntityGraph(attributePaths = {"schoolClass", "schoolClass.academicYear"})
+    List<StudentClassMembership> findAllByStudentIdAndSchoolClassAcademicYearValue(
+        Long studentId, String academicYear
+    );
+
     @EntityGraph(attributePaths = {"student", "student.user"})
     List<StudentClassMembership> findAllBySchoolClassIdAndActiveTrueOrderByStudentSurnameAscStudentNameAsc(
         Long classId

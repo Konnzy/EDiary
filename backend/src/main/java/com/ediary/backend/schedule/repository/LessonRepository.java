@@ -1,6 +1,8 @@
 package com.ediary.backend.schedule.repository;
 
 import com.ediary.backend.schedule.entity.Lesson;
+import com.ediary.backend.journal.entity.LessonWorkType;
+import com.ediary.backend.schedule.entity.LessonStatus;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +12,53 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LessonRepository extends JpaRepository<Lesson, Long> {
+
+    @Query("""
+        select count(lesson) > 0 from Lesson lesson
+        where lesson.scheduleEntry.schoolClass.id = :classId
+          and lesson.scheduleEntry.subject.id = :subjectId
+          and lesson.workType = :workType
+          and lesson.date between :start and :end
+          and lesson.id <> :excludedLessonId
+          and lesson.status <> :excludedStatus
+        """)
+    boolean existsOtherJournalWorkType(
+        @Param("classId") Long classId,
+        @Param("subjectId") Long subjectId,
+        @Param("workType") LessonWorkType workType,
+        @Param("start") LocalDate start,
+        @Param("end") LocalDate end,
+        @Param("excludedLessonId") Long excludedLessonId,
+        @Param("excludedStatus") LessonStatus excludedStatus
+    );
+
+    @EntityGraph(attributePaths = {"scheduleEntry.subject", "scheduleEntry.teacher.user", "scheduleEntry.schoolClass"})
+    @Query("""
+        select lesson from Lesson lesson
+        where lesson.scheduleEntry.schoolClass.id = :classId
+          and lesson.scheduleEntry.subject.id = :subjectId
+          and lesson.date between :start and :end
+        order by lesson.date, lesson.scheduleEntry.lessonNumber
+        """)
+    List<Lesson> findJournalLessons(
+        @Param("classId") Long classId,
+        @Param("subjectId") Long subjectId,
+        @Param("start") LocalDate start,
+        @Param("end") LocalDate end
+    );
+
+    @EntityGraph(attributePaths = {"scheduleEntry.subject", "scheduleEntry.teacher.user", "scheduleEntry.schoolClass"})
+    @Query("""
+        select lesson from Lesson lesson
+        where lesson.scheduleEntry.schoolClass.id = :classId
+          and lesson.date between :start and :end
+        order by lesson.date, lesson.scheduleEntry.lessonNumber
+        """)
+    List<Lesson> findClassLessons(
+        @Param("classId") Long classId,
+        @Param("start") LocalDate start,
+        @Param("end") LocalDate end
+    );
 
     @EntityGraph(attributePaths = {
         "scheduleEntry.subject",
