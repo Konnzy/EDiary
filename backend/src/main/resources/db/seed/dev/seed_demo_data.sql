@@ -96,15 +96,16 @@ ON CONFLICT (teacher_id, subject_id) DO NOTHING;
 
 INSERT INTO School_class (
     class_teacher_id,
+    class_academic_year,
     class_number,
     class_letter,
     class_limit
 )
-SELECT teacher.teacher_id, 9, 'А', 30
+SELECT teacher.teacher_id, '2026/2027', 9, 'А', 30
 FROM Teacher teacher
 JOIN App_user app_user ON app_user.user_id = teacher.user_id
 WHERE app_user.user_login = 'teacher.test'
-ON CONFLICT (class_number, class_letter) DO NOTHING;
+ON CONFLICT (class_academic_year, class_number, class_letter) DO NOTHING;
 
 INSERT INTO App_user (
     user_login,
@@ -145,6 +146,7 @@ FROM App_user app_user
 CROSS JOIN School_class school_class
 WHERE app_user.user_login = 'student.test'
   AND app_user.user_role = 'STUDENT'
+  AND school_class.class_academic_year = '2026/2027'
   AND school_class.class_number = 9
   AND school_class.class_letter = 'А'
 ON CONFLICT (user_id) DO NOTHING;

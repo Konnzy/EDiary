@@ -20,31 +20,62 @@ EDiary/
 - Node.js 24 LTS та npm 11+;
 - SMTP-сервер для надсилання результатів розгляду заявок.
 
-## PostgreSQL
+## Docker Compose
 
-Flyway автоматично виконує міграції з `backend/src/main/resources/db/migration`.
-Hibernate працює в режимі `validate` і не змінює схему самостійно.
+Docker Compose запускає лише backend і frontend. PostgreSQL залишається на
+хостовому комп'ютері та не створюється, не зупиняється і не видаляється разом
+із Docker-контейнерами. Перед запуском переконайтеся, що локальний PostgreSQL
+працює, а база `ediary` уже містить потрібну схему й дані.
 
-Для локального запуску PostgreSQL через Docker виконайте команди з кореня проєкту:
+Скопіюйте `.env.example` у `.env` у корені проєкту та за потреби вкажіть назву
+БД, порт, користувача й пароль, які використовує ваш локальний PostgreSQL.
+Файл `.env` ігнорується Git, тому секрети не потраплять до коміту.
+
+Запустіть frontend і backend через Docker Desktop або з PowerShell у корені:
 
 ```powershell
-docker compose up -d db
+Copy-Item .env.example .env
+# Відредагуйте .env і вкажіть фактичні реквізити вашої локальної БД.
+docker compose up -d --build
 docker compose ps
 ```
 
-Compose запускає PostgreSQL 18 на `localhost:5432`, створює БД `ediary` і
-користувача `ediary`. Ці облікові дані призначені лише для локальної розробки;
-їх можна перевизначити змінними `EDIARY_DB_NAME`, `EDIARY_DB_USERNAME` та
-`EDIARY_DB_PASSWORD`. Дані зберігаються в Docker volume `ediary_postgres_data`.
-Щоб зупинити БД, не видаляючи дані, виконайте `docker compose down`.
+Docker Desktop покаже лише `ediary-backend` і `ediary-frontend`. Контейнер
+backend підключається до PostgreSQL на цьому ж комп'ютері через
+`host.docker.internal` (Docker Desktop hostname для доступу контейнера до хоста).
+Браузер відкриває frontend за `http://127.0.0.1:5173`; Nginx у frontend-
+контейнері пересилає запити `/api` до backend. Порт `8081` також доступний
+локально для перевірки API.
 
-Перед запуском backend задайте підключення до БД:
+Окремо можна запускати `docker compose up -d backend` або
+`docker compose up -d frontend`. Зупинка через `docker compose down` прибирає
+лише ці два контейнери; локальний PostgreSQL і його дані не зачіпаються.
+
+Якщо змінився код і потрібно перебудувати відповідний образ, додай `--build`,
+наприклад `docker compose up -d --build backend`.
+
+Compose читає налаштування підключення з `.env`: `EDIARY_DB_HOST`,
+`EDIARY_DB_PORT`, `EDIARY_DB_NAME`, `EDIARY_DB_USERNAME` та
+`EDIARY_DB_PASSWORD`. Значення за замовчуванням відповідають локальним
+налаштуванням backend (`ediary`, порт `5432`, користувач/пароль `ediary`), але
+їх потрібно звірити з налаштуваннями сервера у pgAdmin.
+
+Якщо PostgreSQL відхиляє з'єднання з контейнера, перевірте, чи сервер слухає
+TCP-з'єднання, чи `pg_hba.conf` дозволяє підключення з Docker Desktop, та чи
+брандмауер Windows не блокує його. Не відкривайте PostgreSQL для публічних
+мереж. Backend, запущений безпосередньо з IDE, як і раніше використовує
+`localhost:5432` і налаштування в `backend/src/main/resources/application.yaml`.
+
+Якщо потрібно явно перевизначити локальні IDE-налаштування:
 
 ```powershell
 $env:EDIARY_DB_URL = "jdbc:postgresql://localhost:5432/ediary"
 $env:EDIARY_DB_USERNAME = "ediary"
-$env:EDIARY_DB_PASSWORD = "change-me"
+$env:EDIARY_DB_PASSWORD = "ediary"
 ```
+
+Flyway автоматично виконує міграції з `backend/src/main/resources/db/migration`.
+Hibernate працює в режимі `validate` і не змінює схему самостійно.
 
 Якщо міграція `V1__init_schema.sql` уже застосовувалась до постійної БД, її не
 можна редагувати повторно. Наступні зміни схеми потрібно оформлювати як `V2`,
