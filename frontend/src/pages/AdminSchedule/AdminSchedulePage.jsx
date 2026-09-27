@@ -6,10 +6,12 @@ import {
   Clock3,
   Copy,
   EllipsisVertical,
+  FileUp,
   MapPin,
   Loader2,
   Pencil,
   Plus,
+  Search,
   Save,
   Trash2,
   UserRound,
@@ -338,25 +340,16 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
       subtitle="Перегляд та редагування розкладу занять для класів"
     >
       <Card className="rounded-lg p-4 sm:p-5">
-        <div className="grid gap-4 lg:grid-cols-[minmax(200px,1fr)_minmax(200px,1fr)_auto] lg:items-end 2xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto_auto]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(200px,1fr)_minmax(200px,1fr)_minmax(300px,1.2fr)] lg:items-end xl:grid-cols-[minmax(150px,1fr)_minmax(150px,1fr)_minmax(260px,1.4fr)_minmax(0,2.8fr)]">
           <SelectField label="Клас">
-            <select
+            <ClassCombobox
+              classes={classes}
               value={selectedClassId}
-              onChange={(event) => {
-                const nextClassId = event.target.value;
+              loading={loadingClasses}
+              onChange={(nextClassId) => {
                 if (nextClassId !== selectedClassId) requestContextChange(() => setSelectedClassId(nextClassId));
               }}
-              disabled={loadingClasses}
-              className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-hidden hover:border-slate-400 focus:border-slate-500 disabled:opacity-60"
-            >
-              {loadingClasses ? <option value="">Завантаження...</option> : null}
-              {!loadingClasses && classes.length === 0 ? <option value="">Класи не знайдено</option> : null}
-              {classes.map((schoolClass) => (
-                <option key={schoolClass.id} value={schoolClass.id}>
-                  {schoolClass.number}-{schoolClass.letter}{schoolClass.status === "DRAFT" ? " · Чернетка" : ""}
-                </option>
-              ))}
-            </select>
+            />
           </SelectField>
 
           <SelectField label="Навчальний рік">
@@ -392,16 +385,28 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
             </div>
           </div>
 
-          <div className="flex flex-wrap items-end justify-end gap-2 lg:col-span-3 2xl:col-span-1 2xl:flex-nowrap">
+          <div className="flex flex-wrap items-end justify-end gap-2 lg:col-span-3 xl:col-span-1 xl:flex-nowrap">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled
+              title="Імпорт розкладу з файлів буде доступний пізніше"
+              className="h-10 shrink-0 whitespace-nowrap rounded-md border border-slate-300 bg-white px-2.5 text-[0.7rem] text-slate-500"
+            >
+              <FileUp className="h-4 w-4" aria-hidden="true" />
+              Імпорт
+            </Button>
+
             <Button
               type="button"
               variant="ghost"
               onClick={() => setCopyDialogOpen(true)}
               disabled={!selectedClassId || selectedClass?.status === "DRAFT" || loadingSchedule || savingSchedule}
-              className="h-10 rounded-md border border-slate-300 bg-white px-4 text-xs"
+              title="Скопіювати розклад"
+              className="h-10 shrink-0 whitespace-nowrap rounded-md border border-slate-300 bg-white px-2.5 text-[0.7rem]"
             >
               <Copy className="h-4 w-4" aria-hidden="true" />
-              Скопіювати розклад
+              Копіювати
             </Button>
 
             <Button
@@ -409,14 +414,15 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
               variant="ghost"
               onClick={() => setClearDialogOpen(true)}
               disabled={!selectedClassId || selectedClass?.status === "DRAFT" || loadingSchedule || savingSchedule || lessonCount === 0}
-              className="h-10 rounded-md border border-red-300 bg-white px-4 text-xs text-red-600 hover:border-red-400 hover:bg-red-50 hover:text-red-700"
+              title="Очистити розклад"
+              className="h-10 shrink-0 whitespace-nowrap rounded-md border border-red-300 bg-white px-2.5 text-[0.7rem] text-red-600 hover:border-red-400 hover:bg-red-50 hover:text-red-700"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
-              Очистити розклад
+              Очистити
             </Button>
 
-            <div className="min-w-[178px]">
-              <p className={cn("mb-2 inline-flex items-center gap-2 whitespace-nowrap text-[0.72rem] font-medium", dirty ? "text-amber-700" : "text-emerald-700")}>
+            <div className="min-w-[140px] shrink-0">
+              <p className={cn("mb-2 inline-flex items-center gap-2 whitespace-nowrap text-[0.68rem] font-medium", dirty ? "text-amber-700" : "text-emerald-700")}>
                 <span className={cn("h-2 w-2 rounded-full", dirty ? "bg-amber-400" : "bg-emerald-500")} aria-hidden="true" />
                 {dirty ? "Є незбережені зміни" : "Усі зміни збережено"}
               </p>
@@ -424,10 +430,11 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
                 type="button"
                 onClick={saveSchedule}
                 disabled={!selectedClassId || selectedClass?.status === "DRAFT" || loadingSchedule || savingSchedule || !dirty}
-                className="h-10 w-full rounded-md px-4 text-xs"
+                title="Зберегти зміни"
+                className="h-10 w-full rounded-md px-2.5 text-[0.7rem]"
               >
                 <Save className="h-4 w-4" aria-hidden="true" />
-                {savingSchedule ? "Збереження..." : "Зберегти зміни"}
+                {savingSchedule ? "Збереження..." : "Зберегти"}
               </Button>
             </div>
           </div>
@@ -678,6 +685,115 @@ function SelectField({ label, children }) {
       </span>
     </label>
   );
+}
+
+function ClassCombobox({ classes, value, loading, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const containerRef = useRef(null);
+  const optionRefs = useRef([]);
+  const selectedClass = classes.find((schoolClass) => String(schoolClass.id) === value);
+  const selectedLabel = selectedClass
+    ? `${selectedClass.number}-${selectedClass.letter}${selectedClass.status === "DRAFT" ? " · Чернетка" : ""}`
+    : "";
+  const normalizedQuery = normalizeClassSearch(query);
+  const filteredClasses = classes.filter((schoolClass) => (
+    normalizeClassSearch(`${schoolClass.number}${schoolClass.letter}`).includes(normalizedQuery)
+  ));
+
+  useEffect(() => {
+    if (open) optionRefs.current[activeIndex]?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open]);
+
+  const openOptions = () => {
+    setQuery("");
+    setActiveIndex(0);
+    setOpen(true);
+  };
+
+  const selectClass = (schoolClass) => {
+    onChange(String(schoolClass.id));
+    setOpen(false);
+    setQuery("");
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (!open) openOptions();
+      else setActiveIndex((index) => Math.max(0, Math.min(index + 1, filteredClasses.length - 1)));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!open) openOptions();
+      else setActiveIndex((index) => Math.max(0, index - 1));
+    } else if (event.key === "Enter" && open && filteredClasses[activeIndex]) {
+      event.preventDefault();
+      selectClass(filteredClasses[activeIndex]);
+    } else if (event.key === "Escape" && open) {
+      event.preventDefault();
+      setOpen(false);
+      setQuery("");
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative min-w-0">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+        <input
+          type="text"
+          role="combobox"
+          aria-label="Пошук класу"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls="admin-schedule-class-options"
+          aria-activedescendant={open && filteredClasses[activeIndex] ? `admin-class-option-${filteredClasses[activeIndex].id}` : undefined}
+          autoComplete="off"
+          value={open ? query : selectedLabel}
+          placeholder={loading ? "Завантаження..." : classes.length ? "Пошук класу" : "Класи не знайдено"}
+          disabled={loading || classes.length === 0}
+          onFocus={() => !open && openOptions()}
+          onChange={(event) => { setQuery(event.target.value); setActiveIndex(0); setOpen(true); }}
+          onKeyDown={handleKeyDown}
+          onBlur={(event) => {
+            if (!containerRef.current?.contains(event.relatedTarget)) {
+              setOpen(false);
+              setQuery("");
+            }
+          }}
+          className="h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-9 text-[0.82rem] font-medium text-slate-700 outline-hidden hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:opacity-60"
+        />
+      </div>
+      {open ? (
+        <ul id="admin-schedule-class-options" role="listbox" className="absolute z-40 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+          {filteredClasses.length ? filteredClasses.map((schoolClass, index) => (
+            <li
+              key={schoolClass.id}
+              id={`admin-class-option-${schoolClass.id}`}
+              ref={(node) => { optionRefs.current[index] = node; }}
+              role="option"
+              aria-selected={String(schoolClass.id) === value}
+              onMouseDown={(event) => event.preventDefault()}
+              onMouseEnter={() => setActiveIndex(index)}
+              onClick={() => selectClass(schoolClass)}
+              className={cn(
+                "flex min-h-10 cursor-pointer items-center justify-between gap-3 px-3 py-2 text-[0.82rem]",
+                activeIndex === index ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50",
+              )}
+            >
+              <span className="font-medium">{schoolClass.number}-{schoolClass.letter}</span>
+              {schoolClass.status === "DRAFT" ? <span className="text-xs text-amber-700">Чернетка</span> : null}
+            </li>
+          )) : <li className="px-3 py-3 text-xs text-slate-500">За цим запитом класи не знайдено</li>}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function normalizeClassSearch(value) {
+  return value.toLocaleLowerCase("uk-UA").replace(/[\s.-]/g, "");
 }
 
 function DayColumn({ day, lessons, openMenu, onToggleMenu, onAdd, onEdit, onDelete }) {

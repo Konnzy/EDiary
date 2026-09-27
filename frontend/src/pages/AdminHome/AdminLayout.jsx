@@ -27,6 +27,7 @@ const navigationItems = [
   { label: "Предмети", icon: BookOpen, route: "admin/subjects" },
   { label: "Розклад", icon: CalendarDays, route: "admin/schedule" },
 ];
+const navigationGroups = [navigationItems.slice(0, 1), navigationItems.slice(1, 3), navigationItems.slice(3)];
 
 export function AdminLayout({ activeItem, title, subtitle, breadcrumb, actions, children }) {
   return (
@@ -185,7 +186,7 @@ function NavigationItem({ item, activeItem, compact = false }) {
   const Icon = item.icon;
   const className = cn(
     compact
-      ? "inline-flex h-10 min-w-0 items-center justify-center rounded-md px-1"
+      ? "inline-flex h-10 w-full min-w-0 items-center justify-center rounded-md px-1"
       : "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left",
     "text-[0.82rem] font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
     activeItem === item.label
@@ -218,9 +219,11 @@ function NavigationItem({ item, activeItem, compact = false }) {
 function MobileNavigation({ activeItem }) {
   return (
     <nav className="sticky top-16 z-20 border-b border-slate-200/80 bg-white px-3 py-2 lg:hidden" aria-label="Основна навігація адміністратора">
-      <div className="grid grid-cols-6 gap-1">
-        {navigationItems.map((item) => (
-          <NavigationItem key={item.label} item={item} activeItem={activeItem} compact />
+      <div className="grid grid-cols-6 items-center gap-1">
+        {navigationGroups.map((group, index) => (
+          <div key={index} className={cn("grid min-w-0 gap-1", index === 0 ? "col-span-1 grid-cols-1" : index === 1 ? "col-span-2 grid-cols-2 border-l border-slate-200 pl-1" : "col-span-3 grid-cols-3 border-l border-slate-200 pl-1")}>
+            {group.map((item) => <NavigationItem key={item.label} item={item} activeItem={activeItem} compact />)}
+          </div>
         ))}
       </div>
     </nav>
@@ -230,9 +233,11 @@ function MobileNavigation({ activeItem }) {
 function Sidebar({ activeItem }) {
   return (
     <aside className="hidden w-[220px] shrink-0 bg-white px-3 py-4 lg:block">
-      <nav className="space-y-2" aria-label="Основна навігація адміністратора">
-        {navigationItems.map((item) => (
-          <NavigationItem key={item.label} item={item} activeItem={activeItem} />
+      <nav aria-label="Основна навігація адміністратора">
+        {navigationGroups.map((group, index) => (
+          <div key={index} className={cn("space-y-2", index > 0 && "mt-3 border-t border-slate-200 pt-3")}>
+            {group.map((item) => <NavigationItem key={item.label} item={item} activeItem={activeItem} />)}
+          </div>
         ))}
       </nav>
     </aside>

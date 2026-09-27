@@ -42,6 +42,11 @@ import com.ediary.backend.user.repository.StudentParentLinkRepository;
 import com.ediary.backend.user.repository.TeacherProfileRepository;
 import com.ediary.backend.user.repository.UserRepository;
 import com.ediary.backend.user.session.repository.UserSessionRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -166,10 +171,12 @@ public class AdminUserService {
         String normalizedQuery = normalizeQuery(query);
 
         if (normalizedQuery != null) {
-            String pattern = "%" + normalizedQuery.toLowerCase(Locale.ROOT) + "%";
+            String[] nameParts = normalizedQuery.toLowerCase(Locale.ROOT).split("\\s+");
             specification = specification.and((root, criteriaQuery, builder) -> builder.or(
-                builder.like(builder.lower(root.get("login")), pattern),
-                builder.like(builder.lower(root.get("email")), pattern)
+                profileNameMatches(criteriaQuery, builder, root, StudentProfile.class, nameParts),
+                profileNameMatches(criteriaQuery, builder, root, ParentProfile.class, nameParts),
+                profileNameMatches(criteriaQuery, builder, root, TeacherProfile.class, nameParts),
+                profileNameMatches(criteriaQuery, builder, root, AdministratorProfile.class, nameParts)
             ));
         }
         if (role != null) {
@@ -650,6 +657,35 @@ public class AdminUserService {
             return null;
         }
         return query.strip();
+    }
+
+    private <T> Predicate profileNameMatches(
+        CriteriaQuery<?> criteriaQuery,
+        CriteriaBuilder builder,
+        Root<AppUser> user,
+        Class<T> profileType,
+        String[] nameParts
+    ) {
+        Subquery<Long> profileQuery = criteriaQuery.subquery(Long.class);
+        Root<T> profile = profileQuery.from(profileType);
+        var userId = profile.<AppUser>get("user").<Long>get("id");
+        var patronymic = builder.coalesce(profile.<String>get("patronymic"), "");
+        Predicate[] matchingParts = java.util.Arrays.stream(nameParts)
+            .map(part -> {
+                String pattern = "%" + part + "%";
+                return builder.or(
+                    builder.like(builder.lower(profile.<String>get("surname")), pattern),
+                    builder.like(builder.lower(profile.<String>get("name")), pattern),
+                    builder.like(builder.lower(patronymic), pattern)
+                );
+            })
+            .toArray(Predicate[]::new);
+        profileQuery.select(userId)
+            .where(
+                builder.equal(userId, user.<Long>get("id")),
+                builder.and(matchingParts)
+            );
+        return builder.exists(profileQuery);
     }
 
     private void ensureUniqueCredentials(String login, String email) {

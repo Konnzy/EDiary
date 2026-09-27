@@ -37,6 +37,9 @@ public interface StudentProfileRepository extends JpaRepository<StudentProfile, 
     @EntityGraph(attributePaths = "user")
     List<StudentProfile> findAllBySchoolClassIdOrderBySurnameAscNameAsc(Long classId);
 
+    @EntityGraph(attributePaths = {"user", "schoolClass"})
+    List<StudentProfile> findAllBySchoolClassIdInOrderBySurnameAscNameAsc(List<Long> classIds);
+
     @EntityGraph(attributePaths = "user")
     List<StudentProfile> findAllBySchoolClassIsNullAndUser_StatusAndStatusOrderBySurnameAscNameAsc(
         UserStatus userStatus,

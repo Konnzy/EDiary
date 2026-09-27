@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Ban,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  FileUp,
   Loader2,
   KeyRound,
   Pencil,
@@ -173,16 +175,21 @@ export function AdminUsersPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editDialog, setEditDialog] = useState(null);
   const [resetDialog, setResetDialog] = useState(null);
+  const requestSequence = useRef(0);
 
   const loadUsers = useCallback(async () => {
+    const requestId = ++requestSequence.current;
     setIsLoading(true);
     setError("");
     try {
-      setData(await adminUsersApi.findAll({ query, role, status, page, size: 15 }));
+      const result = await adminUsersApi.findAll({ query, role, status, page, size: 15 });
+      if (requestId === requestSequence.current) setData(result);
     } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити користувачів.");
+      if (requestId === requestSequence.current) {
+        setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити користувачів.");
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === requestSequence.current) setIsLoading(false);
     }
   }, [page, query, role, status]);
 
@@ -190,11 +197,13 @@ export function AdminUsersPage() {
     loadUsers();
   }, [loadUsers]);
 
-  const submitSearch = (event) => {
-    event.preventDefault();
-    setQuery(searchInput.trim());
-    setPage(0);
-  };
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setQuery(searchInput.trim());
+      setPage(0);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   const resetFilters = () => {
     setSearchInput("");
@@ -242,47 +251,55 @@ export function AdminUsersPage() {
     <AdminLayout
       activeItem="Користувачі"
       title="Користувачі"
-      subtitle="Пошук облікових записів і керування доступом до системи."
+      subtitle="Пошук користувачів за ПІБ і керування доступом до системи."
       actions={(
-        <Button type="button" onClick={() => setCreateOpen(true)} className="h-10 w-full rounded-md px-4 sm:w-auto">
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Створити користувача
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            type="button"
+            variant="ghost"
+            disabled
+            title="Імпорт із CSV та XLSX буде доступний пізніше"
+            className="h-10 w-full rounded-md border border-slate-300 bg-white px-4 text-slate-500 sm:w-auto"
+          >
+            <FileUp className="h-4 w-4" aria-hidden="true" />
+            Завантаження користувачів
+          </Button>
+          <Button type="button" onClick={() => setCreateOpen(true)} className="h-10 w-full rounded-md px-4 sm:w-auto">
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Створити користувача
+          </Button>
+        </div>
       )}
     >
-      <Card className="overflow-hidden rounded-lg">
-        <div className="border-b border-slate-200 px-4 py-4 sm:px-5">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <form onSubmit={submitSearch} className="flex min-w-0 flex-1 gap-2 xl:max-w-[520px]">
-              <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                <Input
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="Логін або електронна пошта"
-                  className="h-10 pl-10"
-                  aria-label="Пошук користувачів"
-                />
-              </div>
-              <Button type="submit" className="h-10 rounded-md px-4">Знайти</Button>
-            </form>
-
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <FilterSelect label="Роль" value={role} options={roleOptions} onChange={(value) => { setRole(value); setPage(0); }} />
-              <FilterSelect label="Статус" value={status} options={statusOptions} onChange={(value) => { setStatus(value); setPage(0); }} />
-              <Button type="button" variant="ghost" onClick={loadUsers} disabled={isLoading} className="h-10 rounded-md border border-slate-200 px-3 text-slate-600" title="Оновити список">
-                <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} aria-hidden="true" />
-                <span className="sm:hidden">Оновити</span>
-              </Button>
-            </div>
-          </div>
-          {query || role || status ? (
-            <button type="button" onClick={resetFilters} className="mt-3 text-[0.75rem] font-semibold text-slate-500 hover:text-slate-900">
-              Очистити фільтри
-            </button>
-          ) : null}
+      <Card className="mb-5 w-full max-w-5xl rounded-lg p-4 sm:p-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_180px_180px_40px] lg:items-end">
+          <label className="block min-w-0 sm:col-span-2 lg:col-span-1">
+            <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">Пошук за ПІБ</span>
+            <span className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <Input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Прізвище, ім’я або по батькові"
+                className="h-10 pl-10"
+                aria-label="Пошук користувачів за ПІБ"
+              />
+            </span>
+          </label>
+          <FilterSelect label="Роль" value={role} options={roleOptions} onChange={(value) => { setRole(value); setPage(0); }} />
+          <FilterSelect label="Статус" value={status} options={statusOptions} onChange={(value) => { setStatus(value); setPage(0); }} />
+          <Button type="button" variant="ghost" onClick={loadUsers} disabled={isLoading} className="h-10 w-10 justify-self-end rounded-md border border-slate-200 p-0 text-slate-600" title="Оновити список" aria-label="Оновити список користувачів">
+            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} aria-hidden="true" />
+          </Button>
         </div>
+        {query || role || status ? (
+          <button type="button" onClick={resetFilters} className="mt-3 text-[0.75rem] font-semibold text-slate-500 hover:text-slate-900">
+            Очистити фільтри
+          </button>
+        ) : null}
+      </Card>
 
+      <Card className="overflow-hidden rounded-lg">
         {notice ? <div className="border-b border-emerald-100 bg-emerald-50 px-5 py-3 text-[0.8rem] font-medium text-emerald-700">{notice}</div> : null}
         {error ? (
           <div className="p-5">
@@ -296,7 +313,7 @@ export function AdminUsersPage() {
         {!error && isLoading ? (
           <div className="flex min-h-[340px] items-center justify-center text-slate-400"><Loader2 className="h-6 w-6 animate-spin" aria-label="Завантаження" /></div>
         ) : null}
-        {!error && !isLoading && data?.content?.length === 0 ? <EmptyState /> : null}
+        {!error && !isLoading && data?.content?.length === 0 ? <EmptyState query={query} /> : null}
         {!error && !isLoading && data?.content?.length ? (
           <>
             <DesktopTable users={data.content} onChangeStatus={setDialog} onEdit={setEditDialog} onResetPassword={setResetDialog} onDelete={setDeleteDialog} />
@@ -528,11 +545,14 @@ function CreateField({ label, error, children }) {
 
 function FilterSelect({ label, value, options, onChange }) {
   return (
-    <label className="sr-only">
-      {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 min-w-[150px] rounded-md border border-slate-200 bg-white px-3 text-[0.78rem] font-semibold text-slate-600 outline-hidden transition-colors hover:border-slate-300 focus:border-slate-500">
-        {options.map((option) => <option key={option.value || "all"} value={option.value}>{option.label}</option>)}
-      </select>
+    <label className="block min-w-0">
+      <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">{label}</span>
+      <span className="relative block">
+        <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-9 text-[0.78rem] font-semibold text-slate-600 outline-hidden transition-colors hover:border-slate-300 focus:border-slate-500">
+          {options.map((option) => <option key={option.value || "all"} value={option.value}>{option.label}</option>)}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+      </span>
     </label>
   );
 }
@@ -547,7 +567,7 @@ function DesktopTable({ users, onChangeStatus, onEdit, onResetPassword, onDelete
         <tbody>
           {users.map((user) => (
             <tr key={user.id} className="border-t border-slate-100 text-[0.8rem] text-slate-600 transition-colors hover:bg-slate-50/80">
-              <td className="px-5 py-4"><div className="font-bold text-slate-900">{user.login}</div><div className="mt-1 text-[0.72rem] text-slate-400">{user.email}</div></td>
+              <td className="px-5 py-4"><div className="font-bold text-slate-900">{formatFullName(user) || user.login}</div><div className="mt-1 text-[0.72rem] text-slate-400">{user.login} · {user.email}</div></td>
               <td className="px-4 py-4 font-semibold">{roleLabels[user.role]}</td>
               <td className="px-4 py-4"><StatusBadge status={user.status} /></td>
               <td className="px-4 py-4 text-slate-400">{formatDate(user.createdAt)}</td>
@@ -565,7 +585,7 @@ function MobileList({ users, onChangeStatus, onEdit, onResetPassword, onDelete }
     <div className="divide-y divide-slate-100 xl:hidden">
       {users.map((user) => (
         <article key={user.id} className="px-4 py-4">
-          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[0.88rem] font-bold text-slate-900">{user.login}</h2><p className="mt-1 truncate text-[0.74rem] text-slate-400">{user.email}</p></div><StatusBadge status={user.status} /></div>
+          <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[0.88rem] font-bold text-slate-900">{formatFullName(user) || user.login}</h2><p className="mt-1 truncate text-[0.74rem] text-slate-400">{user.login} · {user.email}</p></div><StatusBadge status={user.status} /></div>
           <div className="mt-3 text-[0.75rem] font-semibold text-slate-500">{roleLabels[user.role]} · створено {formatDate(user.createdAt)}</div>
           <div className="mt-4"><UserActions user={user} onChangeStatus={onChangeStatus} onEdit={onEdit} onResetPassword={onResetPassword} onDelete={onDelete} /></div>
         </article>
@@ -872,8 +892,12 @@ function Pagination({ data, page, onPageChange }) {
   );
 }
 
-function EmptyState() {
-  return <div className="flex min-h-[340px] flex-col items-center justify-center px-5 text-center"><span className="flex h-12 w-12 items-center justify-center rounded-md bg-slate-100 text-slate-500"><Users className="h-5 w-5" /></span><h2 className="mt-4 text-[0.95rem] font-bold text-slate-900">Користувачів не знайдено</h2><p className="mt-1 text-[0.78rem] text-slate-500">Змініть пошуковий запит або вибрані фільтри.</p></div>;
+function EmptyState({ query }) {
+  return <div className="flex min-h-[340px] flex-col items-center justify-center px-5 text-center"><span className="flex h-12 w-12 items-center justify-center rounded-md bg-slate-100 text-slate-500"><Users className="h-5 w-5" /></span><h2 className="mt-4 text-[0.95rem] font-bold text-slate-900">{query ? "Користувачів не знайдено" : "Користувачів поки немає"}</h2><p className="mt-1 text-[0.78rem] text-slate-500">{query ? "Перевірте ПІБ або змініть пошуковий запит." : "Створіть обліковий запис користувача."}</p></div>;
+}
+
+function formatFullName(user) {
+  return [user.lastName, user.firstName, user.patronymic].filter(Boolean).join(" ");
 }
 
 function formatDate(value) {

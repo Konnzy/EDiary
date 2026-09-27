@@ -138,7 +138,7 @@ class JournalServiceTest {
         when(clock.getZone()).thenReturn(ZoneOffset.UTC);
 
         service.saveLesson("teacher.one", 10L, date,
-            new SaveJournalLessonRequest(LessonWorkType.YEAR, null, null, null));
+            new SaveJournalLessonRequest(LessonWorkType.YEAR, "Annual assessment", null, null));
 
         assertThat(lesson.getWorkType()).isEqualTo(LessonWorkType.YEAR);
         verify(lessonRepository).existsOtherJournalWorkType(5L, 4L, LessonWorkType.YEAR,
@@ -208,6 +208,40 @@ class JournalServiceTest {
         verifyNoInteractions(gradeService, homeworkRepository, studentHomeworkRepository);
     }
 
+    @Test
+    void newScheduleDoesNotAddPastEmptySlotsAndPreservesRecordedLessons() {
+        Lesson recorded = lesson(LocalDate.of(2026, 9, 14), LessonWorkType.CLASSWORK);
+        var user = new com.ediary.backend.user.entity.AppUser();
+        user.setLogin("teacher.one");
+        var teacher = new com.ediary.backend.user.entity.TeacherProfile();
+        teacher.setUser(user);
+        ScheduleEntry oldEntry = recorded.getScheduleEntry();
+        oldEntry.setId(11L);
+        oldEntry.setTeacher(teacher);
+        oldEntry.setLessonNumber(1);
+        oldEntry.setActive(false);
+        ScheduleEntry newEntry = new ScheduleEntry();
+        newEntry.setId(10L);
+        newEntry.setSchoolClass(oldEntry.getSchoolClass());
+        newEntry.setSubject(oldEntry.getSubject());
+        newEntry.setTeacher(teacher);
+        newEntry.setLessonNumber(1);
+        newEntry.setWeekNumber(1);
+        newEntry.setWeekday(com.ediary.backend.schedule.entity.Weekday.MONDAY);
+        newEntry.setEffectiveFrom(LocalDate.of(2026, 9, 28));
+        when(scheduleRepository.findJournalAssignmentsForTeacher("teacher.one", "2026/2027"))
+            .thenReturn(List.of(oldEntry, newEntry));
+        when(lessonRepository.findJournalLessons(5L, 4L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
+            .thenReturn(List.of(recorded));
+
+        var journal = service.find("teacher.one", 5L, 4L, "2026-09");
+
+        assertThat(journal.lessons()).hasSize(2);
+        assertThat(journal.lessons().getFirst().id()).isEqualTo(21L);
+        assertThat(journal.lessons().getLast().scheduleId()).isEqualTo(10L);
+        assertThat(journal.lessons().getLast().date()).isEqualTo(LocalDate.of(2026, 9, 28));
+    }
+
     private Lesson lesson(LocalDate date, LessonWorkType workType) {
         SchoolClass schoolClass = new SchoolClass();
         schoolClass.setId(5L);
@@ -223,7 +257,37 @@ class JournalServiceTest {
         lesson.setDate(date);
         lesson.setStatus(LessonStatus.PLANNED);
         lesson.setWorkType(workType);
+        lesson.setTopic("Lesson topic");
         return lesson;
+    }
+
+    @Test
+    void rejectsRecordingWithoutTopicBeforeWritingStudentData() {
+        Lesson lesson = lesson(LocalDate.of(2026, 9, 24), LessonWorkType.CLASSWORK);
+        lesson.setTopic("   ");
+        StudentProfile student = new StudentProfile();
+        student.setId(7L);
+        student.setSchoolClass(lesson.getScheduleEntry().getSchoolClass());
+        when(lessonRepository.findForTeacher(21L, "teacher.one")).thenReturn(Optional.of(lesson));
+        when(studentProfileRepository.findById(7L)).thenReturn(Optional.of(student));
+
+        assertThatThrownBy(() -> service.saveCell("teacher.one", 21L, 7L, CELL))
+            .isInstanceOf(ApplicationException.class)
+            .satisfies(error -> assertThat(((ApplicationException) error).getCode()).isEqualTo("LESSON_TOPIC_REQUIRED"));
+        verifyNoInteractions(gradeService, attendanceService, homeworkRepository, studentHomeworkRepository);
+    }
+
+    @Test
+    void rejectsBulkAttendanceWithoutTopic() {
+        LocalDate date = LocalDate.of(2026, 9, 24);
+        Lesson lesson = lesson(date, LessonWorkType.CLASSWORK);
+        lesson.setTopic(null);
+        stubOpenedLesson(lesson, date);
+
+        assertThatThrownBy(() -> service.markAllPresent("teacher.one", 10L, date))
+            .isInstanceOf(ApplicationException.class)
+            .satisfies(error -> assertThat(((ApplicationException) error).getCode()).isEqualTo("LESSON_TOPIC_REQUIRED"));
+        verifyNoInteractions(attendanceService);
     }
 
     private void stubOpenedLesson(Lesson lesson, LocalDate date) {

@@ -24,6 +24,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
+import { LearnerNavigation } from "@/components/LearnerNavigation.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { Alert } from "@/components/ui/alert.jsx";
 import { Button } from "@/components/ui/button.jsx";
@@ -32,6 +33,7 @@ import { Input } from "@/components/ui/input.jsx";
 import { authApi, userProfileApi } from "@/lib/api.js";
 import { getPasswordStrength } from "@/lib/passwordStrength.js";
 import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
+import { TeacherNavigation } from "@/components/TeacherNavigation.jsx";
 import { formatShortName } from "@/lib/userIdentity.js";
 import { cn } from "@/lib/utils.js";
 import {
@@ -52,7 +54,7 @@ const roleConfig = {
       { label: "Головна", icon: Home, route: "student" },
       { label: "Розклад", icon: CalendarDays, route: "student/schedule" },
       { label: "Предмети", icon: BookOpen, route: "student/subjects" },
-      { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
+      { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail, route: "student/messages" },
       { label: "Профіль", icon: User, route: "student/profile" },
     ],
   },
@@ -65,7 +67,7 @@ const roleConfig = {
       { label: "Головна", icon: Home, route: "parent" },
       { label: "Розклад", icon: CalendarDays, route: "parent/schedule" },
       { label: "Предмети", icon: BookOpen, route: "parent/subjects" },
-      { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
+      { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail, route: "parent/messages" },
       { label: "Профіль", icon: User, route: "parent/profile" },
     ],
   },
@@ -594,23 +596,9 @@ function TopBar({ config, data, avatar }) {
 }
 
 function Navigation({ config, compact = false }) {
-  const content = config.navigation.map((item) => {
-    const Icon = item.icon;
-    const active = item.route === config.profileRoute;
-    const classes = cn(
-      compact ? "inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-md px-1" : "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left",
-      "text-[0.82rem] font-semibold transition-colors",
-      active ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
-      !item.route && "cursor-default hover:bg-transparent hover:text-slate-500",
-    );
-    const label = <><Icon className={compact ? "h-4 w-4 shrink-0" : "h-5 w-5 shrink-0"} aria-hidden="true" />{compact ? <span className="hidden truncate min-[540px]:inline">{item.shortLabel || item.label}</span> : item.label}</>;
-    return item.route
-      ? <a key={item.label} href={`#${item.route}`} className={classes} aria-current={active ? "page" : undefined} aria-label={compact ? item.label : undefined}>{label}</a>
-      : <button key={item.label} type="button" disabled className={classes} title={`${item.label}: розділ у розробці`}>{label}</button>;
-  });
-
-  if (compact) return <nav className="sticky top-16 z-20 border-b border-slate-200/80 bg-white px-3 py-2 lg:hidden" aria-label="Основна навігація"><div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${config.navigation.length}, minmax(0, 1fr))` }}>{content}</div></nav>;
-  return <aside className="hidden w-[210px] shrink-0 bg-white px-3 py-4 lg:block"><nav className="space-y-2" aria-label="Основна навігація">{content}</nav></aside>;
+  return config.homeRoute === "teacher"
+    ? <TeacherNavigation activeRoute="teacher/profile" compact={compact} />
+    : <LearnerNavigation role={config.homeRoute.toUpperCase()} activeRoute={config.profileRoute} compact={compact} />;
 }
 
 function readAvatar(file) {

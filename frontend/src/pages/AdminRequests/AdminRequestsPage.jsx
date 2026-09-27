@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -16,21 +17,27 @@ import { ApiError, adminRegistrationApi } from "@/lib/api.js";
 import { cn } from "@/lib/utils.js";
 import { AdminLayout } from "@/pages/AdminHome/AdminLayout.jsx";
 
-const filters = [
-  { value: "", label: "Усі" },
-  { value: "PENDING", label: "Перевірка" },
+const statusOptions = [
+  { value: "", label: "Усі статуси" },
+  { value: "PENDING", label: "На розгляді" },
   { value: "APPROVED", label: "Схвалено" },
   { value: "REJECTED", label: "Відхилено" },
 ];
 
+const roleOptions = [
+  { value: "", label: "Усі ролі" },
+  { value: "STUDENT", label: "Учень" },
+  { value: "PARENT", label: "Батьки" },
+  { value: "TEACHER", label: "Вчитель" },
+];
 const roleLabels = { STUDENT: "Учень", PARENT: "Батьки", TEACHER: "Вчитель" };
-const statusLabels = { PENDING: "Перевірка", APPROVED: "Схвалено", REJECTED: "Відхилено" };
+const statusLabels = { PENDING: "На розгляді", APPROVED: "Схвалено", REJECTED: "Відхилено" };
 const requestFilterKey = "admin-request-status-filter";
 
 function initialStatus() {
   const savedStatus = window.sessionStorage.getItem(requestFilterKey);
   window.sessionStorage.removeItem(requestFilterKey);
-  return filters.some((filter) => filter.value === savedStatus) ? savedStatus : "PENDING";
+  return statusOptions.some((option) => option.value === savedStatus) ? savedStatus : "";
 }
 
 function requestContext(request) {
@@ -43,6 +50,7 @@ function requestContext(request) {
 
 export function AdminRequestsPage() {
   const [status, setStatus] = useState(initialStatus);
+  const [role, setRole] = useState("");
   const [page, setPage] = useState(0);
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,14 +62,14 @@ export function AdminRequestsPage() {
     setIsLoading(true);
     setError("");
     try {
-      const result = await adminRegistrationApi.findAll({ status, page, size: 15 });
+      const result = await adminRegistrationApi.findAll({ status, role, page, size: 15 });
       setData(result);
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити заявки.");
     } finally {
       setIsLoading(false);
     }
-  }, [page, status]);
+  }, [page, role, status]);
 
   useEffect(() => {
     loadRequests();
@@ -92,32 +100,21 @@ export function AdminRequestsPage() {
       title="Заявки на реєстрацію"
       subtitle="Перевірка даних і створення облікових записів користувачів."
     >
-      <Card className="overflow-hidden rounded-lg">
-        <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex max-w-full overflow-x-auto rounded-md bg-slate-100 p-1" aria-label="Фільтр заявок">
-            {filters.map((filter) => (
-              <button
-                key={filter.value || "all"}
-                type="button"
-                onClick={() => changeStatus(filter.value)}
-                className={cn(
-                  "h-9 shrink-0 rounded px-3 text-[0.78rem] font-bold transition-colors",
-                  status === filter.value ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800",
-                )}
-                aria-pressed={status === filter.value}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-
-          <Button type="button" variant="ghost" onClick={loadRequests} disabled={isLoading} className="h-9 self-start rounded-md border border-slate-200 px-3 text-[0.78rem] text-slate-600 lg:self-auto">
+      <Card className="mb-4 grid w-full max-w-[820px] grid-cols-1 gap-3 rounded-lg p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end sm:p-5">
+        <FilterSelect label="Статус заявки" value={status} options={statusOptions} onChange={(value) => changeStatus(value)} />
+        <FilterSelect label="Роль" value={role} options={roleOptions} onChange={(value) => { setRole(value); setPage(0); }} />
+        <div className="flex items-center justify-between gap-3 sm:justify-end">
+          {data ? <span className="whitespace-nowrap text-[0.75rem] text-slate-500">{data.totalElements} заявок</span> : null}
+          <Button type="button" variant="ghost" onClick={loadRequests} disabled={isLoading} className="h-10 shrink-0 rounded-md border border-slate-200 px-3 text-[0.78rem] text-slate-600">
             <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} aria-hidden="true" />
             Оновити
           </Button>
         </div>
+      </Card>
 
-        {notice ? <div className="border-b border-emerald-100 bg-emerald-50 px-5 py-3 text-[0.8rem] font-medium text-emerald-700">{notice}</div> : null}
+      {notice ? <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-[0.8rem] font-medium text-emerald-700">{notice}</div> : null}
+
+      <Card className="overflow-hidden rounded-lg">
         {error ? (
           <div className="p-5">
             <Alert>{error}</Alert>
@@ -126,7 +123,7 @@ export function AdminRequestsPage() {
         ) : null}
 
         {!error && isLoading ? (
-          <div className="flex min-h-[320px] items-center justify-center text-slate-400"><Loader2 className="h-6 w-6 animate-spin" aria-label="Завантаження" /></div>
+          <div className="flex min-h-[240px] items-center justify-center text-slate-400"><Loader2 className="h-6 w-6 animate-spin" aria-label="Завантаження" /></div>
         ) : null}
 
         {!error && !isLoading && data?.content?.length === 0 ? <EmptyState /> : null}
@@ -148,6 +145,20 @@ export function AdminRequestsPage() {
         />
       ) : null}
     </AdminLayout>
+  );
+}
+
+function FilterSelect({ label, value, options, onChange }) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">{label}</span>
+      <span className="relative block">
+        <select value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500">
+          {options.map((option) => <option key={option.value || "all"} value={option.value}>{option.label}</option>)}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+      </span>
+    </label>
   );
 }
 
@@ -311,7 +322,7 @@ function Pagination({ data, page, onPageChange }) {
 }
 
 function EmptyState() {
-  return <div className="flex min-h-[320px] flex-col items-center justify-center px-5 text-center"><span className="flex h-12 w-12 items-center justify-center rounded-md bg-slate-100 text-slate-500"><Mail className="h-5 w-5" /></span><h2 className="mt-4 text-[0.95rem] font-bold text-slate-900">Заявок не знайдено</h2><p className="mt-1 text-[0.78rem] text-slate-500">Для вибраного статусу поки немає записів.</p></div>;
+  return <div className="flex min-h-[240px] flex-col items-center justify-center px-5 py-8 text-center"><span className="flex h-11 w-11 items-center justify-center rounded-md bg-slate-100 text-slate-500"><Mail className="h-5 w-5" /></span><h2 className="mt-3 text-[0.95rem] font-bold text-slate-900">Заявок не знайдено</h2><p className="mt-1 text-[0.78rem] text-slate-500">Для вибраного статусу поки немає записів.</p></div>;
 }
 
 function formatDate(value) {

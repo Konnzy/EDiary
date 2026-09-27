@@ -1,15 +1,16 @@
+import { RecentGradesCard, HomeworkCard } from "@/components/StudentProgressCards.jsx";
+import { useStudentProgress } from "@/hooks/useStudentProgress.js";
 import {
   BookOpen,
   CalendarDays,
-  CheckSquare,
   GraduationCap,
   Home,
   LogOut,
   Mail,
   User,
-  UserRound,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
+import { LearnerNavigation } from "@/components/LearnerNavigation.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Card, CardContent, CardHeader } from "@/components/ui/card.jsx";
@@ -21,94 +22,16 @@ const navigationItems = [
   { label: "Головна", icon: Home, active: true, route: "student" },
   { label: "Розклад", icon: CalendarDays, route: "student/schedule" },
   { label: "Предмети", icon: BookOpen, route: "student/subjects" },
-  { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
+  { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail, route: "student/messages" },
   { label: "Профіль", icon: User, route: "student/profile" },
 ];
 
-const grades = [
-  {
-    subject: "Математика",
-    type: "Контрольна робота",
-    grade: "7",
-    date: "15.10.2026",
-    comment: "—",
-  },
-  {
-    subject: "Англійська мова",
-    type: "Самостійна робота",
-    grade: "11",
-    date: "14.10.2026",
-    comment: "—",
-  },
-  {
-    subject: "Біологія",
-    type: "Самостійна робота",
-    grade: "9",
-    date: "13.10.2026",
-    comment: "—",
-  },
-  {
-    subject: "Географія",
-    type: "Самостійна робота",
-    grade: "8",
-    date: "12.10.2026",
-    comment: "—",
-  },
-  {
-    subject: "Інформатика",
-    type: "Практична робота",
-    grade: "9",
-    date: "11.10.2026",
-    comment: "—",
-  },
-  {
-    subject: "Географія",
-    type: "Домашня робота",
-    grade: "8",
-    date: "11.10.2026",
-    comment: "—",
-  },
-  {
-    subject: "Хімія",
-    type: "Лабораторна робота",
-    grade: "6",
-    date: "11.10.2026",
-    comment: "—",
-  },
-];
 
-const homework = [
-  {
-    title: "Українська мова - Впр. 142",
-    status: "Виконано",
-    completed: true,
-  },
-  {
-    title: "Алгебра - Параграф 5, №12-15",
-    status: "До 20.10",
-  },
-  {
-    title: "Хімія - Лабораторна робота №2",
-    status: "До 21.10",
-  },
-];
-
-const messages = [
-  {
-    author: "Олена Миколаївна",
-    text: "Підготуватися до контрольної роботи з української мови у четвер.",
-    time: "10:45",
-  },
-  {
-    author: "Адміністрація",
-    text: "Завтра відбудуться загальношкільні збори в актовій залі о 15:00.",
-    time: "Вчора",
-  },
-];
 
 const hasUnreadNotifications = false;
 
 export function StudentHomePage() {
+  const progress = useStudentProgress("STUDENT");
   const todaySchedule = useTodaySchedule("STUDENT");
 
   return (
@@ -135,11 +58,11 @@ export function StudentHomePage() {
 
               <div className="grid gap-5 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)]">
                 <TodayScheduleCard schedule={todaySchedule} />
-                <RecentGradesCard />
+                <RecentGradesCard data={progress} />
               </div>
 
               <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <HomeworkCard />
+                <HomeworkCard data={progress} />
                 <MessagesCard />
               </div>
             </div>
@@ -193,69 +116,11 @@ function TopBar() {
 }
 
 function MobileNavigation() {
-  return (
-    <nav
-      className="sticky top-16 z-20 border-b border-slate-200/80 bg-white px-3 py-2 lg:hidden"
-      aria-label="Основна навігація"
-    >
-      <div className="grid grid-cols-5 gap-1">
-        {navigationItems.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <button
-              key={item.label}
-              type="button"
-              disabled={!item.route}
-              onClick={() => { if (item.route) window.location.hash = item.route; }}
-              className={cn(
-                "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-1 text-[0.82rem] font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-[480px]:gap-2 min-[480px]:px-2",
-                item.active
-                  ? "bg-slate-100 text-slate-900"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
-              )}
-              aria-label={item.label}
-              aria-current={item.active ? "page" : undefined}
-            >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="hidden truncate min-[480px]:inline">{item.shortLabel ?? item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
+  return <LearnerNavigation role="STUDENT" activeRoute="student" compact />;
 }
 
 function Sidebar() {
-  return (
-    <aside className="hidden w-[210px] shrink-0 bg-white px-3 py-4 lg:block">
-      <nav className="space-y-2" aria-label="Основна навігація">
-        {navigationItems.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <button
-              key={item.label}
-              type="button"
-              disabled={!item.route}
-              onClick={() => { if (item.route) window.location.hash = item.route; }}
-              className={cn(
-                "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.82rem] font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                item.active
-                  ? "bg-slate-100 text-slate-900"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
-              )}
-              aria-current={item.active ? "page" : undefined}
-            >
-              <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-              {item.label}
-            </button>
-          );
-        })}
-      </nav>
-    </aside>
-  );
+  return <LearnerNavigation role="STUDENT" activeRoute="student" />;
 }
 
 function SectionTitle({ children }) {
@@ -294,108 +159,6 @@ function ScheduleLoading() {
   return <div className="flex min-h-24 items-center justify-center text-slate-400"><CalendarDays className="h-5 w-5 animate-pulse" aria-label="Завантаження розкладу" /></div>;
 }
 
-function RecentGradesCard() {
-  return (
-    <Card className="rounded-lg px-4 py-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] sm:px-5 sm:py-5">
-      <CardHeader className="mb-4 space-y-0">
-        <SectionTitle>Останні оцінки</SectionTitle>
-      </CardHeader>
-
-      <CardContent>
-        <div className="hidden overflow-x-auto sm:block">
-          <table className="min-w-[540px] w-full border-collapse text-left">
-            <thead>
-              <tr className="text-[0.72rem] font-bold text-slate-400">
-                <th className="pb-4 pr-4">Предмет</th>
-                <th className="pb-4 pr-4">Тип роботи</th>
-                <th className="pb-4 pr-4 text-center">Оцінка</th>
-                <th className="pb-4 pr-4">Дата</th>
-                <th className="pb-4">Коментар</th>
-              </tr>
-            </thead>
-            <tbody>
-              {grades.map((item) => (
-                <tr key={`${item.subject}-${item.type}-${item.date}`} className="text-[0.82rem] text-slate-600">
-                  <td className="py-2.5 pr-4 font-semibold text-slate-700">{item.subject}</td>
-                  <td className="py-2.5 pr-4">{item.type}</td>
-                  <td className="py-2.5 pr-4 text-center font-bold text-slate-900">{item.grade}</td>
-                  <td className="py-2.5 pr-4 font-medium">{item.date}</td>
-                  <td className="py-2.5 text-slate-400">{item.comment}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="space-y-3 sm:hidden">
-          {grades.map((item) => (
-            <article
-              key={`${item.subject}-${item.type}-${item.date}-mobile`}
-              className="rounded-md border border-slate-200/80 bg-slate-50/70 px-3 py-3"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="truncate text-[0.86rem] font-bold text-slate-800">{item.subject}</h3>
-                  <p className="mt-1 text-[0.76rem] leading-4 text-slate-500">{item.type}</p>
-                </div>
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-900 text-[0.94rem] font-bold text-white">
-                  {item.grade}
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-3 text-[0.72rem] font-medium text-slate-400">
-                <span>{item.date}</span>
-                <span>Коментар: {item.comment}</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function HomeworkCard() {
-  return (
-    <Card className="rounded-lg px-4 py-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] sm:px-5 sm:py-5">
-      <CardHeader className="mb-4 space-y-0">
-        <SectionTitle>Домашні завдання</SectionTitle>
-      </CardHeader>
-
-      <CardContent className="space-y-3">
-        {homework.map((item) => (
-          <article
-            key={item.title}
-            className="flex min-h-11 items-start justify-between gap-3 rounded-md border border-slate-200/80 bg-white px-3 py-2.5 sm:items-center"
-          >
-            <div className="flex min-w-0 items-center gap-3">
-              <CheckSquare
-                className={cn("h-5 w-5 shrink-0", item.completed ? "text-slate-900" : "text-slate-700")}
-                aria-hidden="true"
-              />
-              <p
-                className={cn(
-                  "text-[0.84rem] font-medium leading-5 sm:truncate",
-                  item.completed ? "text-slate-400 line-through" : "text-slate-700",
-                )}
-              >
-                {item.title}
-              </p>
-            </div>
-            <span
-              className={cn(
-                "shrink-0 rounded px-2 py-1 text-[0.66rem] font-bold",
-                item.completed ? "bg-slate-100 text-slate-400" : "bg-slate-800 text-white",
-              )}
-            >
-              {item.status}
-            </span>
-          </article>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
 function MessagesCard() {
   return (
     <Card className="rounded-lg px-4 py-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] sm:px-5 sm:py-5">
@@ -403,22 +166,9 @@ function MessagesCard() {
         <SectionTitle>Останні повідомлення</SectionTitle>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {messages.map((message) => (
-          <article key={`${message.author}-${message.time}`} className="flex gap-3">
-            <UserRound className="mt-0.5 h-8 w-8 shrink-0 text-slate-800" strokeWidth={1.7} aria-hidden="true" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="text-[0.84rem] font-bold text-slate-800">{message.author}</h3>
-                <div className="flex shrink-0 items-center gap-2">
-                  <time className="text-[0.66rem] font-medium text-slate-400">{message.time}</time>
-                  {message.unread ? <span className="h-2 w-2 rounded-full bg-slate-900" /> : null}
-                </div>
-              </div>
-              <p className="mt-0.5 text-[0.78rem] leading-5 text-slate-500">{message.text}</p>
-            </div>
-          </article>
-        ))}
+      <CardContent className="flex min-h-28 flex-col justify-between gap-4">
+        <p className="text-[0.8rem] text-slate-500">Повідомлень поки немає.</p>
+        <a href="#student/messages" className="inline-flex w-fit items-center gap-2 text-[0.8rem] font-semibold text-slate-800 hover:underline"><Mail className="h-4 w-4" aria-hidden="true" />Перейти до повідомлень</a>
       </CardContent>
     </Card>
   );

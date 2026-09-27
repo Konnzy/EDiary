@@ -155,6 +155,7 @@ public class AdminScheduleService {
             }
             if (entry == null) {
                 entry = new ScheduleEntry();
+                entry.setEffectiveFrom(LocalDate.now(clock));
                 entry.setSchoolClass(schoolClass);
                 entry.setAcademicYear(academicYear);
                 entry.setWeekNumber(week);
@@ -162,6 +163,9 @@ public class AdminScheduleService {
                 entry.setLessonNumber(lesson.lessonNumber());
             }
             if (entry.getId() == null || !referencedIds.contains(entry.getId())) {
+                if (entry.getId() != null && !sameDefinition(entry, lesson)) {
+                    entry.setEffectiveFrom(LocalDate.now(clock));
+                }
                 entry.setSubject(subjects.get(lesson.subjectId()));
                 entry.setTeacher(teachers.get(lesson.teacherId()));
                 entry.setRoom(normalizeRoom(lesson.room()));

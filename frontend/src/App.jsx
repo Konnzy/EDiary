@@ -15,12 +15,15 @@ import { ResetPasswordPage } from "@/pages/ResetPassword/ResetPasswordPage.jsx";
 import { StudentHomePage } from "@/pages/StudentHome/StudentHomePage.jsx";
 import { TeacherHomePage } from "@/pages/TeacherHome/TeacherHomePage.jsx";
 import { TeacherJournalPage } from "@/pages/TeacherJournal/TeacherJournalPage.jsx";
+import { TeacherStudentsPage } from "@/pages/TeacherStudents/TeacherStudentsPage.jsx";
 import { ParentHomePage } from "@/pages/ParentHome/ParentHomePage.jsx";
 import { TermsOfUsePage } from "@/pages/TermsOfUse/TermsOfUsePage.jsx";
 import { PrivacyPolicyPage } from "@/pages/PrivacyPolicy/PrivacyPolicyPage.jsx";
 import { UserSchedulePage } from "@/pages/Schedule/UserSchedulePage.jsx";
 import { UserSubjectsPage } from "@/pages/Subjects/UserSubjectsPage.jsx";
+import { UserTeachersPage } from "@/pages/Teachers/UserTeachersPage.jsx";
 import { UserProfilePage } from "@/pages/Profile/UserProfilePage.jsx";
+import { UserMessagesPage } from "@/pages/Messages/UserMessagesPage.jsx";
 import { ApiError, authApi, userProfileApi } from "@/lib/api.js";
 import { CurrentUserContext } from "@/lib/currentUser.jsx";
 import { ThemeToggle } from "@/components/ThemeToggle.jsx";
@@ -202,6 +205,15 @@ function AppContent() {
     return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserSubjectsPage role="STUDENT" /></ProtectedRoute>;
   }
 
+  if (route === "student/teachers") {
+    return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserTeachersPage role="STUDENT" /></ProtectedRoute>;
+  }
+
+  if (route === "student/messages" || route.startsWith("student/messages?")) {
+    const params = new URLSearchParams(route.split("?")[1] || "");
+    return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserMessagesPage role="STUDENT" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} /></ProtectedRoute>;
+  }
+
   if (route === "student/profile") {
     return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserProfilePage role="STUDENT" /></ProtectedRoute>;
   }
@@ -218,6 +230,15 @@ function AppContent() {
     return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherJournalPage /></ProtectedRoute>;
   }
 
+  if (route === "teacher/students") {
+    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherStudentsPage /></ProtectedRoute>;
+  }
+
+  if (route === "teacher/messages" || route.startsWith("teacher/messages?")) {
+    const params = new URLSearchParams(route.split("?")[1] || "");
+    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><UserMessagesPage role="TEACHER" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} /></ProtectedRoute>;
+  }
+
   if (route === "teacher/profile") {
     return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><UserProfilePage role="TEACHER" /></ProtectedRoute>;
   }
@@ -232,6 +253,15 @@ function AppContent() {
 
   if (route === "parent/subjects") {
     return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserSubjectsPage role="PARENT" /></ProtectedRoute>;
+  }
+
+  if (route === "parent/teachers") {
+    return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserTeachersPage role="PARENT" /></ProtectedRoute>;
+  }
+
+  if (route === "parent/messages" || route.startsWith("parent/messages?")) {
+    const params = new URLSearchParams(route.split("?")[1] || "");
+    return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserMessagesPage role="PARENT" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} /></ProtectedRoute>;
   }
 
   if (route === "parent/profile") {

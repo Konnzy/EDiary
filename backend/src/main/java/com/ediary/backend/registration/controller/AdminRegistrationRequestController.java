@@ -8,6 +8,7 @@ import com.ediary.backend.registration.dto.response.RegistrationNotificationFeed
 import com.ediary.backend.registration.dto.response.RegistrationRequestResponse;
 import com.ediary.backend.registration.entity.RegistrationStatus;
 import com.ediary.backend.registration.service.RegistrationRequestService;
+import com.ediary.backend.user.entity.UserRole;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,10 +32,11 @@ public class AdminRegistrationRequestController {
     @GetMapping
     public PageResponse<RegistrationRequestResponse> findAll(
         @RequestParam(required = false) RegistrationStatus status,
+        @RequestParam(required = false) UserRole role,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        return registrationRequestService.findAll(status, page, size);
+        return registrationRequestService.findAll(status, role, page, size);
     }
 
     @GetMapping("/notifications")

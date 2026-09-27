@@ -14,10 +14,13 @@ function errorMessage(error, fallback) {
   return error instanceof ApiError ? error.message : fallback;
 }
 
+function normalizeSearch(value) {
+  return value.trim().toLocaleLowerCase("uk-UA");
+}
+
 export function AdminSubjectsPage() {
   const [subjects, setSubjects] = useState([]);
   const [searchInput, setSearchInput] = useState("");
-  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -28,15 +31,20 @@ export function AdminSubjectsPage() {
     setLoading(true);
     setError("");
     try {
-      setSubjects(await adminSubjectsApi.findAll(query));
+      setSubjects(await adminSubjectsApi.findAll());
     } catch (requestError) {
       setError(errorMessage(requestError, "Не вдалося завантажити предмети."));
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const visibleSubjects = useMemo(() => {
+    const query = normalizeSearch(searchInput);
+    return subjects.filter((subject) => normalizeSearch(subject.title).includes(query));
+  }, [searchInput, subjects]);
 
   const completeAction = async (message) => {
     setEditingSubject(null);
@@ -52,25 +60,27 @@ export function AdminSubjectsPage() {
       subtitle="Створення навчальних предметів і призначення вчителів."
       actions={<Button onClick={() => setEditingSubject({})} className="h-10 w-full rounded-md px-4 sm:w-auto"><Plus className="h-4 w-4" />Створити предмет</Button>}
     >
-      <Card className="rounded-lg p-4 sm:p-5">
-        <form onSubmit={(event) => { event.preventDefault(); setQuery(searchInput.trim()); }} className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative min-w-0 flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Пошук за назвою предмета" aria-label="Пошук предметів" className="h-10 pl-10" />
-          </div>
-          <Button type="submit" className="h-10 rounded-md px-4">Знайти</Button>
+      <Card className="w-full max-w-2xl rounded-lg p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="block min-w-0 flex-1">
+            <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">Пошук предмета</span>
+            <span className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <Input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Назва предмета" aria-label="Пошук предметів" className="h-10 pl-10" />
+            </span>
+          </label>
           <Button type="button" variant="ghost" size="icon" onClick={load} disabled={loading} className="h-10 w-10 shrink-0 rounded-md border border-slate-200 bg-white" title="Оновити список">
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} aria-hidden="true" />
           </Button>
-        </form>
+        </div>
       </Card>
 
       {notice ? <div role="status" className="mt-5 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div> : null}
       {error ? <div className="mt-5"><Alert>{error}</Alert></div> : null}
 
       {!error && loading ? <div className="flex min-h-[320px] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-slate-400" aria-label="Завантаження" /></div> : null}
-      {!error && !loading && !subjects.length ? <EmptyState query={query} onCreate={() => setEditingSubject({})} /> : null}
-      {!error && !loading && subjects.length ? <SubjectsList subjects={subjects} onEdit={setEditingSubject} onDelete={setDeletingSubject} /> : null}
+      {!error && !loading && !visibleSubjects.length ? <EmptyState query={searchInput.trim()} onCreate={() => setEditingSubject({})} /> : null}
+      {!error && !loading && visibleSubjects.length ? <SubjectsList subjects={visibleSubjects} onEdit={setEditingSubject} onDelete={setDeletingSubject} /> : null}
 
       {editingSubject ? <SubjectDialog subject={editingSubject.id ? editingSubject : null} onClose={() => setEditingSubject(null)} onCompleted={completeAction} /> : null}
       {deletingSubject ? <DeleteSubjectDialog subject={deletingSubject} onClose={() => setDeletingSubject(null)} onCompleted={completeAction} /> : null}

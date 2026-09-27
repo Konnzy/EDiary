@@ -26,6 +26,7 @@ import com.ediary.backend.user.entity.UserStatus;
 import com.ediary.backend.user.repository.TeacherProfileRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
@@ -91,6 +92,7 @@ class AdminScheduleServiceTest {
         )).thenReturn(List.of());
         when(scheduleRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> {
             List<ScheduleEntry> entries = invocation.getArgument(0);
+            assertThat(entries.getFirst().getEffectiveFrom()).isEqualTo(LocalDate.of(2026, 9, 12));
             entries.getFirst().setId(10L);
             return entries;
         });
@@ -169,8 +171,25 @@ class AdminScheduleServiceTest {
             .satisfies(entry -> {
                 assertThat(entry).isNotSameAs(recorded);
                 assertThat(entry.isActive()).isTrue();
+                assertThat(entry.getEffectiveFrom()).isEqualTo(LocalDate.of(2026, 9, 12));
             });
         verify(scheduleRepository, never()).deleteAll(anyList());
+    }
+
+    @Test
+    void changedUnrecordedSlotStartsOnScheduleChangeDate() {
+        Subject subject = subject(2L);
+        TeacherProfile teacher = activeTeacher(3L, subject);
+        ScheduleEntry entry = existingEntry(subject, teacher);
+        entry.setEffectiveFrom(LocalDate.of(2026, 9, 1));
+        prepareSave(entry, subject, teacher);
+        when(scheduleRepository.saveAllAndFlush(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.save(1L, "2026/2027", 1, new SaveScheduleRequest(List.of(
+            new SaveScheduleLessonRequest(Weekday.MONDAY, 1, 2L, 3L, "202")
+        )));
+
+        assertThat(entry.getEffectiveFrom()).isEqualTo(LocalDate.of(2026, 9, 12));
     }
 
     @Test

@@ -51,7 +51,6 @@ function validateClass(form) {
 export function AdminClassesPage() {
   const [classes, setClasses] = useState([]);
   const [searchInput, setSearchInput] = useState("");
-  const [query, setQuery] = useState("");
   const [number, setNumber] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -71,13 +70,13 @@ export function AdminClassesPage() {
         setClasses([]);
         return;
       }
-      setClasses(await adminClassesApi.findAll({ query, number, academicYear: selectedYear }));
+      setClasses(await adminClassesApi.findAll({ academicYear: selectedYear }));
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити класи.");
     } finally {
       setIsLoading(false);
     }
-  }, [number, query, selectedYear]);
+  }, [selectedYear]);
 
   useEffect(() => {
     if (selectedYear) loadClasses();
@@ -101,11 +100,6 @@ export function AdminClassesPage() {
       .finally(() => active && setIsLoadingYears(false));
     return () => { active = false; };
   }, []);
-
-  const submitSearch = (event) => {
-    event.preventDefault();
-    setQuery(searchInput.trim());
-  };
 
   const openCreate = () => {
     setEditingClass(null);
@@ -134,6 +128,15 @@ export function AdminClassesPage() {
     setYearDialogOpen(false);
   };
 
+  const visibleClasses = useMemo(() => {
+    const search = normalizeClassSearch(searchInput);
+    return classes.filter((schoolClass) => {
+      const matchesNumber = !number || String(schoolClass.number) === number;
+      const searchableText = normalizeClassSearch(`${schoolClass.number}-${schoolClass.letter} ${schoolClass.classTeacherName || ""}`);
+      return matchesNumber && (!search || searchableText.includes(search));
+    });
+  }, [classes, number, searchInput]);
+
   return (
     <AdminLayout
       activeItem="Класи"
@@ -146,10 +149,11 @@ export function AdminClassesPage() {
         </Button>
       )}
     >
-      <Card className="rounded-lg p-4 sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row">
-          <form onSubmit={submitSearch} className="flex min-w-0 flex-1 gap-2">
-            <div className="relative min-w-0 flex-1">
+      <Card className="w-full max-w-5xl rounded-lg p-4 sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <label className="block min-w-0 flex-1">
+            <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">Пошук класу</span>
+            <span className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
               <Input
                 value={searchInput}
@@ -158,12 +162,13 @@ export function AdminClassesPage() {
                 className="h-10 pl-10"
                 aria-label="Пошук класів"
               />
-            </div>
-            <Button type="submit" className="h-10 rounded-md px-4">Знайти</Button>
-          </form>
+            </span>
+          </label>
 
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative min-w-0 flex-1 sm:min-w-[190px]">
+          <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
+            <label className="block min-w-0 flex-1 sm:min-w-[190px]">
+              <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">Паралель</span>
+              <span className="relative block">
               <select
                 value={number}
                 onChange={(event) => setNumber(event.target.value)}
@@ -174,8 +179,11 @@ export function AdminClassesPage() {
                 {Array.from({ length: 12 }, (_, index) => index + 1).map((item) => <option key={item} value={item}>{item} класи</option>)}
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-            </div>
-            <div className="relative min-w-0 flex-1 sm:min-w-[220px]">
+              </span>
+            </label>
+            <label className="block min-w-0 flex-1 sm:min-w-[220px]">
+              <span className="mb-2 block text-[0.75rem] font-semibold text-slate-600">Навчальний рік</span>
+              <span className="relative block">
               <select
                 value={selectedYear}
                 onChange={(event) => changeAcademicYear(event.target.value)}
@@ -188,12 +196,18 @@ export function AdminClassesPage() {
                 <option value="__add_year__">+ Додати навчальний рік</option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-            </div>
-            <Button type="button" variant="ghost" size="icon" onClick={loadClasses} disabled={isLoading} className="h-10 w-10 rounded-md border border-slate-200 bg-white" title="Оновити список">
+              </span>
+            </label>
+            <Button type="button" variant="ghost" size="icon" onClick={loadClasses} disabled={isLoading} className="h-10 w-10 self-end rounded-md border border-slate-200 bg-white" title="Оновити список">
               <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} aria-hidden="true" />
             </Button>
           </div>
         </div>
+        {!isLoading && !error ? (
+          <p className="mt-3 text-[0.72rem] text-slate-500" aria-live="polite">
+            Показано {visibleClasses.length} із {classes.length} класів
+          </p>
+        ) : null}
       </Card>
 
       {notice ? (
@@ -211,17 +225,21 @@ export function AdminClassesPage() {
         </div>
       ) : null}
 
-      {!error && !isLoading && classes.length === 0 ? (
+      {!error && !isLoading && visibleClasses.length === 0 ? (
         <Card className="mt-5 flex min-h-[260px] flex-col items-center justify-center rounded-lg px-5 text-center">
           <GraduationCap className="h-9 w-9 text-slate-300" aria-hidden="true" />
           <h2 className="mt-4 text-[0.95rem] font-bold text-slate-800">Класів не знайдено</h2>
-          <p className="mt-1 text-[0.8rem] text-slate-500">{selectedYear === getCurrentAcademicYear() ? "Змініть параметри пошуку або створіть новий клас." : "У вибраному навчальному році класів немає."}</p>
+          <p className="mt-1 text-[0.8rem] text-slate-500">
+            {classes.length > 0
+              ? "Змініть текст пошуку або фільтр паралелі."
+              : selectedYear === getCurrentAcademicYear() ? "Створіть новий клас або оберіть інший навчальний рік." : "У вибраному навчальному році класів немає."}
+          </p>
         </Card>
       ) : null}
 
-      {!error && !isLoading && classes.length > 0 ? (
+      {!error && !isLoading && visibleClasses.length > 0 ? (
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {classes.map((schoolClass) => (
+          {visibleClasses.map((schoolClass) => (
             <ClassCard key={schoolClass.id} schoolClass={schoolClass} />
           ))}
         </div>
@@ -244,6 +262,10 @@ export function AdminClassesPage() {
       ) : null}
     </AdminLayout>
   );
+}
+
+function normalizeClassSearch(value) {
+  return value.toLocaleLowerCase("uk-UA").replace(/[\s.-]/g, "");
 }
 
 function ClassCard({ schoolClass }) {

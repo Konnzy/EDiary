@@ -26,6 +26,7 @@ import com.ediary.backend.schedule.repository.LessonRepository;
 import com.ediary.backend.schedule.repository.ScheduleRepository;
 import com.ediary.backend.schedule.repository.StudentClassMembershipRepository;
 import com.ediary.backend.schedule.service.LessonService;
+import com.ediary.backend.schedule.service.LessonTopicPolicy;
 import com.ediary.backend.schedule.service.SchedulePeriod;
 import com.ediary.backend.schedule.service.SchoolVacationCalendar;
 import com.ediary.backend.user.entity.StudentProfile;
@@ -112,7 +113,8 @@ public class JournalService {
             if (!entry.isActive()) continue;
             for (int day = 1; day <= period.lengthOfMonth(); day++) {
                 LocalDate date = period.atDay(day);
-                if (!SchoolVacationCalendar.isVacation(date)
+                if ((entry.getEffectiveFrom() == null || !date.isBefore(entry.getEffectiveFrom()))
+                    && !SchoolVacationCalendar.isVacation(date)
                     && entry.getWeekNumber() == SchedulePeriod.weekNumber(date)
                     && entry.getWeekday() == Weekday.valueOf(date.getDayOfWeek().name())) {
                     slots.put(slotKey(entry.getId(), date), new JournalSlot(entry, date, null));
@@ -205,9 +207,14 @@ public class JournalService {
                 "Термін домашнього завдання не може передувати уроку");
         }
         validateFinalWorkType(lesson, request.workType());
+        String topic = normalize(request.topic());
+        if (topic == null) {
+            LessonTopicPolicy.validate(lesson, topic, LocalDate.now(clock),
+                homeworkText != null || lessonRepository.hasJournalRecords(lessonId));
+        }
         gradeService.retagLessonGrades(lesson, gradeType(request.workType()));
         lesson.setWorkType(request.workType());
-        lesson.setTopic(normalize(request.topic()));
+        lesson.setTopic(topic);
         lesson.setUpdatedAt(LocalDateTime.now(clock));
         lessonRepository.save(lesson);
 
@@ -243,6 +250,9 @@ public class JournalService {
             throw new ApplicationException(HttpStatus.CONFLICT, "STUDENT_NOT_IN_CLASS",
                 "Учень не належить до класу цього уроку");
         }
+        if (request.score() != null || request.attendanceStatus() != null || request.homeworkStatus() != null) {
+            LessonTopicPolicy.requireTopic(lesson.getTopic());
+        }
         gradeService.save(student, lesson, request.score(), gradeType(lesson.getWorkType()), request.comment());
         attendanceService.save(student, lesson, request.attendanceStatus());
 
@@ -276,6 +286,7 @@ public class JournalService {
         if (lesson.getStatus() == LessonStatus.CANCELLED) {
             throw new ApplicationException(HttpStatus.CONFLICT, "LESSON_CANCELLED", "Скасований урок не можна редагувати");
         }
+        LessonTopicPolicy.requireTopic(lesson.getTopic());
 
         for (StudentProfile student : studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(
             lesson.getScheduleEntry().getSchoolClass().getId()

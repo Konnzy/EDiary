@@ -2,6 +2,7 @@ package com.ediary.backend.registration.repository;
 
 import com.ediary.backend.registration.entity.RegistrationRequest;
 import com.ediary.backend.registration.entity.RegistrationStatus;
+import com.ediary.backend.user.entity.UserRole;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
@@ -31,6 +32,45 @@ public interface RegistrationRequestRepository extends JpaRepository<Registratio
 
     @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})
     Page<RegistrationRequest> findAllByStatusNot(RegistrationStatus status, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})
+    @Query(value = """
+        select request from RegistrationRequest request
+        order by case when cast(request.status as string) = 'PENDING' then 0 else 1 end,
+                 request.createdAt desc, request.id desc
+        """, countQuery = "select count(request) from RegistrationRequest request")
+    Page<RegistrationRequest> findAllWithPendingPriority(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})
+    @Query(value = """
+        select request from RegistrationRequest request
+        where request.status = :status
+        order by case when cast(request.status as string) = 'PENDING' then 0 else 1 end,
+                 request.createdAt desc, request.id desc
+        """, countQuery = "select count(request) from RegistrationRequest request where request.status = :status")
+    Page<RegistrationRequest> findAllWithPendingPriorityByStatus(@Param("status") RegistrationStatus status, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})
+    @Query(value = """
+        select request from RegistrationRequest request
+        where request.requestedRole = :role
+        order by case when cast(request.status as string) = 'PENDING' then 0 else 1 end,
+                 request.createdAt desc, request.id desc
+        """, countQuery = "select count(request) from RegistrationRequest request where request.requestedRole = :role")
+    Page<RegistrationRequest> findAllWithPendingPriorityByRole(@Param("role") UserRole role, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})
+    @Query(value = """
+        select request from RegistrationRequest request
+        where request.status = :status and request.requestedRole = :role
+        order by case when cast(request.status as string) = 'PENDING' then 0 else 1 end,
+                 request.createdAt desc, request.id desc
+        """, countQuery = "select count(request) from RegistrationRequest request where request.status = :status and request.requestedRole = :role")
+    Page<RegistrationRequest> findAllWithPendingPriorityByStatusAndRole(
+        @Param("status") RegistrationStatus status,
+        @Param("role") UserRole role,
+        Pageable pageable
+    );
 
     @Override
     @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})

@@ -89,6 +89,14 @@ public class LessonService {
             );
         }
 
+        if (topic == null) {
+            boolean hasRecords = lessonRepository.hasJournalRecords(lessonId);
+            if (hasRecords) LessonTopicPolicy.requireTopic(topic);
+            if (request.status() != LessonStatus.CANCELLED) {
+                LessonTopicPolicy.validate(lesson, topic, LocalDate.now(clock), hasRecords);
+            }
+        }
+
         lesson.setTopic(topic);
         lesson.setStatus(request.status());
         lesson.setUpdatedAt(LocalDateTime.now(clock));
@@ -125,6 +133,13 @@ public class LessonService {
         }
         if (!schedule.getAcademicYear().equals(SchedulePeriod.academicYear(date))) {
             throw invalidDate();
+        }
+        if (schedule.getEffectiveFrom() != null && date.isBefore(schedule.getEffectiveFrom())) {
+            throw new ApplicationException(
+                HttpStatus.CONFLICT,
+                "SCHEDULE_NOT_EFFECTIVE",
+                "Цей урок розкладу ще не діяв на обрану дату"
+            );
         }
         if (SchoolVacationCalendar.isVacation(date)) {
             throw new ApplicationException(

@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import lombok.Getter;
@@ -69,6 +70,9 @@ public class ScheduleEntry {
 
     @Column(name = "schedule_active", nullable = false)
     private boolean active = true;
+
+    @Column(name = "schedule_effective_from", nullable = false)
+    private LocalDate effectiveFrom;
 
     @Column(name = "schedule_archived_at")
     private LocalDateTime archivedAt;

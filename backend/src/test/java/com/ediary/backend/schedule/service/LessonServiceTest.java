@@ -53,6 +53,19 @@ class LessonServiceTest {
     }
 
     @Test
+    void rejectsCreatingLessonBeforeScheduleTookEffect() {
+        ScheduleEntry schedule = schedule("teacher.one", 1, Weekday.MONDAY);
+        schedule.setEffectiveFrom(LESSON_DATE.plusDays(1));
+        when(scheduleRepository.findByIdForLessonCreation(10L)).thenReturn(Optional.of(schedule));
+        when(lessonRepository.findByScheduleEntry_IdAndDate(10L, LESSON_DATE)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.openForTeacher("teacher.one", 10L, LESSON_DATE))
+            .isInstanceOf(ApplicationException.class)
+            .satisfies(error -> assertThat(((ApplicationException) error).getCode()).isEqualTo("SCHEDULE_NOT_EFFECTIVE"));
+        verify(lessonRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void opensLessonFromMatchingScheduleEntry() {
         ScheduleEntry schedule = schedule("teacher.one", 1, Weekday.MONDAY);
         when(scheduleRepository.findByIdForLessonCreation(10L)).thenReturn(Optional.of(schedule));

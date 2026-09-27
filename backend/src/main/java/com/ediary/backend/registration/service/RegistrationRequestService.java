@@ -131,6 +131,7 @@ public class RegistrationRequestService {
     @Transactional(readOnly = true)
     public PageResponse<RegistrationRequestResponse> findAll(
         RegistrationStatus status,
+        UserRole role,
         int page,
         int size
     ) {
@@ -139,11 +140,18 @@ public class RegistrationRequestService {
         PageRequest pageRequest = PageRequest.of(
             safePage,
             safeSize,
-            Sort.by(Sort.Direction.DESC, "createdAt")
+            Sort.unsorted()
         );
-        Page<RegistrationRequest> requests = status == null
-            ? registrationRequestRepository.findAll(pageRequest)
-            : registrationRequestRepository.findAllByStatus(status, pageRequest);
+        Page<RegistrationRequest> requests;
+        if (status != null && role != null) {
+            requests = registrationRequestRepository.findAllWithPendingPriorityByStatusAndRole(status, role, pageRequest);
+        } else if (status != null) {
+            requests = registrationRequestRepository.findAllWithPendingPriorityByStatus(status, pageRequest);
+        } else if (role != null) {
+            requests = registrationRequestRepository.findAllWithPendingPriorityByRole(role, pageRequest);
+        } else {
+            requests = registrationRequestRepository.findAllWithPendingPriority(pageRequest);
+        }
         return PageResponse.from(requests.map(mapper::toResponse));
     }
 

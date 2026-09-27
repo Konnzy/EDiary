@@ -15,6 +15,16 @@ public interface LessonRepository extends JpaRepository<Lesson, Long> {
 
     @Query("""
         select count(lesson) > 0 from Lesson lesson
+        where lesson.id = :lessonId and (
+            exists (select grade.id from Grade grade where grade.lesson = lesson)
+            or exists (select attendance.id from Attendance attendance where attendance.lesson = lesson)
+            or exists (select homework.id from Homework homework where homework.lesson = lesson)
+        )
+        """)
+    boolean hasJournalRecords(@Param("lessonId") Long lessonId);
+
+    @Query("""
+        select count(lesson) > 0 from Lesson lesson
         where lesson.scheduleEntry.schoolClass.id = :classId
           and lesson.scheduleEntry.subject.id = :subjectId
           and lesson.workType = :workType

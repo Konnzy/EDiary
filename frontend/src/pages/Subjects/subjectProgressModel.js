@@ -20,6 +20,14 @@ export function getPeriodOptions(academicYear) {
   ];
 }
 
+export function getCurrentMonthPeriod(academicYear, date = new Date()) {
+  if (!academicYear) return "YEAR";
+  const calendarMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  return getPeriodOptions(academicYear).some((item) => item.value === calendarMonth)
+    ? calendarMonth
+    : "YEAR";
+}
+
 export function getSubjectPeriodView(subject, academicYear, period) {
   if (!subject) return null;
   const filterByDate = (items, dateKey) => items.filter((item) => dateMatchesPeriod(item[dateKey], academicYear, period));
@@ -80,9 +88,9 @@ export function calculateAverage(grades) {
 export function getSubjectStats(subject) {
   if (!subject) return null;
   const average = calculateAverage(subject.grades);
-  const delta = average === null || subject.previousAverage === null || subject.previousAverage === undefined
+  const delta = average === null || subject.previousAverage === null || subject.previousAverage === undefined || subject.previousAverage <= 0
     ? null
-    : Math.round((average - subject.previousAverage) * 10) / 10;
+    : Math.round(((average - subject.previousAverage) / subject.previousAverage) * 1000) / 10;
   const missed = subject.attendance.filter((item) => ["ABSENT", "EXCUSED_ABSENCE"].includes(item.status)).length;
   const exempted = subject.attendance.filter((item) => item.status === "EXEMPTED").length;
   const totalLessons = subject.attendance.length;

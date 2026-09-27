@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { WorkTypeBadge } from "@/components/WorkTypeBadge.jsx";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDownRight,
@@ -10,6 +11,8 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronsUpDown,
   CircleAlert,
   ClipboardCheck,
   GraduationCap,
@@ -18,10 +21,12 @@ import {
   LogOut,
   Mail,
   Minus,
+  Search,
   Target,
   User,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
+import { LearnerNavigation } from "@/components/LearnerNavigation.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Alert } from "@/components/ui/alert.jsx";
@@ -29,6 +34,7 @@ import { Card } from "@/components/ui/card.jsx";
 import { ApiError, authApi, parentApi, subjectsApi } from "@/lib/api.js";
 import { cn } from "@/lib/utils.js";
 import {
+  getCurrentMonthPeriod,
   getGradeForecast,
   getPeriodOptions,
   getSubjectPeriodView,
@@ -40,6 +46,7 @@ const workTypeLabels = {
   CONTROL: "Контрольна робота", PRACTICAL: "Практична робота", LABORATORY: "Лабораторна робота", THEMATIC: "Тематична",
   SEMESTER: "Семестрова", YEAR: "Річна",
 };
+
 
 const tabs = [
   { id: "grades", label: "Оцінки" },
@@ -71,7 +78,7 @@ const roleConfig = {
       { label: "Головна", icon: Home, route: "student" },
       { label: "Розклад", icon: CalendarDays, route: "student/schedule" },
       { label: "Предмети", icon: BookOpen, route: "student/subjects" },
-      { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
+      { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail, route: "student/messages" },
       { label: "Профіль", icon: User, route: "student/profile" },
     ],
   },
@@ -83,7 +90,7 @@ const roleConfig = {
       { label: "Головна", icon: Home, route: "parent" },
       { label: "Розклад", icon: CalendarDays, route: "parent/schedule" },
       { label: "Предмети", icon: BookOpen, route: "parent/subjects" },
-      { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail },
+      { label: "Повідомлення", shortLabel: "Повідомл.", icon: Mail, route: "parent/messages" },
       { label: "Профіль", icon: User, route: "parent/profile" },
     ],
   },
@@ -130,7 +137,11 @@ export function UserSubjectsPage({ role }) {
     load.then((result) => {
       if (!active) return;
       setAcademicYears([...new Set([result.currentAcademicYear, ...(result.academicYears || [])].filter(Boolean))]);
-      if (!academicYear) setAcademicYear(result.currentAcademicYear || result.academicYears?.[0] || "");
+      if (!academicYear) {
+        const initialAcademicYear = result.currentAcademicYear || result.academicYears?.[0] || "";
+        setAcademicYear(initialAcademicYear);
+        setPeriod(getCurrentMonthPeriod(initialAcademicYear));
+      }
       const items = (result.subjects || []).map((item) => ({
         ...item,
         grades: item.grades.map((grade) => ({
@@ -267,11 +278,7 @@ function SubjectControls({
           </SelectField>
         ) : null}
 
-        <SelectField label="Предмет" htmlFor="subjects-subject" className="xl:col-span-3">
-          <select id="subjects-subject" value={subjectId} onChange={(event) => onSubjectChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
-            {subjects.length ? subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>) : <option value="">Немає предметів</option>}
-          </select>
-        </SelectField>
+        <SubjectCombobox subjects={subjects} value={subjectId} onChange={onSubjectChange} />
 
         <SelectField label="Навчальний рік" htmlFor="subjects-academic-year" className="xl:col-span-2">
           <select id="subjects-academic-year" value={academicYear} onChange={(event) => onAcademicYearChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-medium text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
@@ -293,6 +300,85 @@ function SubjectControls({
         </div>
       </div>
     </Card>
+  );
+}
+
+function SubjectCombobox({ subjects, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const containerRef = useRef(null);
+  const optionRefs = useRef([]);
+  const selected = subjects.find((item) => String(item.id) === String(value));
+  const searchTerms = query.trim().toLocaleLowerCase("uk-UA").split(/\s+/).filter(Boolean);
+  const filtered = subjects.filter((item) => searchTerms.every((term) => item.name.toLocaleLowerCase("uk-UA").includes(term)));
+
+  useEffect(() => {
+    if (open) optionRefs.current[activeIndex]?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open, query]);
+
+  const openOptions = () => {
+    setQuery("");
+    setActiveIndex(0);
+    setOpen(true);
+  };
+  const select = (item) => {
+    onChange(String(item.id));
+    setOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <div ref={containerRef} className="min-w-0 xl:col-span-3">
+      <label htmlFor="subjects-subject" className="mb-2 block text-[0.75rem] font-semibold text-slate-600">Предмет</label>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+        <input
+          id="subjects-subject"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls="subjects-subject-options"
+          aria-activedescendant={open && filtered[activeIndex] ? `subject-option-${filtered[activeIndex].id}` : undefined}
+          autoComplete="off"
+          value={open ? query : selected?.name || ""}
+          placeholder={subjects.length ? "Пошук предмета" : "Немає предметів"}
+          disabled={!subjects.length}
+          onFocus={() => !open && openOptions()}
+          onChange={(event) => { setQuery(event.target.value); setActiveIndex(0); setOpen(true); }}
+          onBlur={(event) => {
+            if (!containerRef.current?.contains(event.relatedTarget)) {
+              setOpen(false);
+              setQuery("");
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              if (!open) openOptions();
+              else setActiveIndex((index) => Math.max(0, Math.min(filtered.length - 1, index + (event.key === "ArrowDown" ? 1 : -1))));
+            } else if (event.key === "Enter" && open) {
+              event.preventDefault();
+              if (filtered[activeIndex]) select(filtered[activeIndex]);
+            } else if (event.key === "Escape") {
+              setOpen(false);
+              setQuery("");
+            }
+          }}
+          className="h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-9 text-[0.82rem] font-medium text-slate-700 outline-hidden hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:opacity-60"
+        />
+        <ChevronDown className="pointer-events-none absolute right-3 top-5 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+        {open ? (
+          <ul id="subjects-subject-options" role="listbox" aria-label="Предмети" className="absolute z-40 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+            {filtered.length ? filtered.map((item, index) => (
+              <li key={item.id} id={`subject-option-${item.id}`} ref={(node) => { optionRefs.current[index] = node; }} role="option" aria-selected={String(item.id) === String(value)} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => select(item)} className={cn("min-h-10 cursor-pointer break-words px-3 py-2 text-[0.82rem] font-medium", activeIndex === index ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50")}>
+                {item.name}
+              </li>
+            )) : <li className="px-3 py-3 text-xs text-slate-500">За цим запитом предметів не знайдено</li>}
+          </ul>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -382,7 +468,6 @@ function GradeForecastCard({ forecast }) {
           </div>
         ))}
       </div>
-      <p className="mt-3 truncate text-[0.64rem] text-slate-400" title="Тематична оцінка виставляється на останньому уроці місяця.">Тематична — на останньому уроці місяця</p>
     </Card>
   );
 }
@@ -438,7 +523,52 @@ function SubjectTabs({ activeTab, onChange }) {
   );
 }
 
+function useSortableRows(rows) {
+  const [sort, setSort] = useState({ column: null, direction: null });
+  const sortedRows = useMemo(() => {
+    if (!sort.column || !sort.direction) return rows;
+    const labels = { ...attendanceLabels, ...homeworkLabels };
+    return [...rows].sort((left, right) => {
+      let first = left[sort.column];
+      let second = right[sort.column];
+      if (sort.column === "status") {
+        first = labels[first]?.label || first;
+        second = labels[second]?.label || second;
+      }
+      if (first == null) return second == null ? 0 : 1;
+      if (second == null) return -1;
+      const comparison = typeof first === "number" && typeof second === "number"
+        ? first - second
+        : String(first).localeCompare(String(second), "uk", { numeric: true });
+      return sort.direction === "desc" ? -comparison : comparison;
+    });
+  }, [rows, sort]);
+
+  const onSort = (column) => setSort((current) => {
+    if (current.column !== column) return { column, direction: "desc" };
+    if (current.direction === "desc") return { column, direction: "asc" };
+    return { column: null, direction: null };
+  });
+
+  return { sortedRows, sort, onSort };
+}
+
+function SortableHeader({ label, column, sort, onSort, className = "" }) {
+  const direction = sort.column === column ? sort.direction : null;
+  const Icon = direction === "desc" ? ChevronDown : direction === "asc" ? ChevronUp : ChevronsUpDown;
+  const directionLabel = direction === "desc" ? "за спаданням" : direction === "asc" ? "за зростанням" : "без сортування";
+  return (
+    <th scope="col" aria-sort={direction === "desc" ? "descending" : direction === "asc" ? "ascending" : "none"} className={className}>
+      <button type="button" onClick={() => onSort(column)} className="flex w-full cursor-pointer items-center gap-1.5 text-left transition-colors hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-400">
+        <span>{label}</span><Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" />
+        <span className="sr-only">Сортування {directionLabel}</span>
+      </button>
+    </th>
+  );
+}
+
 function GradesPanel({ subject, stats }) {
+  const { sortedRows, sort, onSort } = useSortableRows(subject.grades);
   if (!subject.grades.length) return <EmptyPeriodData message="За вибраний період оцінок немає" />;
   return (
     <>
@@ -446,18 +576,24 @@ function GradesPanel({ subject, stats }) {
       <div className="mt-4 hidden overflow-x-auto rounded-md border border-slate-200 md:block">
         <table className="w-full min-w-[680px] table-fixed border-collapse text-left">
           <colgroup><col className="w-[16%]" /><col className="w-[30%]" /><col className="w-[14%]" /><col className="w-[40%]" /></colgroup>
-          <thead className="bg-slate-50"><tr className="border-b border-slate-200 text-[0.7rem] font-bold text-slate-500"><th className="border-r border-slate-200 px-4 py-3">Дата</th><th className="border-r border-slate-200 px-4 py-3">Тип роботи</th><th className="border-r border-slate-200 px-4 py-3 text-center">Оцінка</th><th className="px-4 py-3">Коментар учителя</th></tr></thead>
-          <tbody>{subject.grades.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.date)}</td><td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.workType}</td><td className="border-r border-slate-100 px-4 py-3.5 text-center"><GradeBadge value={item.grade} /></td><td className="px-4 py-3.5 text-slate-500">{item.comment || "—"}</td></tr>)}</tbody>
+          <thead className="bg-slate-50"><tr className="border-b border-slate-200 text-[0.7rem] font-bold text-slate-500">
+            <SortableHeader label="Дата" column="date" sort={sort} onSort={onSort} className="border-r border-slate-200 px-4 py-3" />
+            <SortableHeader label="Тип роботи" column="workType" sort={sort} onSort={onSort} className="border-r border-slate-200 px-4 py-3" />
+            <SortableHeader label="Оцінка" column="grade" sort={sort} onSort={onSort} className="border-r border-slate-200 px-4 py-3 text-center [&_button]:justify-center" />
+            <th scope="col" className="px-4 py-3">Коментар учителя</th>
+          </tr></thead>
+          <tbody>{sortedRows.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.date)}</td><td className="border-r border-slate-100 px-4 py-3.5"><WorkTypeBadge type={item.workType} /></td><td className="border-r border-slate-100 px-4 py-3.5 text-center"><GradeBadge value={item.grade} /></td><td className="px-4 py-3.5 text-slate-500">{item.comment || "—"}</td></tr>)}</tbody>
         </table>
       </div>
       <div className="mt-4 space-y-3 md:hidden">
-        {subject.grades.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.date)}</p><h3 className="mt-1 text-[0.82rem] font-bold text-slate-800">{item.workType}</h3></div><GradeBadge value={item.grade} /></div><p className="mt-3 text-[0.74rem] leading-5 text-slate-500">{item.comment || "Без коментаря"}</p></article>)}
+        {sortedRows.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.date)}</p><div className="mt-1"><WorkTypeBadge type={item.workType} /></div></div><GradeBadge value={item.grade} /></div><p className="mt-3 text-[0.74rem] leading-5 text-slate-500">{item.comment || "Без коментаря"}</p></article>)}
       </div>
     </>
   );
 }
 
 function AttendancePanel({ subject }) {
+  const { sortedRows, sort, onSort } = useSortableRows(subject.attendance);
   if (!subject.attendance.length) return <EmptyPeriodData message="За вибраний період записів відвідування немає" />;
   return (
     <>
@@ -465,48 +601,23 @@ function AttendancePanel({ subject }) {
       <div className="mt-4 hidden overflow-x-auto rounded-md border border-slate-200 md:block">
         <table className="w-full min-w-[640px] table-fixed border-collapse text-left">
           <colgroup><col className="w-[16%]" /><col className="w-[58%]" /><col className="w-[26%]" /></colgroup>
-          <thead className="bg-slate-50">
-            <tr className="border-b border-slate-200 text-[0.7rem] font-bold text-slate-500">
-              <th className="border-r border-slate-200 px-4 py-3">Дата</th>
-              <th className="border-r border-slate-200 px-4 py-3">Тема уроку</th>
-              <th className="px-4 py-3 text-center">Статус відвідування</th>
-            </tr>
-          </thead>
-          <tbody>
-            {subject.attendance.map((item) => {
-              const status = attendanceLabels[item.status];
-              return (
-                <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0">
-                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.date)}</td>
-                  <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.topic}</td>
-                  <td className="px-4 py-3.5 text-center"><StatusBadge status={status} /></td>
-                </tr>
-              );
-            })}
-          </tbody>
+          <thead className="bg-slate-50"><tr className="border-b border-slate-200 text-[0.7rem] font-bold text-slate-500">
+            <SortableHeader label="Дата" column="date" sort={sort} onSort={onSort} className="border-r border-slate-200 px-4 py-3" />
+            <th scope="col" className="border-r border-slate-200 px-4 py-3">Тема уроку</th>
+            <SortableHeader label="Статус відвідування" column="status" sort={sort} onSort={onSort} className="px-4 py-3 text-center [&_button]:justify-center" />
+          </tr></thead>
+          <tbody>{sortedRows.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.date)}</td><td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.topic}</td><td className="px-4 py-3.5 text-center"><StatusBadge status={attendanceLabels[item.status]} /></td></tr>)}</tbody>
         </table>
       </div>
       <div className="mt-4 space-y-3 md:hidden">
-        {subject.attendance.map((item) => {
-          const status = attendanceLabels[item.status];
-          return (
-            <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <time className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.date)}</time>
-                  <h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.topic}</h3>
-                </div>
-                <StatusBadge status={status} />
-              </div>
-            </article>
-          );
-        })}
+        {sortedRows.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><time className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.date)}</time><h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.topic}</h3></div><StatusBadge status={attendanceLabels[item.status]} /></div></article>)}
       </div>
     </>
   );
 }
 
 function HomeworkPanel({ subject }) {
+  const { sortedRows, sort, onSort } = useSortableRows(subject.homework);
   if (!subject.homework.length) return <EmptyPeriodData message="За вибраний період домашніх завдань немає" />;
   return (
     <>
@@ -514,44 +625,17 @@ function HomeworkPanel({ subject }) {
       <div className="mt-4 hidden overflow-x-auto rounded-md border border-slate-200 md:block">
         <table className="w-full min-w-[760px] table-fixed border-collapse text-left">
           <colgroup><col className="w-[16%]" /><col className="w-[16%]" /><col className="w-[42%]" /><col className="w-[26%]" /></colgroup>
-          <thead className="bg-slate-50">
-            <tr className="border-b border-slate-200 text-[0.7rem] font-bold text-slate-500">
-              <th className="border-r border-slate-200 px-4 py-3">Дата видачі</th>
-              <th className="border-r border-slate-200 px-4 py-3">Термін здачі</th>
-              <th className="border-r border-slate-200 px-4 py-3">Опис домашнього завдання</th>
-              <th className="px-4 py-3 text-center">Статус домашнього завдання</th>
-            </tr>
-          </thead>
-          <tbody>
-            {subject.homework.map((item) => {
-              const status = homeworkLabels[item.status];
-              return (
-                <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0">
-                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.assignedDate)}</td>
-                  <td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.dueDate) || "—"}</td>
-                  <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.title}</td>
-                  <td className="px-4 py-3.5 text-center"><StatusBadge status={status} /></td>
-                </tr>
-              );
-            })}
-          </tbody>
+          <thead className="bg-slate-50"><tr className="border-b border-slate-200 text-[0.7rem] font-bold text-slate-500">
+            <SortableHeader label="Дата видачі" column="assignedDate" sort={sort} onSort={onSort} className="border-r border-slate-200 px-4 py-3" />
+            <SortableHeader label="Термін здачі" column="dueDate" sort={sort} onSort={onSort} className="border-r border-slate-200 px-4 py-3" />
+            <th scope="col" className="border-r border-slate-200 px-4 py-3">Опис домашнього завдання</th>
+            <SortableHeader label="Статус домашнього завдання" column="status" sort={sort} onSort={onSort} className="px-4 py-3 text-center [&_button]:justify-center" />
+          </tr></thead>
+          <tbody>{sortedRows.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.assignedDate)}</td><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.dueDate) || "—"}</td><td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.title}</td><td className="px-4 py-3.5 text-center"><StatusBadge status={homeworkLabels[item.status]} /></td></tr>)}</tbody>
         </table>
       </div>
       <div className="mt-4 space-y-3 md:hidden">
-        {subject.homework.map((item) => {
-          const status = homeworkLabels[item.status];
-          return (
-            <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.assignedDate)} · до {formatDate(item.dueDate) || "без терміну"}</p>
-                  <h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.title}</h3>
-                </div>
-                <StatusBadge status={status} />
-              </div>
-            </article>
-          );
-        })}
+        {sortedRows.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.assignedDate)} · до {formatDate(item.dueDate) || "без терміну"}</p><h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.title}</h3></div><StatusBadge status={homeworkLabels[item.status]} /></div></article>)}
       </div>
     </>
   );
@@ -594,18 +678,7 @@ function TopBar({ config }) {
 }
 
 function Navigation({ config, compact = false }) {
-  const content = config.navigation.map((item) => {
-    const Icon = item.icon;
-    const active = item.route === config.subjectsRoute;
-    const classes = cn(compact ? "inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-md px-1" : "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left", "text-[0.82rem] font-semibold transition-colors", active ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800", !item.route && "cursor-default hover:bg-transparent hover:text-slate-500");
-    const label = <><Icon className={compact ? "h-4 w-4 shrink-0" : "h-5 w-5 shrink-0"} aria-hidden="true" />{compact ? <span className="hidden truncate min-[480px]:inline">{item.shortLabel || item.label}</span> : item.label}</>;
-    return item.route
-      ? <a key={item.label} href={`#${item.route}`} className={classes} aria-current={active ? "page" : undefined} aria-label={compact ? item.label : undefined}>{label}</a>
-      : <button key={item.label} type="button" disabled className={classes} title={`${item.label}: розділ у розробці`}>{label}</button>;
-  });
-
-  if (compact) return <nav className="sticky top-16 z-20 border-b border-slate-200/80 bg-white px-3 py-2 lg:hidden" aria-label="Основна навігація"><div className="grid grid-cols-5 gap-1">{content}</div></nav>;
-  return <aside className="hidden w-[210px] shrink-0 bg-white px-3 py-4 lg:block"><nav className="space-y-2" aria-label="Основна навігація">{content}</nav></aside>;
+  return <LearnerNavigation role={config.homeRoute.toUpperCase()} activeRoute={config.subjectsRoute} compact={compact} />;
 }
 
 function LoadingState() {
@@ -618,8 +691,10 @@ function EmptyChildren() {
 
 function formatDelta(delta) {
   if (delta === null) return "—";
-  if (delta > 0) return `+${delta}`;
-  return String(delta);
+  const formatted = new Intl.NumberFormat("uk-UA", { maximumFractionDigits: 1 }).format(Math.abs(delta));
+  if (delta > 0) return `+${formatted}%`;
+  if (delta < 0) return `−${formatted}%`;
+  return "0%";
 }
 
 function deltaDescription(delta) {

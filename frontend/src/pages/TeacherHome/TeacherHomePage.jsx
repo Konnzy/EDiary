@@ -3,7 +3,7 @@ import {
   CalendarDays,
   GraduationCap,
   LogOut,
-  UserRound,
+  Mail,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
@@ -11,14 +11,8 @@ import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card, CardContent, CardHeader } from "@/components/ui/card.jsx";
 import { authApi } from "@/lib/api.js";
-import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
-import { cn } from "@/lib/utils.js";
+import { TeacherNavigation } from "@/components/TeacherNavigation.jsx";
 import { formatToday, useTodaySchedule } from "@/hooks/useTodaySchedule.js";
-
-const navigationItems = teacherNavigationItems.map((item) => ({
-  ...item,
-  active: item.route === "teacher",
-}));
 
 const homework = [
   {
@@ -48,17 +42,6 @@ const homework = [
     status: "Перевірено",
     due: "До 23.05",
     submitted: "22/22 здано",
-  },
-];
-
-const messages = [
-  {
-    author: "Марія Іванова (Мати)",
-    text: "Добрий день, чи можна передати контрольну роботу",
-  },
-  {
-    author: "Адміністратор",
-    text: "Нагадування про педраду о 15:00",
   },
 ];
 
@@ -159,69 +142,11 @@ function TopBar() {
 }
 
 function MobileNavigation() {
-  return (
-    <nav
-      className="sticky top-16 z-20 border-b border-slate-200/80 bg-white px-3 py-2 lg:hidden"
-      aria-label="Основна навігація"
-    >
-      <div className="grid grid-cols-6 gap-1">
-        {navigationItems.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <button
-              key={item.label}
-              type="button"
-              disabled={!item.route}
-              onClick={() => { if (item.route) window.location.hash = item.route; }}
-              className={cn(
-                "inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-md px-1 text-[0.68rem] font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-[560px]:gap-1.5 min-[560px]:text-[0.76rem]",
-                item.active
-                  ? "bg-slate-100 text-slate-900"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
-              )}
-              aria-label={item.label}
-              aria-current={item.active ? "page" : undefined}
-            >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="hidden truncate min-[560px]:inline">{item.shortLabel ?? item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
+  return <TeacherNavigation activeRoute="teacher" compact />;
 }
 
 function Sidebar() {
-  return (
-    <aside className="hidden w-[210px] shrink-0 bg-white px-3 py-4 lg:block">
-      <nav className="space-y-2" aria-label="Основна навігація">
-        {navigationItems.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <button
-              key={item.label}
-              type="button"
-              disabled={!item.route}
-              onClick={() => { if (item.route) window.location.hash = item.route; }}
-              className={cn(
-                "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.82rem] font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                item.active
-                  ? "bg-slate-100 text-slate-900"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
-              )}
-              aria-current={item.active ? "page" : undefined}
-            >
-              <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-              {item.label}
-            </button>
-          );
-        })}
-      </nav>
-    </aside>
-  );
+  return <TeacherNavigation activeRoute="teacher" />;
 }
 
 function SectionTitle({ children }) {
@@ -312,16 +237,9 @@ function MessagesCard() {
         <SectionTitle>Останні повідомлення</SectionTitle>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {messages.map((message) => (
-          <article key={message.author} className="flex gap-3">
-            <UserRound className="mt-0.5 h-8 w-8 shrink-0 text-slate-800" strokeWidth={1.7} aria-hidden="true" />
-            <div className="min-w-0">
-              <h3 className="text-[0.84rem] font-bold text-slate-800">{message.author}</h3>
-              <p className="mt-0.5 text-[0.76rem] leading-5 text-slate-500">{message.text}</p>
-            </div>
-          </article>
-        ))}
+      <CardContent className="flex min-h-28 flex-col justify-between gap-4">
+        <p className="text-[0.8rem] text-slate-500">Повідомлень поки немає.</p>
+        <a href="#teacher/messages" className="inline-flex w-fit items-center gap-2 text-[0.8rem] font-semibold text-slate-800 hover:underline"><Mail className="h-4 w-4" aria-hidden="true" />Перейти до повідомлень</a>
       </CardContent>
     </Card>
   );

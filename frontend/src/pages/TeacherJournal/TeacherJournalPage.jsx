@@ -22,7 +22,7 @@ import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { authApi, teacherJournalApi } from "@/lib/api.js";
-import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
+import { TeacherNavigation as SharedTeacherNavigation } from "@/components/TeacherNavigation.jsx";
 import { cn } from "@/lib/utils.js";
 import {
   dateParts,
@@ -157,6 +157,11 @@ export function TeacherJournalPage() {
   });
 
   const markAllPresent = async (lesson) => {
+    if (!lesson.topic?.trim()) {
+      setError("Спочатку вкажіть тему уроку.");
+      setLessonEditor(lesson);
+      return;
+    }
     setSaving(true);
     setError("");
     setGradeEditor(null);
@@ -242,7 +247,11 @@ export function TeacherJournalPage() {
                   onClearAttendance={clearAttendance}
                   saving={saving}
                   onGradeClick={(event, student, lesson) => {
-                    if (!lesson.id) { setLessonEditor(lesson); return; }
+                    if (!lesson.id || !lesson.topic?.trim()) {
+                      setError("Спочатку вкажіть тему уроку.");
+                      setLessonEditor(lesson);
+                      return;
+                    }
                     setGradeEditor({
                       student,
                       lesson,
@@ -638,6 +647,7 @@ function LessonDetailsDialog({ date, className, subject, initialValue, requestEr
   const datePicker = useRef(null);
   const [deadlineText, setDeadlineText] = useState(() => isoDateToUkrainian(form.homeworkDeadline));
   const [deadlineError, setDeadlineError] = useState("");
+  const [topicError, setTopicError] = useState("");
   const formattedDate = new Intl.DateTimeFormat("uk-UA", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     .format(new Date(`${date}T12:00:00`));
 
@@ -650,6 +660,10 @@ function LessonDetailsDialog({ date, className, subject, initialValue, requestEr
 
   const submit = (event) => {
     event.preventDefault();
+    if (!form.topic.trim() && (date <= new Date().toLocaleDateString("sv-SE") || form.homework.trim())) {
+      setTopicError("Для проведеного уроку та призначення ДЗ необхідно вказати тему.");
+      return;
+    }
     if (deadlineText && !ukrainianDateToIso(deadlineText)) {
       setDeadlineError("Введіть коректну дату у форматі дд.мм.рррр.");
       return;
@@ -674,10 +688,11 @@ function LessonDetailsDialog({ date, className, subject, initialValue, requestEr
         </div>
         <form onSubmit={submit} className="mt-5 space-y-4">
           {requestError ? <p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{requestError}</p> : null}
+          {topicError ? <p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{topicError}</p> : null}
           <SelectField label="Тип роботи" value={form.workType} onChange={(value) => setForm((current) => ({ ...current, workType: value }))}>
             {workTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </SelectField>
-          <TextAreaField label="Тема уроку" value={form.topic} maxLength={200} rows={3} placeholder="Вкажіть тему уроку" onChange={(value) => setForm((current) => ({ ...current, topic: value }))} />
+          <TextAreaField label="Тема уроку" value={form.topic} maxLength={200} rows={3} placeholder="Вкажіть тему уроку" onChange={(value) => { setTopicError(""); setForm((current) => ({ ...current, topic: value })); }} />
           <TextAreaField label="Домашнє завдання" value={form.homework} maxLength={500} rows={4} placeholder="Вкажіть домашнє завдання" onChange={(value) => setForm((current) => ({ ...current, homework: value }))} />
           <label className="block">
             <span className="mb-2 block text-[0.74rem] font-semibold text-slate-600">Дедлайн ДЗ <span className="font-normal text-slate-400">(необов’язково)</span></span>
@@ -924,20 +939,5 @@ function TeacherTopBar({ onLogout }) {
 }
 
 function TeacherNavigation({ compact = false }) {
-  const content = teacherNavigationItems.map((item) => {
-    const Icon = item.icon;
-    const active = item.route === "teacher/journal";
-    const classes = cn(
-      compact ? "inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-md px-1" : "flex h-11 w-full items-center gap-3 rounded-md px-3 text-left",
-      "text-[0.82rem] font-semibold transition-colors",
-      active ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
-      !item.route && "cursor-default hover:bg-transparent hover:text-slate-500",
-    );
-    const label = <><Icon className={compact ? "h-4 w-4 shrink-0" : "h-5 w-5 shrink-0"} />{compact ? <span className="hidden truncate min-[540px]:inline">{item.shortLabel || item.label}</span> : item.label}</>;
-    return item.route
-      ? <a key={item.label} href={`#${item.route}`} className={classes} aria-current={active ? "page" : undefined} aria-label={compact ? item.label : undefined}>{label}</a>
-      : <button key={item.label} type="button" disabled className={classes} title={`${item.label}: розділ у розробці`}>{label}</button>;
-  });
-  if (compact) return <nav className="sticky top-16 z-40 border-b border-slate-200/80 bg-white px-3 py-2 lg:hidden" aria-label="Основна навігація"><div className="grid grid-cols-6 gap-1">{content}</div></nav>;
-  return <aside className="hidden w-[210px] shrink-0 bg-white px-3 py-4 lg:block"><nav className="space-y-2" aria-label="Основна навігація">{content}</nav></aside>;
+  return <SharedTeacherNavigation activeRoute="teacher/journal" compact={compact} />;
 }

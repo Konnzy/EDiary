@@ -142,6 +142,15 @@ export const teacherJournalApi = {
   }),
 };
 
+export const teacherStudentsApi = {
+  find: () => request("/teacher/students"),
+};
+
+export const learnerTeachersApi = {
+  student: () => request("/student/teachers"),
+  parent: (studentId) => request(`/parent/children/${studentId}/teachers`),
+};
+
 export const subjectsApi = {
   student: (academicYear) => request(`/student/subjects${academicYear ? `?${new URLSearchParams({ academicYear })}` : ""}`),
   parent: (studentId, academicYear) => request(`/parent/children/${studentId}/subjects${academicYear ? `?${new URLSearchParams({ academicYear })}` : ""}`),
@@ -154,9 +163,10 @@ export const adminAuthApi = {
 
 export const adminRegistrationApi = {
   findNotifications: () => request("/admin/registration-requests/notifications"),
-  findAll: ({ status, page = 0, size = 20 } = {}) => {
+  findAll: ({ status, role, page = 0, size = 20 } = {}) => {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
     if (status) params.set("status", status);
+    if (role) params.set("role", role);
     return request(`/admin/registration-requests?${params}`);
   },
   approve: (requestId, login) => request(`/admin/registration-requests/${requestId}/approve`, {
