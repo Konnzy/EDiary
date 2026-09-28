@@ -51,6 +51,9 @@ public record ProfileDetailsResponse(
         boolean newHomework,
         boolean absence,
         boolean newMessage,
-        boolean scheduleChange
+        boolean scheduleChange,
+        boolean classScheduleChange,
+        boolean prolongedAbsence,
+        boolean classRosterChange
     ) { }
 }

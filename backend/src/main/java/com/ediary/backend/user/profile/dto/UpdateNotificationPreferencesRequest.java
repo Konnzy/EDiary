@@ -5,5 +5,8 @@ public record UpdateNotificationPreferencesRequest(
     Boolean newHomework,
     Boolean absence,
     Boolean newMessage,
-    Boolean scheduleChange
+    Boolean scheduleChange,
+    Boolean classScheduleChange,
+    Boolean prolongedAbsence,
+    Boolean classRosterChange
 ) { }

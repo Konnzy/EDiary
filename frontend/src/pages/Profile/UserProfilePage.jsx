@@ -24,6 +24,7 @@ import {
   Trash2,
   User,
   UserRound,
+  Users,
   X,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
@@ -89,15 +90,20 @@ const notificationOptions = {
     { key: "newGrade", title: "Нова оцінка", description: "Сповіщати після виставлення нової оцінки", icon: GraduationCap },
     { key: "newHomework", title: "Нове домашнє завдання", description: "Сповіщати про нове призначене завдання", icon: BookOpen },
     { key: "absence", title: "Відсутність на уроці", description: "Сповіщати, коли викладач виставив статус «Н»", icon: CalendarX2 },
+    { key: "scheduleChange", title: "Зміна розкладу", description: "Сповіщати про зміни у розкладі занять", icon: CalendarDays },
   ],
   PARENT: [
     { key: "newGrade", title: "Нова оцінка", description: "Сповіщати після виставлення нової оцінки", icon: GraduationCap },
     { key: "newHomework", title: "Нове домашнє завдання", description: "Сповіщати про нове призначене завдання", icon: BookOpen },
     { key: "absence", title: "Відсутність на уроці", description: "Сповіщати, коли викладач виставив статус «Н»", icon: CalendarX2 },
+    { key: "scheduleChange", title: "Зміна розкладу", description: "Сповіщати про зміни у розкладі занять дитини", icon: CalendarDays },
   ],
   TEACHER: [
     { key: "newMessage", title: "Нове повідомлення", description: "Сповіщати про нові повідомлення від учнів і батьків", icon: Mail },
     { key: "scheduleChange", title: "Зміна розкладу", description: "Сповіщати про зміни у розкладі занять", icon: CalendarDays },
+    { key: "classScheduleChange", title: "Зміни розкладу класу", description: "Сповіщати про зміни у розкладі класу", icon: CalendarDays, homeroomOnly: true },
+    { key: "prolongedAbsence", title: "Тривалі пропуски", description: "Сповіщати про тривалі пропуски учнів класу", icon: CalendarX2, homeroomOnly: true },
+    { key: "classRosterChange", title: "Зміни у складі класу", description: "Сповіщати, коли учня додають до класу або переводять з нього", icon: Users, homeroomOnly: true },
   ],
 };
 
@@ -323,7 +329,7 @@ export function UserProfilePage({ role, openAddChild = false }) {
                 {role === "TEACHER" ? <ProfessionalInformation className="xl:col-start-1 xl:row-start-2" data={data.professional} /> : null}
                 <NotificationSettings
                   className="xl:col-start-2 xl:row-start-1"
-                  options={notificationOptions[role]}
+                  options={notificationOptions[role].filter((option) => !option.homeroomOnly || Boolean(data.professional?.homeroomClass))}
                   settings={notificationDraft}
                   notice={notificationNotice}
                   error={notificationError}

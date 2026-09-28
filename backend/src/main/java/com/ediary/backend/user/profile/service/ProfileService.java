@@ -164,11 +164,19 @@ public class ProfileService {
             if (request.newMessage() == null || request.scheduleChange() == null) throw invalidPreferences();
             preferences.setMessageEmailEnabled(request.newMessage());
             preferences.setScheduleChangeEmailEnabled(request.scheduleChange());
+            if (isHomeroomTeacher(user)) {
+                if (request.classScheduleChange() == null || request.prolongedAbsence() == null
+                    || request.classRosterChange() == null) throw invalidPreferences();
+                preferences.setClassScheduleChangeEmailEnabled(request.classScheduleChange());
+                preferences.setProlongedAbsenceEmailEnabled(request.prolongedAbsence());
+                preferences.setClassRosterChangeEmailEnabled(request.classRosterChange());
+            }
         } else {
-            if (request.newGrade() == null || request.newHomework() == null || request.absence() == null) throw invalidPreferences();
+            if (request.newGrade() == null || request.newHomework() == null || request.absence() == null || request.scheduleChange() == null) throw invalidPreferences();
             preferences.setGradeEmailEnabled(request.newGrade());
             preferences.setHomeworkEmailEnabled(request.newHomework());
             preferences.setAttendanceEmailEnabled(request.absence());
+            preferences.setScheduleChangeEmailEnabled(request.scheduleChange());
         }
         settings.save(preferences);
         return find(login);
@@ -227,10 +235,19 @@ public class ProfileService {
 
     private static ProfileDetailsResponse.NotificationPreferences toPreferences(UserNotificationSettings value) {
         return value == null
-            ? new ProfileDetailsResponse.NotificationPreferences(true, true, true, true, true)
+            ? new ProfileDetailsResponse.NotificationPreferences(true, true, true, true, true, true, true, true)
             : new ProfileDetailsResponse.NotificationPreferences(value.isGradeEmailEnabled(),
                 value.isHomeworkEmailEnabled(), value.isAttendanceEmailEnabled(),
-                value.isMessageEmailEnabled(), value.isScheduleChangeEmailEnabled());
+                value.isMessageEmailEnabled(), value.isScheduleChangeEmailEnabled(),
+                value.isClassScheduleChangeEmailEnabled(), value.isProlongedAbsenceEmailEnabled(),
+                value.isClassRosterChangeEmailEnabled());
+    }
+
+    private boolean isHomeroomTeacher(AppUser user) {
+        TeacherProfile teacher = teachers.findByUser_Id(user.getId()).orElseThrow(this::profileMissing);
+        String academicYear = currentAcademicYear();
+        return classes.findAllByClassTeacherIdOrderByNumberAscLetterAsc(teacher.getId()).stream()
+            .anyMatch(schoolClass -> schoolClass.getAcademicYear().getValue().equals(academicYear));
     }
 
     private static String fullName(TeacherProfile teacher) {

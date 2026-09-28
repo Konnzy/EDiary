@@ -310,7 +310,9 @@ function ScheduleFilters({ role, academicYear, week, children, studentId, homero
   return (
     <section className={cn(
       "grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)]",
-      role === "TEACHER" && "w-full max-w-[1500px] sm:grid-cols-2 lg:items-end",
+      role === "TEACHER" && "w-full sm:grid-cols-2 lg:items-end",
+      role === "TEACHER" && homeroomClasses.length > 0 && "max-w-[1300px]",
+      role === "TEACHER" && homeroomClasses.length === 0 && "max-w-[960px]",
       role === "TEACHER" && homeroomClasses.length > 1 && scheduleView === "class"
         && "lg:grid-cols-[minmax(0,1.1fr)_minmax(0,.8fr)_minmax(0,1.2fr)_minmax(0,.75fr)_minmax(0,1.5fr)]",
       role === "TEACHER" && homeroomClasses.length && !(homeroomClasses.length > 1 && scheduleView === "class")

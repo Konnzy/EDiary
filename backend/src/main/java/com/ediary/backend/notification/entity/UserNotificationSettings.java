@@ -47,4 +47,13 @@ public class UserNotificationSettings {
 
     @Column(name = "schedule_change_email_enabled", nullable = false)
     private boolean scheduleChangeEmailEnabled = true;
+
+    @Column(name = "class_schedule_change_email_enabled", nullable = false)
+    private boolean classScheduleChangeEmailEnabled = true;
+
+    @Column(name = "prolonged_absence_email_enabled", nullable = false)
+    private boolean prolongedAbsenceEmailEnabled = true;
+
+    @Column(name = "class_roster_change_email_enabled", nullable = false)
+    private boolean classRosterChangeEmailEnabled = true;
 }
