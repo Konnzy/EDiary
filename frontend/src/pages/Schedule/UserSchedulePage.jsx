@@ -18,7 +18,8 @@ import { LearnerNavigation } from "@/components/LearnerNavigation.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Alert } from "@/components/ui/alert.jsx";
-import { ApiError, authApi, parentApi, scheduleApi } from "@/lib/api.js";
+import { ApiError, authApi, parentApi, scheduleApi, teacherClassApi } from "@/lib/api.js";
+import { childOptionLabel } from "@/lib/childOption.js";
 import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
 import { TeacherNavigation } from "@/components/TeacherNavigation.jsx";
 import { cn } from "@/lib/utils.js";
@@ -76,13 +77,16 @@ const roleConfig = {
   },
 };
 
-export function UserSchedulePage({ role }) {
+export function UserSchedulePage({ role, initialClassId = "" }) {
   const config = roleConfig[role];
   const [options, setOptions] = useState(null);
   const [academicYear, setAcademicYear] = useState("");
   const [week, setWeek] = useState(1);
   const [children, setChildren] = useState([]);
   const [studentId, setStudentId] = useState("");
+  const [homeroomClasses, setHomeroomClasses] = useState([]);
+  const [classId, setClassId] = useState(initialClassId);
+  const [scheduleView, setScheduleView] = useState(initialClassId ? "class" : "own");
   const [schedule, setSchedule] = useState(null);
   const [otherWeekSchedule, setOtherWeekSchedule] = useState(undefined);
   const [loading, setLoading] = useState(true);
@@ -101,8 +105,9 @@ export function UserSchedulePage({ role }) {
     Promise.all([
       scheduleApi.findOptions(),
       role === "PARENT" ? parentApi.findChildren() : Promise.resolve([]),
+      role === "TEACHER" ? teacherClassApi.findAll() : Promise.resolve([]),
     ])
-      .then(([nextOptions, nextChildren]) => {
+      .then(([nextOptions, nextChildren, nextClasses]) => {
         if (!active) return;
         const years = nextOptions.academicYears || [];
         const selectedYear = years.includes(nextOptions.currentAcademicYear)
@@ -112,6 +117,12 @@ export function UserSchedulePage({ role }) {
         setAcademicYear(selectedYear);
         setWeek(nextOptions.currentWeek || 1);
         setChildren(nextChildren);
+        setHomeroomClasses(nextClasses);
+        if (role === "TEACHER") {
+          const selectedClass = nextClasses.find((item) => String(item.id) === String(initialClassId));
+          setClassId(String(selectedClass?.id || nextClasses[0]?.id || ""));
+          setScheduleView(selectedClass ? "class" : "own");
+        }
         setStudentId(nextChildren[0] ? String(nextChildren[0].studentId) : "");
         if (!selectedYear || (role === "PARENT" && !nextChildren.length)) {
           setLoading(false);
@@ -126,10 +137,10 @@ export function UserSchedulePage({ role }) {
     return () => {
       active = false;
     };
-  }, [role]);
+  }, [role, initialClassId]);
 
   useEffect(() => {
-    if (!academicYear || (role === "PARENT" && !studentId)) return undefined;
+    if (!academicYear || (role === "PARENT" && !studentId) || (role === "TEACHER" && scheduleView === "class" && !classId)) return undefined;
 
     let active = true;
     setLoading(true);
@@ -138,7 +149,7 @@ export function UserSchedulePage({ role }) {
     const request = role === "STUDENT"
       ? scheduleApi.findForStudent(period)
       : role === "TEACHER"
-        ? scheduleApi.findForTeacher(period)
+        ? scheduleView === "class" ? teacherClassApi.findSchedule(classId, week) : scheduleApi.findForTeacher(period)
         : parentApi.findSchedule(Number(studentId), period);
 
     request
@@ -156,10 +167,10 @@ export function UserSchedulePage({ role }) {
     return () => {
       active = false;
     };
-  }, [academicYear, role, studentId, week]);
+  }, [academicYear, role, studentId, week, scheduleView, classId]);
 
   useEffect(() => {
-    if (!academicYear || (role === "PARENT" && !studentId)) return undefined;
+    if (!academicYear || (role === "PARENT" && !studentId) || (role === "TEACHER" && scheduleView === "class" && !classId)) return undefined;
 
     let active = true;
     setOtherWeekSchedule(undefined);
@@ -167,7 +178,7 @@ export function UserSchedulePage({ role }) {
     const request = role === "STUDENT"
       ? scheduleApi.findForStudent(period)
       : role === "TEACHER"
-        ? scheduleApi.findForTeacher(period)
+        ? scheduleView === "class" ? teacherClassApi.findSchedule(classId, 3 - week) : scheduleApi.findForTeacher(period)
         : parentApi.findSchedule(Number(studentId), period);
 
     request
@@ -179,7 +190,7 @@ export function UserSchedulePage({ role }) {
       });
 
     return () => { active = false; };
-  }, [academicYear, role, studentId, week]);
+  }, [academicYear, role, studentId, week, scheduleView, classId]);
 
   const groupedLessons = useMemo(() => Object.fromEntries(
     weekdays.map((day) => [
@@ -192,14 +203,16 @@ export function UserSchedulePage({ role }) {
 
   const selectedChild = children.find((child) => String(child.studentId) === studentId);
   const hasNoClass = schedule && role !== "TEACHER" && !schedule.className;
-  const title = role !== "TEACHER" && schedule?.className
+  const title = (role !== "TEACHER" || scheduleView === "class") && schedule?.className
     ? `Розклад ${schedule.className} класу`
     : "Розклад";
-  const subtitle = role === "PARENT" && selectedChild
+  const subtitle = role === "TEACHER" && scheduleView === "class"
+    ? "Розклад занять класу, яким ви керуєте"
+    : role === "PARENT" && selectedChild
     ? `Розклад занять: ${selectedChild.firstName} ${selectedChild.lastName}`
     : config.subtitle;
   const nextLesson = useMemo(() => {
-    if (!schedule || academicYear !== options?.currentAcademicYear) return null;
+    if (!schedule || schedule.academicYear !== options?.currentAcademicYear) return null;
     if (week === options.currentWeek) {
       const thisWeek = findNextLesson({ [week]: schedule }, week, now);
       if (thisWeek) return thisWeek;
@@ -237,6 +250,11 @@ export function UserSchedulePage({ role }) {
                 week={week}
                 children={children}
                 studentId={studentId}
+                homeroomClasses={homeroomClasses}
+                classId={classId}
+                scheduleView={scheduleView}
+                onScheduleViewChange={(value) => { setSchedule(null); setOtherWeekSchedule(undefined); setScheduleView(value); }}
+                onClassChange={(value) => { setSchedule(null); setOtherWeekSchedule(undefined); setClassId(value); }}
                 nextLessonLabel={teacherNextLessonLabel}
                 onWeekChange={(value) => {
                   if (value === week) return;
@@ -246,7 +264,7 @@ export function UserSchedulePage({ role }) {
                 }}
                 onStudentChange={(value) => {
                   if (value === "__add_child__") {
-                    window.location.hash = "parent";
+                    window.location.hash = "parent/profile?addChild=1";
                     return;
                   }
                   if (value === studentId) return;
@@ -262,7 +280,7 @@ export function UserSchedulePage({ role }) {
                 <EmptyState title="Навчальний рік не налаштовано" description="Зверніться до адміністратора навчального закладу." />
               ) : null}
               {!loading && !error && role === "PARENT" && !children.length ? (
-                <EmptyState title="Немає прив’язаних дітей" description="Додайте дитину за кодом прив’язки на головній сторінці." />
+                <EmptyState title="Немає прив’язаних дітей" description="Додайте дитину за кодом прив’язки у профілі." />
               ) : null}
               {!loading && !error && hasNoClass ? (
                 <EmptyState title="Клас ще не призначено" description="Після додавання учня до класу тут з’явиться його розклад." />
@@ -271,7 +289,8 @@ export function UserSchedulePage({ role }) {
                 <ScheduleGrid
                   groupedLessons={groupedLessons}
                   role={role}
-                  academicYear={academicYear}
+                  scheduleView={scheduleView}
+                  academicYear={schedule.academicYear || academicYear}
                   week={week}
                   options={options}
                   now={now}
@@ -287,27 +306,44 @@ export function UserSchedulePage({ role }) {
   );
 }
 
-function ScheduleFilters({ role, academicYear, week, children, studentId, nextLessonLabel, onWeekChange, onStudentChange }) {
+function ScheduleFilters({ role, academicYear, week, children, studentId, homeroomClasses, classId, scheduleView, nextLessonLabel, onWeekChange, onStudentChange, onScheduleViewChange, onClassChange }) {
   return (
     <section className={cn(
       "grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)]",
-      role === "TEACHER" && "max-w-[960px] md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_180px_310px] xl:items-end",
+      role === "TEACHER" && "w-full max-w-[1500px] sm:grid-cols-2 lg:items-end",
+      role === "TEACHER" && homeroomClasses.length > 1 && scheduleView === "class"
+        && "lg:grid-cols-[minmax(0,1.1fr)_minmax(0,.8fr)_minmax(0,1.2fr)_minmax(0,.75fr)_minmax(0,1.5fr)]",
+      role === "TEACHER" && homeroomClasses.length && !(homeroomClasses.length > 1 && scheduleView === "class")
+        && "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,.8fr)_minmax(0,1.5fr)]",
+      role === "TEACHER" && !homeroomClasses.length
+        && "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,.8fr)_minmax(0,1.5fr)]",
       role === "PARENT" && "max-w-[760px] sm:grid-cols-[minmax(0,1fr)_310px] sm:items-end",
       role === "STUDENT" && "max-w-[380px]",
     )}>
+      {role === "TEACHER" && homeroomClasses.length ? (
+        <SelectField label="Переглянути розклад" value={scheduleView} onChange={onScheduleViewChange}>
+          <option value="own">Мій розклад</option>
+          <option value="class">Розклад мого класу</option>
+        </SelectField>
+      ) : null}
+      {role === "TEACHER" && scheduleView === "class" && homeroomClasses.length > 1 ? (
+        <SelectField label="Клас" value={classId} onChange={onClassChange}>
+          {homeroomClasses.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.academicYear} н. р.</option>)}
+        </SelectField>
+      ) : null}
       {role === "PARENT" ? (
         <SelectField label="Дитина" value={studentId} onChange={onStudentChange}>
           {!studentId ? <option value="">Оберіть дитину</option> : null}
           {children.map((child) => (
             <option key={child.studentId} value={child.studentId}>
-              {child.firstName} {child.lastName}{child.className ? ` · ${child.className}` : ""}
+              {childOptionLabel(child)}
             </option>
           ))}
           <option value="__add_child__">+ Додати дитину</option>
         </SelectField>
       ) : role === "TEACHER" ? (
         <div className="min-w-0">
-          <p className="text-[0.75rem] font-semibold text-slate-500">Наступний урок</p>
+          <p className="text-[0.75rem] font-semibold text-slate-500">{scheduleView === "class" ? "Наступний урок класу" : "Наступний урок"}</p>
           <p className="mt-2 flex min-h-10 items-center text-[0.82rem] font-semibold leading-5 text-slate-800">
             {nextLessonLabel}
           </p>
@@ -364,8 +400,8 @@ function SelectField({ label, value, onChange, children }) {
   );
 }
 
-function ScheduleGrid({ groupedLessons, role, academicYear, week, options, now, nextLesson }) {
-  if (role === "TEACHER") {
+function ScheduleGrid({ groupedLessons, role, scheduleView, academicYear, week, options, now, nextLesson }) {
+  if (role === "TEACHER" && scheduleView !== "class") {
     return (
       <TeacherScheduleGrid
         groupedLessons={groupedLessons}
@@ -399,7 +435,7 @@ function ScheduleGrid({ groupedLessons, role, academicYear, week, options, now, 
                 <LessonCard
                   key={lesson.id}
                   lesson={lesson}
-                  role={role}
+                  role={scheduleView === "class" ? "STUDENT" : role}
                   current={isToday && isCurrentLesson(lesson, now)}
                   next={nextLesson?.week === week && nextLesson.lesson.id === lesson.id}
                 />

@@ -26,6 +26,9 @@ public interface StudentClassMembershipRepository extends JpaRepository<StudentC
         Long classId
     );
 
+    @EntityGraph(attributePaths = {"student", "student.user"})
+    List<StudentClassMembership> findAllBySchoolClassIdOrderByStudentSurnameAscStudentNameAsc(Long classId);
+
     Optional<StudentClassMembership> findByStudentIdAndSchoolClassIdAndActiveTrue(Long studentId, Long classId);
 
     Optional<StudentClassMembership> findByStudentIdAndSchoolClassId(Long studentId, Long classId);

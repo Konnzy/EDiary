@@ -112,4 +112,13 @@ public class JournalController {
     ) {
         return subjectProgressService.forParent(authentication.getName(), studentId, academicYear);
     }
+
+    @GetMapping("/admin/students/{studentId}/subjects")
+    @PreAuthorize("hasRole('ADMIN')")
+    public SubjectProgressResponse adminStudentSubjects(
+        @PathVariable Long studentId,
+        @RequestParam(required = false) String academicYear
+    ) {
+        return subjectProgressService.forAdmin(studentId, academicYear);
+    }
 }

@@ -94,7 +94,8 @@ public class ProfileService {
                     TeacherProfile classTeacher = schoolClass == null ? null : schoolClass.getClassTeacher();
                     return new ProfileDetailsResponse.Child(
                         student.getId(),
-                        student.getSurname() + " " + student.getName(),
+                        fullName(student.getSurname(), student.getName(), student.getPatronymic()),
+                        student.getUser().getEmail(),
                         schoolClass == null ? null : schoolClass.getDisplayName(),
                         fullName(classTeacher),
                         classTeacher == null ? null : classTeacher.getEmail(),
@@ -235,6 +236,10 @@ public class ProfileService {
     private static String fullName(TeacherProfile teacher) {
         return teacher == null ? null : teacher.getSurname() + " " + teacher.getName()
             + (teacher.getPatronymic() == null ? "" : " " + teacher.getPatronymic());
+    }
+
+    private static String fullName(String surname, String name, String patronymic) {
+        return surname + " " + name + (patronymic == null || patronymic.isBlank() ? "" : " " + patronymic);
     }
 
     private String currentAcademicYear() {

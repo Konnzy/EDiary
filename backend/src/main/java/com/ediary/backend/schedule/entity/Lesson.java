@@ -50,7 +50,7 @@ public class Lesson {
     private String topic;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "lesson_work_type", nullable = false, length = 24)
+    @Column(name = "lesson_work_type", length = 24)
     private LessonWorkType workType = LessonWorkType.CLASSWORK;
 
     @Enumerated(EnumType.STRING)

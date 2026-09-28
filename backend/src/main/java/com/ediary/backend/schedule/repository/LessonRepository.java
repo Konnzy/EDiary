@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Pageable;
 
 public interface LessonRepository extends JpaRepository<Lesson, Long> {
 
@@ -108,5 +109,34 @@ public interface LessonRepository extends JpaRepository<Lesson, Long> {
     List<Lesson> findAllForTeacherByDate(
         @Param("teacherLogin") String teacherLogin,
         @Param("date") LocalDate date
+    );
+
+    @EntityGraph(attributePaths = {"scheduleEntry.subject", "scheduleEntry.schoolClass"})
+    @Query("""
+        select lesson from Lesson lesson
+        where lower(lesson.scheduleEntry.teacher.user.login) = lower(:teacherLogin)
+          and lesson.date between :start and :end
+        """)
+    List<Lesson> findAllForTeacherBetween(
+        @Param("teacherLogin") String teacherLogin,
+        @Param("start") LocalDate start,
+        @Param("end") LocalDate end
+    );
+
+    @EntityGraph(attributePaths = {"scheduleEntry.subject", "scheduleEntry.schoolClass"})
+    @Query("""
+        select lesson from Lesson lesson
+        where lower(lesson.scheduleEntry.teacher.user.login) = lower(:teacherLogin)
+          and lesson.status <> :cancelled
+          and (lesson.topic is not null and lesson.topic <> ''
+            or exists (select grade.id from Grade grade where grade.lesson = lesson)
+            or exists (select attendance.id from Attendance attendance where attendance.lesson = lesson)
+            or exists (select homework.id from Homework homework where homework.lesson = lesson))
+        order by lesson.updatedAt desc, lesson.id desc
+        """)
+    List<Lesson> findRecentJournalChangesForTeacher(
+        @Param("teacherLogin") String teacherLogin,
+        @Param("cancelled") LessonStatus cancelled,
+        Pageable pageable
     );
 }

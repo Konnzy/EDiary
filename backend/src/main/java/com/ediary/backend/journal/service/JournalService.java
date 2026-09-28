@@ -185,12 +185,46 @@ public class JournalService {
                 );
             }).toList();
 
+        Map<Long, Double> thematicEstimates = thematicEstimates(classId, subjectId, period);
         ScheduleEntry first = assignments.getFirst();
         return new JournalResponse(classId, first.getSchoolClass().getDisplayName(), subjectId,
             first.getSubject().getTitle(), month,
             students.stream().map(student -> new JournalResponse.Student(
-                student.getId(), student.getSurname() + " " + student.getName()
+                student.getId(), student.getSurname() + " " + student.getName(),
+                thematicEstimates.get(student.getId())
             )).toList(), lessons);
+    }
+
+    private Map<Long, Double> thematicEstimates(Long classId, Long subjectId, YearMonth period) {
+        String academicYear = SchedulePeriod.academicYear(period.atDay(1));
+        int startYear = Integer.parseInt(academicYear.substring(0, 4));
+        List<Lesson> lessons = lessonRepository.findJournalLessons(
+            classId, subjectId, LocalDate.of(startYear, 9, 1), period.atEndOfMonth()
+        ).stream().filter(lesson -> lesson.getStatus() != LessonStatus.CANCELLED).toList();
+        if (lessons.isEmpty()) return Map.of();
+
+        Map<Long, List<Grade>> gradesByLesson = gradeRepository.findAllByLessonIdIn(
+            lessons.stream().map(Lesson::getId).toList()
+        ).stream().collect(Collectors.groupingBy(grade -> grade.getLesson().getId()));
+        Map<Long, Integer> sums = new LinkedHashMap<>();
+        Map<Long, Integer> counts = new LinkedHashMap<>();
+        for (Lesson lesson : lessons) {
+            for (Grade grade : gradesByLesson.getOrDefault(lesson.getId(), List.of())) {
+                Long studentId = grade.getStudent().getId();
+                if (grade.getType() == GradeType.TOPIC || lesson.getWorkType() == LessonWorkType.THEMATIC) {
+                    sums.remove(studentId);
+                    counts.remove(studentId);
+                } else if (grade.getType() != GradeType.SEMESTER && grade.getType() != GradeType.YEAR
+                    && lesson.getWorkType() != LessonWorkType.SEMESTER
+                    && lesson.getWorkType() != LessonWorkType.YEAR) {
+                    sums.merge(studentId, grade.getScore(), Integer::sum);
+                    counts.merge(studentId, 1, Integer::sum);
+                }
+            }
+        }
+        Map<Long, Double> estimates = new LinkedHashMap<>();
+        counts.forEach((studentId, count) -> estimates.put(studentId, (double) sums.get(studentId) / count));
+        return estimates;
     }
 
     @Transactional
@@ -206,8 +240,23 @@ public class JournalService {
             throw new ApplicationException(HttpStatus.BAD_REQUEST, "INVALID_HOMEWORK_DEADLINE",
                 "Термін домашнього завдання не може передувати уроку");
         }
-        validateFinalWorkType(lesson, request.workType());
         String topic = normalize(request.topic());
+        Homework homework = homeworkRepository.findFirstByLessonId(lessonId).orElse(null);
+        if (request.workType() == null) {
+            boolean hasLessonData = topic != null || homeworkText != null || request.homeworkDeadline() != null
+                || lesson.getTopic() != null && !lesson.getTopic().isBlank()
+                || homework != null || lessonRepository.hasJournalRecords(lessonId);
+            if (hasLessonData) {
+                throw new ApplicationException(HttpStatus.CONFLICT, "LESSON_WORK_TYPE_CLEAR_NOT_ALLOWED",
+                    "Не можна очистити тип роботи, поки для уроку збережено тему, домашнє завдання, відвідування або оцінки");
+            }
+            lesson.setWorkType(null);
+            lesson.setTopic(null);
+            lesson.setUpdatedAt(LocalDateTime.now(clock));
+            lessonRepository.save(lesson);
+            return;
+        }
+        validateFinalWorkType(lesson, request.workType());
         if (topic == null) {
             LessonTopicPolicy.validate(lesson, topic, LocalDate.now(clock),
                 homeworkText != null || lessonRepository.hasJournalRecords(lessonId));
@@ -218,7 +267,6 @@ public class JournalService {
         lesson.setUpdatedAt(LocalDateTime.now(clock));
         lessonRepository.save(lesson);
 
-        Homework homework = homeworkRepository.findFirstByLessonId(lessonId).orElse(null);
         if (homeworkText == null) {
             if (homework != null) {
                 studentHomeworkRepository.deleteAll(studentHomeworkRepository.findAllByHomeworkId(homework.getId()));
@@ -250,6 +298,15 @@ public class JournalService {
             throw new ApplicationException(HttpStatus.CONFLICT, "STUDENT_NOT_IN_CLASS",
                 "Учень не належить до класу цього уроку");
         }
+        if (lesson.getWorkType() == null) {
+            boolean hasData = request.score() != null || request.attendanceStatus() != null
+                || request.homeworkStatus() != null || request.comment() != null && !request.comment().isBlank();
+            if (hasData) {
+                throw new ApplicationException(HttpStatus.CONFLICT, "LESSON_WORK_TYPE_REQUIRED",
+                    "Спочатку вкажіть тип роботи уроку");
+            }
+            return;
+        }
         if (request.score() != null || request.attendanceStatus() != null || request.homeworkStatus() != null) {
             LessonTopicPolicy.requireTopic(lesson.getTopic());
         }
@@ -277,6 +334,7 @@ public class JournalService {
                 studentHomeworkRepository.save(studentHomework);
             }
         }
+        lesson.setUpdatedAt(LocalDateTime.now(clock));
     }
 
     @Transactional
@@ -286,6 +344,10 @@ public class JournalService {
         if (lesson.getStatus() == LessonStatus.CANCELLED) {
             throw new ApplicationException(HttpStatus.CONFLICT, "LESSON_CANCELLED", "Скасований урок не можна редагувати");
         }
+        if (lesson.getWorkType() == null) {
+            throw new ApplicationException(HttpStatus.CONFLICT, "LESSON_WORK_TYPE_REQUIRED",
+                "Спочатку вкажіть тип роботи уроку");
+        }
         LessonTopicPolicy.requireTopic(lesson.getTopic());
 
         for (StudentProfile student : studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(
@@ -293,6 +355,7 @@ public class JournalService {
         )) {
             attendanceService.save(student, lesson, AttendanceStatus.PRESENT);
         }
+        lesson.setUpdatedAt(LocalDateTime.now(clock));
     }
 
     @Transactional
@@ -302,6 +365,7 @@ public class JournalService {
             throw new ApplicationException(HttpStatus.CONFLICT, "LESSON_CANCELLED", "Скасований урок не можна редагувати");
         }
         attendanceRepository.deleteAll(attendanceRepository.findAllByLessonIdIn(List.of(lessonId)));
+        lesson.setUpdatedAt(LocalDateTime.now(clock));
     }
 
     private GradeType gradeType(LessonWorkType workType) {

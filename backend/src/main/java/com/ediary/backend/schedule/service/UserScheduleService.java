@@ -32,6 +32,7 @@ public class UserScheduleService {
     private final AcademicYearRepository academicYearRepository;
     private final StudentProfileRepository studentProfileRepository;
     private final StudentParentLinkRepository studentParentLinkRepository;
+    private final TeacherClassService teacherClassService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -92,6 +93,14 @@ public class UserScheduleService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public UserScheduleResponse findForHomeroomTeacher(String login, Long classId, Integer week) {
+        SchoolClass schoolClass = teacherClassService.requireOwnedClass(login, classId);
+        String academicYear = schoolClass.getAcademicYear().getValue();
+        validatePeriod(academicYear, week);
+        return findForClass(schoolClass, academicYear, week);
+    }
+
     private UserScheduleResponse findForClass(
         SchoolClass schoolClass,
         String academicYear,
@@ -117,6 +126,8 @@ public class UserScheduleService {
     private UserScheduleLessonResponse toResponse(ScheduleEntry entry) {
         return new UserScheduleLessonResponse(
             entry.getId(),
+            entry.getSchoolClass().getId(),
+            entry.getSubject().getId(),
             entry.getWeekday(),
             entry.getLessonNumber(),
             entry.getSubject().getTitle(),

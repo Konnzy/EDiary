@@ -15,7 +15,7 @@ public record JournalResponse(
     List<Student> students,
     List<Lesson> lessons
 ) {
-    public record Student(Long id, String name) { }
+    public record Student(Long id, String name, Double thematicEstimate) { }
     public record Lesson(
         Long id,
         Long scheduleId,

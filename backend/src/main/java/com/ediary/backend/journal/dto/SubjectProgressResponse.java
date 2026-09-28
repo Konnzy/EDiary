@@ -19,7 +19,8 @@ public record SubjectProgressResponse(
         List<Attendance> attendance,
         List<Homework> homework
     ) { }
-    public record Grade(Long id, LocalDate date, LessonWorkType workType, Integer score, String comment) { }
+    public record Grade(Long id, LocalDate date, Integer lessonNumber, LessonWorkType workType,
+                        Integer score, String comment) { }
     public record Attendance(Long id, LocalDate date, String topic, AttendanceStatus status) { }
     public record Homework(Long id, LocalDate assignedDate, LocalDate dueDate, String title, HomeworkStatus status) { }
 }

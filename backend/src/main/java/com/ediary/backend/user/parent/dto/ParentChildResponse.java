@@ -6,6 +6,7 @@ public record ParentChildResponse(
     Long studentId,
     String firstName,
     String lastName,
+    String patronymic,
     String login,
     String email,
     String className,

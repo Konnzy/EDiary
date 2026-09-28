@@ -8,7 +8,7 @@ export function TeacherNavigation({ activeRoute, compact = false }) {
   const currentUser = useContext(CurrentUserContext);
   const isHomeroomTeacher = Boolean(currentUser?.profile?.professional?.homeroomClasses?.length);
   const groups = [teacherNavigationItems.slice(0, 1), teacherNavigationItems.slice(1, 3)];
-  if (isHomeroomTeacher) groups.push([{ label: "Мій клас", icon: School }]);
+  if (isHomeroomTeacher) groups.push([{ label: "Мій клас", icon: School, route: "teacher/my-class" }]);
   groups.push(teacherNavigationItems.slice(3));
   const visibleGroups = compact ? [[...groups[0], ...groups[1]], ...groups.slice(2)] : groups;
 

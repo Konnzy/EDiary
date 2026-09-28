@@ -142,8 +142,18 @@ export const teacherJournalApi = {
   }),
 };
 
+export const teacherDashboardApi = {
+  find: () => request("/teacher/dashboard"),
+};
+
 export const teacherStudentsApi = {
   find: () => request("/teacher/students"),
+};
+
+export const teacherClassApi = {
+  findAll: () => request("/teacher/my-classes"),
+  findById: (classId) => request(`/teacher/my-classes/${classId}`),
+  findSchedule: (classId, week) => request(`/teacher/my-classes/${classId}/schedule?${new URLSearchParams({ week: String(week) })}`),
 };
 
 export const learnerTeachersApi = {
@@ -154,6 +164,8 @@ export const learnerTeachersApi = {
 export const subjectsApi = {
   student: (academicYear) => request(`/student/subjects${academicYear ? `?${new URLSearchParams({ academicYear })}` : ""}`),
   parent: (studentId, academicYear) => request(`/parent/children/${studentId}/subjects${academicYear ? `?${new URLSearchParams({ academicYear })}` : ""}`),
+  admin: (studentId, academicYear) => request(`/admin/students/${studentId}/subjects${academicYear ? `?${new URLSearchParams({ academicYear })}` : ""}`),
+  homeroom: (classId, studentId, academicYear) => request(`/teacher/my-classes/${classId}/students/${studentId}/subjects${academicYear ? `?${new URLSearchParams({ academicYear })}` : ""}`),
 };
 
 export const adminAuthApi = {
@@ -230,11 +242,13 @@ export const adminClassesApi = {
     return request(`/admin/classes/options${suffix}`);
   },
   findById: (classId) => request(`/admin/classes/${classId}`),
+  findStatistics: (classId) => request(`/admin/classes/${classId}/statistics`),
   getDeletionEligibility: (classId) => request(`/admin/classes/${classId}/deletion-eligibility`),
   findStudents: (classId, query = "") => {
     const suffix = query ? `?${new URLSearchParams({ query })}` : "";
     return request(`/admin/classes/${classId}/students${suffix}`);
   },
+  findStudentParents: (classId, studentId) => request(`/admin/classes/${classId}/students/${studentId}/parents`),
   findUnassignedStudents: (query = "", academicYear = "") => {
     const params = new URLSearchParams();
     if (query) params.set("query", query);

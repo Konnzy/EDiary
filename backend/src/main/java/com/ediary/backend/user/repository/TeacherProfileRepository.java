@@ -14,6 +14,8 @@ public interface TeacherProfileRepository extends JpaRepository<TeacherProfile, 
 
     Optional<TeacherProfile> findByUser_Id(Long userId);
 
+    Optional<TeacherProfile> findByUser_LoginIgnoreCase(String login);
+
     long deleteByUser_Id(Long userId);
 
     @Query("""

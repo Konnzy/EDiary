@@ -47,36 +47,85 @@ export function getSubjectPeriodView(subject, academicYear, period) {
   };
 }
 
-export function getGradeForecast(subject, academicYear, period) {
+export function getGradeForecast(subject, academicYear, period, fractionDigits = 2) {
   if (!subject) return { thematic: null, semester: null, annual: null };
   const yearView = getSubjectPeriodView(subject, academicYear, "YEAR");
-  const selectedView = getSubjectPeriodView(subject, academicYear, period);
-  const referenceGrades = selectedView.grades.length ? selectedView.grades : yearView.grades;
-  const latestGrade = [...referenceGrades].sort((first, second) => dateValue(second.date) - dateValue(first.date))[0];
+  const cutoff = forecastCutoff(academicYear, period);
+  const grades = yearView.grades.filter((grade) => grade.date <= cutoff);
+  const latestGrade = [...grades].sort(compareGrades).at(-1);
   const referenceMonth = /^\d{4}-\d{2}$/.test(period)
-    ? period
-    : latestGrade
-      ? monthPeriod(latestGrade.date)
-      : null;
+    ? period : latestGrade ? monthPeriod(latestGrade.date) : null;
   const semesterPeriod = period === "SEMESTER_1" || period === "SEMESTER_2"
     ? period
     : referenceMonth
       ? (Number(referenceMonth.slice(5)) >= 9 ? "SEMESTER_1" : "SEMESTER_2")
       : null;
 
-  const thematicAverage = referenceMonth
-    ? calculateAverage(getSubjectPeriodView(subject, academicYear, referenceMonth).grades)
-    : null;
+  const thematicAverage = meanScore(currentThematicGrades(grades));
   const semesterAverage = semesterPeriod
-    ? calculateAverage(getSubjectPeriodView(subject, academicYear, semesterPeriod).grades)
+    ? semesterForecast(grades, academicYear, semesterPeriod, cutoff)
     : null;
-  const annualAverage = calculateAverage(yearView.grades);
+  const recordedSemesterGrades = grades.filter((grade) => gradeType(grade) === "SEMESTER");
+  const annualAverage = meanScore([
+    ...["SEMESTER_1", "SEMESTER_2"].map((semester) => {
+      const recorded = recordedSemesterGrades.filter((grade) => {
+        const month = monthPeriod(grade.date);
+        return semester === "SEMESTER_1" ? Number(month.slice(5)) >= 9 : Number(month.slice(5)) <= 5;
+      });
+      return recorded.length ? meanScore(recorded) : semesterForecast(grades, academicYear, semester, cutoff);
+    }).filter((value) => value !== null),
+  ]);
 
   return {
-    thematic: forecastGrade(thematicAverage),
-    semester: forecastGrade(semesterAverage),
-    annual: forecastGrade(annualAverage),
+    thematic: forecastGrade(thematicAverage, fractionDigits),
+    semester: forecastGrade(semesterAverage, fractionDigits),
+    annual: forecastGrade(annualAverage, fractionDigits),
   };
+}
+
+function forecastCutoff(academicYear, period) {
+  const startYear = Number(academicYear.split("/")[0]);
+  if (/^\d{4}-\d{2}$/.test(period)) return `${period}-31`;
+  if (period === "SEMESTER_1") return `${startYear}-12-31`;
+  return `${startYear + 1}-05-31`;
+}
+
+function compareGrades(first, second) {
+  return first.date.localeCompare(second.date)
+    || (first.lessonNumber ?? 0) - (second.lessonNumber ?? 0)
+    || (first.id ?? 0) - (second.id ?? 0);
+}
+
+function currentThematicGrades(grades) {
+  let current = [];
+  for (const grade of [...grades].sort(compareGrades)) {
+    const type = gradeType(grade);
+    if (type === "THEMATIC") current = [];
+    else if (type !== "SEMESTER" && type !== "YEAR") current.push(grade);
+  }
+  return current;
+}
+
+function semesterForecast(grades, academicYear, semester, cutoff) {
+  const startYear = Number(academicYear.split("/")[0]);
+  const start = semester === "SEMESTER_1" ? `${startYear}-09-01` : `${startYear + 1}-01-01`;
+  const end = semester === "SEMESTER_1" ? `${startYear}-12-31` : `${startYear + 1}-05-31`;
+  const semesterEnd = cutoff < end ? cutoff : end;
+  const throughSemester = grades.filter((grade) => grade.date <= semesterEnd);
+  const thematicGrades = throughSemester.filter((grade) => grade.date >= start && gradeType(grade) === "THEMATIC");
+  const pendingGrades = currentThematicGrades(throughSemester);
+  const pendingAverage = pendingGrades.some((grade) => grade.date >= start)
+    ? meanScore(pendingGrades) : null;
+  return meanScore([...thematicGrades, ...(pendingAverage === null ? [] : [pendingAverage])]);
+}
+
+function gradeType(grade) {
+  return grade.workTypeCode ?? grade.workType;
+}
+
+function meanScore(values) {
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + Number(typeof value === "number" ? value : value.grade), 0) / values.length;
 }
 
 export function calculateAverage(grades) {
@@ -157,13 +206,9 @@ function monthPeriod(value) {
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 
-function dateValue(value) {
-  return Date.parse(`${value}T12:00:00`);
-}
-
-function forecastGrade(average) {
+function forecastGrade(average, fractionDigits) {
   return average === null ? null : average.toLocaleString("uk-UA", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   });
 }

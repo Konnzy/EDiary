@@ -15,13 +15,16 @@ import {
   KeyRound,
   LockKeyhole,
   LogOut,
+  Loader2,
   Mail,
   Phone,
+  Plus,
   Save,
   ShieldCheck,
   Trash2,
   User,
   UserRound,
+  X,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { LearnerNavigation } from "@/components/LearnerNavigation.jsx";
@@ -30,7 +33,8 @@ import { Alert } from "@/components/ui/alert.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
-import { authApi, userProfileApi } from "@/lib/api.js";
+import { ApiError, authApi, parentApi, userProfileApi } from "@/lib/api.js";
+import { childOptionLabel } from "@/lib/childOption.js";
 import { getPasswordStrength } from "@/lib/passwordStrength.js";
 import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
 import { TeacherNavigation } from "@/components/TeacherNavigation.jsx";
@@ -97,7 +101,7 @@ const notificationOptions = {
   ],
 };
 
-export function UserProfilePage({ role }) {
+export function UserProfilePage({ role, openAddChild = false }) {
   const config = roleConfig[role];
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -112,7 +116,16 @@ export function UserProfilePage({ role }) {
   const [notificationError, setNotificationError] = useState("");
   const [notificationNotice, setNotificationNotice] = useState("");
   const [selectedChildId, setSelectedChildId] = useState("");
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(role === "PARENT" && openAddChild);
+  const [linkCode, setLinkCode] = useState("");
+  const [linkError, setLinkError] = useState("");
+  const [isLinking, setIsLinking] = useState(false);
+  const [linkNotice, setLinkNotice] = useState("");
   const fileInput = useRef(null);
+
+  useEffect(() => {
+    if (role === "PARENT" && openAddChild) setIsLinkModalOpen(true);
+  }, [role, openAddChild]);
 
   useEffect(() => {
     let active = true;
@@ -123,7 +136,8 @@ export function UserProfilePage({ role }) {
       setData(profile);
       setPhone(profile.personal.phone || "");
       setNotificationDraft(profile.notifications);
-      setSelectedChildId(profile.children[0]?.id || "");
+      setSelectedChildId((current) => profile.children.some((child) => child.id === current)
+        ? current : profile.children[0]?.id || "");
       setLoadError("");
     }).catch((error) => {
       if (active) setLoadError(error.message || "Не вдалося завантажити профіль.");
@@ -217,6 +231,46 @@ export function UserProfilePage({ role }) {
     setSelectedChildId(childId);
   };
 
+  const resetLinkModal = () => {
+    setIsLinkModalOpen(false);
+    setLinkCode("");
+    setLinkError("");
+    if (window.location.hash.startsWith("#parent/profile?")) {
+      window.location.hash = "parent/profile";
+    }
+  };
+
+  const closeLinkModal = () => {
+    if (!isLinking) resetLinkModal();
+  };
+
+  const linkChild = async (event) => {
+    event.preventDefault();
+    if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(linkCode)) {
+      setLinkError("Введіть код у форматі XXXX-XXXX");
+      return;
+    }
+    setIsLinking(true);
+    setLinkError("");
+    try {
+      const child = await parentApi.linkChild(linkCode);
+      setSelectedChildId(String(child.studentId));
+      try {
+        const response = await userProfileApi.find();
+        const updatedChildren = mapProfileResponse(response).children;
+        setData((current) => ({ ...current, children: updatedChildren }));
+        setLinkNotice("Дитину додано до профілю.");
+      } catch {
+        setLinkNotice("Дитину додано. Оновіть сторінку, щоб побачити її дані.");
+      }
+      resetLinkModal();
+    } catch (error) {
+      setLinkError(error instanceof ApiError ? error.message : "Не вдалося додати дитину.");
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
   if (!data) {
     return <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       {loadError
@@ -265,7 +319,7 @@ export function UserProfilePage({ role }) {
                   onPhoneSave={savePhone}
                 />
                 {role === "STUDENT" ? <EducationInformation className="xl:col-start-1 xl:row-start-2" data={data.education} /> : null}
-                {role === "PARENT" ? <LinkedChildInformation className="xl:col-start-1 xl:row-start-2" children={data.children} selectedChildId={selectedChildId} onSelect={selectChild} /> : null}
+                {role === "PARENT" ? <LinkedChildInformation className="xl:col-start-1 xl:row-start-2" children={data.children} selectedChildId={selectedChildId} notice={linkNotice} onSelect={selectChild} onAdd={() => { setLinkNotice(""); setIsLinkModalOpen(true); }} /> : null}
                 {role === "TEACHER" ? <ProfessionalInformation className="xl:col-start-1 xl:row-start-2" data={data.professional} /> : null}
                 <NotificationSettings
                   className="xl:col-start-2 xl:row-start-1"
@@ -287,6 +341,16 @@ export function UserProfilePage({ role }) {
           <AppFooter />
         </div>
       </div>
+      {role === "PARENT" && isLinkModalOpen ? (
+        <LinkChildModal
+          code={linkCode}
+          error={linkError}
+          isSubmitting={isLinking}
+          onChange={(value) => { setLinkCode(formatLinkCode(value)); setLinkError(""); }}
+          onClose={closeLinkModal}
+          onSubmit={linkChild}
+        />
+      ) : null}
     </div>
   );
 }
@@ -330,6 +394,7 @@ function PersonalInformation({ className, role, data, phone, phoneError, phoneNo
     ["Прізвище", data.personal.lastName],
     ["По батькові", data.personal.patronymic || "Не вказано"],
     ["Логін", data.personal.login],
+    ["Електронна пошта", data.personal.email || "Не вказано"],
     ["Email батьків", data.personal.parentEmail || "Не прив’язано"],
     ["Телефон батьків", data.personal.parentPhone || "Не прив’язано"],
   ];
@@ -403,30 +468,89 @@ function TagList({ label, values }) {
   );
 }
 
-function LinkedChildInformation({ className, children, selectedChildId, onSelect }) {
+function LinkedChildInformation({ className, children, selectedChildId, notice, onSelect, onAdd }) {
   const selectedChild = children.find((child) => child.id === selectedChildId) || children[0];
-  if (!selectedChild) return <Section className={className} title="Пов’язана дитина" icon={GraduationCap}><p className="text-sm text-slate-500">Дитину ще не прив’язано до профілю.</p></Section>;
   return (
-    <Section className={className} title="Пов’язана дитина" icon={GraduationCap}>
-      <label htmlFor="profile-child" className="block border-b border-slate-200 pb-5">
-        <span className="text-[0.72rem] font-semibold text-slate-500">Оберіть дитину</span>
-        <span className="relative mt-2 block">
-          <select id="profile-child" value={selectedChild.id} onChange={(event) => onSelect(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-10 text-[0.82rem] font-semibold text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
-            {children.map((child) => <option key={child.id} value={child.id}>{child.fullName} · {child.className}</option>)}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-slate-400" aria-hidden="true" />
-        </span>
-      </label>
-      <div className="mt-5">
-      <InformationGrid fields={[
-        ["Повне ім’я", selectedChild.fullName],
-        ["Клас", selectedChild.className],
-        ["Класний керівник", selectedChild.teacherName],
-        ["Email класного керівника", selectedChild.teacherEmail],
-        ["Телефон класного керівника", selectedChild.teacherPhone],
-      ]} />
+    <Section className={className} title="Пов’язані діти" icon={GraduationCap}>
+      <div className="border-b border-slate-200 pb-5">
+        <label htmlFor="profile-child" className="block text-[0.72rem] font-semibold text-slate-500">Оберіть дитину</label>
+        <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <span className="relative min-w-0">
+            <select id="profile-child" value={selectedChild?.id || ""} onChange={(event) => onSelect(event.target.value)} disabled={!children.length} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-9 text-[0.82rem] font-semibold text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">
+              {children.length ? children.map((child) => <option key={child.id} value={child.id}>{childOptionLabel(child)}</option>) : <option value="">Немає прив’язаних дітей</option>}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+          </span>
+          <Button type="button" onClick={onAdd} className="h-10 whitespace-nowrap rounded-md px-3 text-xs"><Plus className="h-4 w-4" aria-hidden="true" /><span>Додати дитину</span></Button>
+        </div>
       </div>
+      {notice ? <SuccessMessage>{notice}</SuccessMessage> : null}
+      {!selectedChild ? <p className="mt-5 text-sm text-slate-500">Дитину ще не прив’язано до профілю.</p> : null}
+      {selectedChild ? <div className="mt-5">
+          <InformationGrid fields={[
+            ["Повне ім’я", selectedChild.fullName],
+            ["Електронна пошта", selectedChild.email || "Не вказано"],
+            ["Клас", selectedChild.className],
+            ["Класний керівник", selectedChild.teacherName],
+            ["Email класного керівника", selectedChild.teacherEmail],
+            ["Телефон класного керівника", selectedChild.teacherPhone],
+          ]} />
+      </div> : null}
     </Section>
+  );
+}
+
+function formatLinkCode(value) {
+  const characters = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+  return characters.length > 4
+    ? `${characters.slice(0, 4)}-${characters.slice(4)}`
+    : characters;
+}
+
+function LinkChildModal({ code, error, isSubmitting, onChange, onClose, onSubmit }) {
+  useEffect(() => {
+    const onKeyDown = (event) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-8" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section role="dialog" aria-modal="true" aria-labelledby="link-child-title" className="w-full max-w-[420px] rounded-lg border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 id="link-child-title" className="text-[1.05rem] font-bold text-slate-900">Додати дитину</h2>
+            <p className="mt-1.5 text-[0.78rem] leading-5 text-slate-500">Введіть код прив’язки, отриманий разом із реєстраційними даними дитини.</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={isSubmitting} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50" aria-label="Закрити"><X className="h-4 w-4" aria-hidden="true" /></button>
+        </div>
+
+        <form className="mt-5" onSubmit={onSubmit}>
+          <label htmlFor="parent-link-code" className="text-[0.78rem] font-semibold text-slate-700">Код прив’язки до дитини</label>
+          <input
+            id="parent-link-code"
+            value={code}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="XXXX-XXXX"
+            maxLength={9}
+            autoComplete="off"
+            autoFocus
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? "parent-link-code-error" : undefined}
+            className={cn("mt-2 h-11 w-full rounded-md border bg-white px-3 text-[0.9rem] font-semibold uppercase tracking-[0.08em] text-slate-800 outline-hidden transition-colors focus:ring-2", error ? "border-red-300 focus:border-red-400 focus:ring-red-100" : "border-slate-300 focus:border-slate-500 focus:ring-slate-200")}
+          />
+          {error ? <p id="parent-link-code-error" className="mt-2 text-[0.76rem] text-red-600">{error}</p> : null}
+
+          <div className="mt-6 flex justify-end gap-3">
+            <button type="button" onClick={onClose} disabled={isSubmitting} className="h-10 rounded-md border border-slate-300 bg-white px-4 text-[0.8rem] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Скасувати</button>
+            <button type="submit" disabled={isSubmitting || code.length !== 9} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-800 px-4 text-[0.8rem] font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
+              Додати
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
   );
 }
 

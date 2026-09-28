@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRightLeft, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Plus, Search, Trash2, UserMinus, Users, X } from "lucide-react";
+import { ArrowRightLeft, BarChart3, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Plus, Search, Trash2, UserMinus, Users, X } from "lucide-react";
 import { Alert } from "@/components/ui/alert.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
@@ -24,6 +24,7 @@ export function AdminClassDetailsPage({ classId }) {
   const [schoolClass, setSchoolClass] = useState(null);
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -31,7 +32,6 @@ export function AdminClassDetailsPage({ classId }) {
   const [dialog, setDialog] = useState(null);
   const [editing, setEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [journalPreviewStudent, setJournalPreviewStudent] = useState(null);
   const [checkingDeletion, setCheckingDeletion] = useState(false);
   const [actionError, setActionError] = useState("");
 
@@ -49,13 +49,15 @@ export function AdminClassDetailsPage({ classId }) {
     setError("");
     try {
       const classData = await adminClassesApi.findById(classId);
-      const [allClasses, classStudents] = await Promise.all([
+      const [allClasses, classStudents, classStatistics] = await Promise.all([
         adminClassesApi.findAll({ academicYear: classData.academicYear }),
         adminClassesApi.findStudents(classId),
+        adminClassesApi.findStatistics(classId),
       ]);
       setSchoolClass(classData);
       setClasses(allClasses);
       setStudents(classStudents);
+      setStatistics(classStatistics);
     } catch (requestError) {
       setError(requestMessage(requestError, "Не вдалося завантажити клас."));
     } finally {
@@ -120,9 +122,11 @@ export function AdminClassDetailsPage({ classId }) {
       ) : schoolClass ? (
         <>
           <ClassSummary schoolClass={schoolClass} studentCount={students.length} />
+          <ClassStatisticsCards statistics={statistics} />
           {actionError ? <div className="mt-5"><Alert>{actionError}</Alert></div> : null}
           {notice ? <SuccessNotice>{notice}</SuccessNotice> : null}
           <StudentsSection
+            classId={classId}
             students={students}
             visibleStudents={visibleStudents}
             query={query}
@@ -130,7 +134,6 @@ export function AdminClassDetailsPage({ classId }) {
             onAdd={() => setDialog({ type: "add" })}
             onTransfer={(student) => setDialog({ type: "transfer", student })}
             onRemove={(student) => setDialog({ type: "remove", student })}
-            onViewLearningData={setJournalPreviewStudent}
             editable={schoolClass.editable}
             draft={schoolClass.status === "DRAFT"}
           />
@@ -153,12 +156,6 @@ export function AdminClassDetailsPage({ classId }) {
         <DeleteClassDialog schoolClass={schoolClass} onClose={() => setDeleteDialogOpen(false)} />
       ) : null}
 
-      {journalPreviewStudent ? (
-        <JournalPendingDialog
-          student={journalPreviewStudent}
-          onClose={() => setJournalPreviewStudent(null)}
-        />
-      ) : null}
     </AdminLayout>
   );
 }
@@ -177,21 +174,24 @@ function ClassSummary({ schoolClass, studentCount }) {
   const status = statuses[schoolClass.status] || statuses.ARCHIVED;
   return (
     <section aria-label="Інформація про клас" className="rounded-lg border border-slate-200 bg-white p-5 sm:p-6">
-      <dl className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <Info label="Класний керівник" value={schoolClass.classTeacherName || "Не призначено"} />
-        <Info label="Кількість учнів" value={`${studentCount} / ${CLASS_CAPACITY}`} />
-        <Info label="Максимальна місткість" value={`${CLASS_CAPACITY} учнів`} />
-        <Info label="Статус класу" value={<span className={`inline-flex rounded-full border px-3 py-1 text-xs ${status.className}`}>{status.label}</span>} />
-      </dl>
+      <div className="flex flex-wrap items-center justify-between gap-5">
+        <dl className="grid min-w-0 flex-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          <Info label="Класний керівник" value={schoolClass.classTeacherName || "Не призначено"} />
+          <Info label="Кількість учнів" value={`${studentCount} / ${CLASS_CAPACITY}`} />
+          <Info label="Максимальна місткість" value={`${CLASS_CAPACITY} учнів`} />
+          <Info label="Статус класу" value={<span className={`inline-flex rounded-full border px-3 py-1 text-xs ${status.className}`}>{status.label}</span>} />
+        </dl>
+        {schoolClass.status !== "DRAFT" ? (
+          <a href={scheduleHref} className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950">
+            <CalendarDays className="h-4 w-4" />Переглянути розклад класу<ChevronRight className="h-4 w-4" />
+          </a>
+        ) : null}
+      </div>
       {schoolClass.status === "DRAFT" ? (
         <p className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           Призначте класного керівника, щоб клас став активним і до нього можна було додавати учнів та розклад.
         </p>
-      ) : (
-        <a href={scheduleHref} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950">
-          <CalendarDays className="h-4 w-4" />Переглянути розклад класу<ChevronRight className="h-4 w-4" />
-        </a>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -200,11 +200,24 @@ function Info({ label, value }) {
   return <div><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-2 break-words text-sm font-semibold text-slate-800">{value}</dd></div>;
 }
 
+function formatMetric(value) {
+  return value == null ? "—" : new Intl.NumberFormat("uk-UA", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value);
+}
+
+function ClassStatisticsCards({ statistics }) {
+  const cards = [
+    { icon: CalendarDays, label: "Пропущено уроків учнями", value: statistics?.recordedAttendance ? statistics.recordedAttendance - statistics.attended : "—", detail: "Сумарно за навчальний рік" },
+    { icon: BarChart3, label: "Відвідуваність класу", value: statistics?.attendancePercent == null ? "—" : `${formatMetric(statistics.attendancePercent)}%`, detail: statistics?.recordedAttendance ? `${statistics.attended} із ${statistics.recordedAttendance} внесених відміток` : "Відміток поки немає" },
+    { icon: BookOpen, label: "Середній бал класу", value: formatMetric(statistics?.averageGrade), detail: statistics?.gradeCount ? `${statistics.gradeCount} оцінок за навчальний рік` : "Оцінок поки немає" },
+  ];
+  return <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Статистика класу">{cards.map(({ icon: Icon, label, value, detail }) => <section key={label} className="rounded-lg border border-slate-200 bg-white p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-3 text-2xl font-bold text-slate-900">{value}</p><p className="mt-2 text-xs text-slate-500">{detail}</p></div><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600"><Icon className="h-4 w-4" /></span></div></section>)}</div>;
+}
+
 function SuccessNotice({ children }) {
   return <div role="status" className="mt-5 flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4 shrink-0" />{children}</div>;
 }
 
-function StudentsSection({ students, visibleStudents, query, onQueryChange, onAdd, onTransfer, onRemove, onViewLearningData, editable, draft }) {
+function StudentsSection({ classId, students, visibleStudents, query, onQueryChange, onAdd, onTransfer, onRemove, editable, draft }) {
   const full = students.length >= CLASS_CAPACITY;
   return (
     <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -227,10 +240,10 @@ function StudentsSection({ students, visibleStudents, query, onQueryChange, onAd
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
-              <tr><th className="px-5 py-3 font-medium">Учень</th><th className="px-5 py-3 font-medium">Статус учня</th><th className="px-5 py-3 text-right font-medium">Дії</th></tr>
+              <tr><th className="px-5 py-3 font-medium">ПІБ</th><th className="px-5 py-3 font-medium">Логін</th><th className="px-5 py-3 font-medium">Пошта</th><th className="px-5 py-3 font-medium">Статус учня</th><th className="px-5 py-3 text-right font-medium">Дії</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {visibleStudents.map((student) => <StudentRow key={student.id} student={student} editable={editable} onViewLearningData={() => onViewLearningData(student)} onTransfer={() => onTransfer(student)} onRemove={() => onRemove(student)} />)}
+              {visibleStudents.map((student) => <StudentRow key={student.id} classId={classId} student={student} editable={editable} onTransfer={() => onTransfer(student)} onRemove={() => onRemove(student)} />)}
             </tbody>
           </table>
         </div>
@@ -244,22 +257,8 @@ function StudentsSection({ students, visibleStudents, query, onQueryChange, onAd
   );
 }
 
-function StudentRow({ student, onViewLearningData, onTransfer, onRemove, editable }) {
-  return <tr className="hover:bg-slate-50/60"><td className="px-5 py-4"><div className="font-semibold text-slate-800">{student.fullName}</div><div className="mt-1 text-xs text-slate-500">{student.login}</div><div className="mt-1 break-all text-xs text-slate-400">{student.email}</div></td><td className="px-5 py-4"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${statusStyles[student.status] || statusStyles.STUDYING}`}>{statusLabels[student.status] || student.status}</span></td><td className="px-5 py-4"><div className="flex flex-wrap justify-end gap-2"><Button className="h-9 rounded-md border border-sky-300 bg-sky-50 px-3 text-xs text-sky-700 hover:bg-sky-100" onClick={onViewLearningData} title="Навчальні дані"><BookOpen className="h-4 w-4" /><span className="hidden 2xl:inline">Навчальні дані</span><span className="sr-only 2xl:hidden">Навчальні дані</span></Button>{editable ? <><Button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-700 hover:bg-slate-100" onClick={onTransfer} title="Перевести до іншого класу"><ArrowRightLeft className="h-4 w-4" /><span className="hidden 2xl:inline">Перевести до іншого класу</span><span className="sr-only 2xl:hidden">Перевести до іншого класу</span></Button><Button className="h-9 rounded-md border border-red-300 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100" onClick={onRemove} title="Вилучити з класу"><UserMinus className="h-4 w-4" /><span className="hidden 2xl:inline">Вилучити з класу</span><span className="sr-only 2xl:hidden">Вилучити з класу</span></Button></> : null}</div></td></tr>;
-}
-
-function JournalPendingDialog({ student, onClose }) {
-  const panel = useRef(null);
-
-  useEffect(() => {
-    const previous = document.activeElement;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    panel.current?.focus();
-    return () => { document.body.style.overflow = previousOverflow; previous?.focus(); };
-  }, []);
-
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><section ref={panel} tabIndex={-1} onKeyDown={(event) => event.key === "Escape" && onClose()} role="dialog" aria-modal="true" aria-labelledby="journal-pending-title" className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-2xl outline-hidden sm:p-6"><div className="flex items-start justify-between gap-4"><div><h2 id="journal-pending-title" className="text-base font-bold text-slate-950">Навчальні дані</h2><p className="mt-1 text-xs text-slate-500">{student.fullName}</p></div><button type="button" onClick={onClose} aria-label="Закрити" className="rounded p-1 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button></div><div className="mt-5 flex gap-4 rounded-md border border-sky-200 bg-sky-50 p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-sky-200 bg-white text-sky-700"><BookOpen className="h-5 w-5" /></span><div><h3 className="text-sm font-bold text-slate-900">Очікується реалізація модуля журналу</h3><p className="mt-1 text-sm leading-6 text-slate-600">Тут буде доступний перегляд оцінок, відвідування та домашніх завдань учня в режимі лише для читання.</p></div></div><div className="mt-6 flex justify-end"><Button type="button" onClick={onClose} className="h-9 rounded-md px-4 text-xs">Зрозуміло</Button></div></section></div>;
+function StudentRow({ classId, student, onTransfer, onRemove, editable }) {
+  return <tr className="hover:bg-slate-50/60"><td className="px-5 py-4 font-semibold text-slate-800">{student.fullName}</td><td className="px-5 py-4 text-slate-600">{student.login}</td><td className="break-all px-5 py-4 text-slate-600">{student.email || "—"}</td><td className="px-5 py-4"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${statusStyles[student.status] || statusStyles.STUDYING}`}>{statusLabels[student.status] || student.status}</span></td><td className="px-5 py-4"><div className="flex flex-wrap justify-end gap-2"><a className="inline-flex h-9 items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 text-xs font-medium text-sky-700 hover:bg-sky-100" href={`#admin/classes/${classId}/students/${student.id}/learning-data`} title="Навчальні дані"><BookOpen className="h-4 w-4" /><span className="hidden 2xl:inline">Навчальні дані</span><span className="sr-only 2xl:hidden">Навчальні дані</span></a>{editable ? <><Button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-700 hover:bg-slate-100" onClick={onTransfer} title="Перевести до іншого класу"><ArrowRightLeft className="h-4 w-4" /><span className="hidden 2xl:inline">Перевести до іншого класу</span><span className="sr-only 2xl:hidden">Перевести до іншого класу</span></Button><Button className="h-9 rounded-md border border-red-300 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100" onClick={onRemove} title="Вилучити з класу"><UserMinus className="h-4 w-4" /><span className="hidden 2xl:inline">Вилучити з класу</span><span className="sr-only 2xl:hidden">Вилучити з класу</span></Button></> : null}</div></td></tr>;
 }
 
 function MembershipDialog({ dialog, schoolClass, classes, onClose, onConfirm }) {

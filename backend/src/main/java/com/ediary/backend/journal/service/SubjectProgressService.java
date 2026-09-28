@@ -18,6 +18,7 @@ import com.ediary.backend.schedule.repository.LessonRepository;
 import com.ediary.backend.schedule.repository.ScheduleRepository;
 import com.ediary.backend.schedule.repository.StudentClassMembershipRepository;
 import com.ediary.backend.schedule.service.SchedulePeriod;
+import com.ediary.backend.schedule.service.TeacherClassService;
 import com.ediary.backend.user.entity.StudentProfile;
 import com.ediary.backend.user.parent.service.ParentAccessService;
 import com.ediary.backend.user.repository.StudentProfileRepository;
@@ -42,6 +43,7 @@ public class SubjectProgressService {
 
     private final StudentProfileRepository studentProfileRepository;
     private final ParentAccessService parentAccessService;
+    private final TeacherClassService teacherClassService;
     private final StudentClassMembershipRepository membershipRepository;
     private final ScheduleRepository scheduleRepository;
     private final LessonRepository lessonRepository;
@@ -63,6 +65,21 @@ public class SubjectProgressService {
     @Transactional(readOnly = true)
     public SubjectProgressResponse forParent(String login, Long studentId, String academicYear) {
         return find(parentAccessService.requireAccessibleStudent(login, studentId), academicYear);
+    }
+
+    @Transactional(readOnly = true)
+    public SubjectProgressResponse forAdmin(Long studentId, String academicYear) {
+        StudentProfile student = studentProfileRepository.findById(studentId)
+            .orElseThrow(() -> new ApplicationException(HttpStatus.NOT_FOUND, "STUDENT_PROFILE_NOT_FOUND",
+                "Профіль учня не знайдено"));
+        return find(student, academicYear);
+    }
+
+    @Transactional(readOnly = true)
+    public SubjectProgressResponse forHomeroomTeacher(
+        String teacherLogin, Long classId, Long studentId, String academicYear
+    ) {
+        return find(teacherClassService.requireStudent(teacherLogin, classId, studentId), academicYear);
     }
 
     private SubjectProgressResponse find(StudentProfile student, String requestedYear) {
@@ -112,7 +129,8 @@ public class SubjectProgressService {
                 Lesson lesson = lessonsById.get(grade.getLesson().getId());
                 subjects.get(lesson.getScheduleEntry().getSubject().getId()).grades.add(
                     new SubjectProgressResponse.Grade(
-                        grade.getId(), lesson.getDate(), lesson.getWorkType(), grade.getScore(), grade.getComment()
+                        grade.getId(), lesson.getDate(), lesson.getScheduleEntry().getLessonNumber(),
+                        lesson.getWorkType(), grade.getScore(), grade.getComment()
                     )
                 );
             });

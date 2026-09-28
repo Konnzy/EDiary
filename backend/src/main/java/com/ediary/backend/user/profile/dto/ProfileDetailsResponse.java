@@ -39,6 +39,7 @@ public record ProfileDetailsResponse(
     public record Child(
         Long id,
         String fullName,
+        String email,
         String className,
         String teacherName,
         String teacherEmail,

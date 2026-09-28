@@ -4,6 +4,7 @@ import { AdminHomePage } from "@/pages/AdminHome/AdminHomePage.jsx";
 import { AdminLoginPage } from "@/pages/AdminLogin/AdminLoginPage.jsx";
 import { AdminClassesPage } from "@/pages/AdminClasses/AdminClassesPage.jsx";
 import { AdminClassDetailsPage } from "@/pages/AdminClasses/AdminClassDetailsPage.jsx";
+import { AdminStudentLearningPage } from "@/pages/AdminClasses/AdminStudentLearningPage.jsx";
 import { AdminRequestsPage } from "@/pages/AdminRequests/AdminRequestsPage.jsx";
 import { AdminUsersPage } from "@/pages/AdminUsers/AdminUsersPage.jsx";
 import { AdminSubjectsPage } from "@/pages/AdminSubjects/AdminSubjectsPage.jsx";
@@ -16,6 +17,7 @@ import { StudentHomePage } from "@/pages/StudentHome/StudentHomePage.jsx";
 import { TeacherHomePage } from "@/pages/TeacherHome/TeacherHomePage.jsx";
 import { TeacherJournalPage } from "@/pages/TeacherJournal/TeacherJournalPage.jsx";
 import { TeacherStudentsPage } from "@/pages/TeacherStudents/TeacherStudentsPage.jsx";
+import { TeacherClassPage, TeacherStudentLearningPage } from "@/pages/TeacherClass/TeacherClassPage.jsx";
 import { ParentHomePage } from "@/pages/ParentHome/ParentHomePage.jsx";
 import { TermsOfUsePage } from "@/pages/TermsOfUse/TermsOfUsePage.jsx";
 import { PrivacyPolicyPage } from "@/pages/PrivacyPolicy/PrivacyPolicyPage.jsx";
@@ -184,6 +186,15 @@ function AppContent() {
     );
   }
 
+  const adminStudentLearningRoute = /^admin\/classes\/(\d+)\/students\/(\d+)\/learning-data$/.exec(route);
+  if (adminStudentLearningRoute) {
+    return (
+      <ProtectedRoute key={route} allowedRole="ADMIN" loginRoute="admin">
+        <AdminStudentLearningPage classId={Number(adminStudentLearningRoute[1])} studentId={Number(adminStudentLearningRoute[2])} />
+      </ProtectedRoute>
+    );
+  }
+
   const classRoute = /^admin\/classes\/(\d+)$/.exec(route);
   if (classRoute) {
     return (
@@ -222,16 +233,40 @@ function AppContent() {
     return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherHomePage /></ProtectedRoute>;
   }
 
-  if (route === "teacher/schedule") {
-    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><UserSchedulePage role="TEACHER" /></ProtectedRoute>;
+  if (route === "teacher/schedule" || route.startsWith("teacher/schedule?")) {
+    const params = new URLSearchParams(route.split("?")[1] || "");
+    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><UserSchedulePage role="TEACHER" initialClassId={params.get("classId") || ""} /></ProtectedRoute>;
   }
 
-  if (route === "teacher/journal") {
-    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherJournalPage /></ProtectedRoute>;
+  if (route === "teacher/journal" || route.startsWith("teacher/journal?")) {
+    const params = new URLSearchParams(route.split("?")[1] || "");
+    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherJournalPage
+      initialClassId={params.get("classId") || ""}
+      initialClassName={params.get("className") || ""}
+      initialSubjectId={params.get("subjectId") || ""}
+      initialSubjectName={params.get("subjectName") || ""}
+      initialMonth={params.get("month") || ""}
+      initialTarget={{
+        date: params.get("date") || "",
+        lessonNumber: params.get("lessonNumber") || "",
+        lessonId: params.get("lessonId") || "",
+        scheduleId: params.get("scheduleId") || "",
+      }}
+    /></ProtectedRoute>;
   }
 
   if (route === "teacher/students") {
     return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherStudentsPage /></ProtectedRoute>;
+  }
+
+  const teacherStudentLearningRoute = /^teacher\/my-class\/(\d+)\/students\/(\d+)\/learning-data$/.exec(route);
+  if (teacherStudentLearningRoute) {
+    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherStudentLearningPage classId={Number(teacherStudentLearningRoute[1])} studentId={Number(teacherStudentLearningRoute[2])} /></ProtectedRoute>;
+  }
+
+  if (route === "teacher/my-class" || route.startsWith("teacher/my-class?")) {
+    const params = new URLSearchParams(route.split("?")[1] || "");
+    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><TeacherClassPage initialClassId={params.get("classId") || ""} /></ProtectedRoute>;
   }
 
   if (route === "teacher/messages" || route.startsWith("teacher/messages?")) {
@@ -264,8 +299,9 @@ function AppContent() {
     return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserMessagesPage role="PARENT" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} /></ProtectedRoute>;
   }
 
-  if (route === "parent/profile") {
-    return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserProfilePage role="PARENT" /></ProtectedRoute>;
+  if (route === "parent/profile" || route.startsWith("parent/profile?")) {
+    const params = new URLSearchParams(route.split("?")[1] || "");
+    return <ProtectedRoute key="parent/profile" allowedRole="PARENT" loginRoute="login"><UserProfilePage role="PARENT" openAddChild={params.get("addChild") === "1"} /></ProtectedRoute>;
   }
 
   return <LoginPage />;

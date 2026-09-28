@@ -20,7 +20,9 @@ export const homeworkStatuses = [
 
 export function normalizeLessonForm(lesson) {
   return {
-    workType: workTypes.some((type) => type.value === lesson?.workType) ? lesson.workType : "CLASSWORK",
+    workType: lesson?.id && lesson.workType == null
+      ? ""
+      : workTypes.some((type) => type.value === lesson?.workType) ? lesson.workType : "CLASSWORK",
     topic: lesson?.topic ?? "",
     homework: lesson?.homework ?? "",
     homeworkDeadline: lesson?.homeworkDeadline ?? "",

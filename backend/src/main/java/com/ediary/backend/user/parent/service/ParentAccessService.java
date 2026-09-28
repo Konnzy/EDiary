@@ -77,6 +77,7 @@ public class ParentAccessService {
             student.getId(),
             student.getName(),
             student.getSurname(),
+            student.getPatronymic(),
             student.getUser().getLogin(),
             student.getUser().getEmail(),
             student.getSchoolClass() == null ? null : student.getSchoolClass().getDisplayName(),

@@ -46,3 +46,24 @@ test("builds period options and grade forecast without prototype data", () => {
     thematic: "9,00", semester: "9,00", annual: "9,00",
   });
 });
+
+test("forecasts thematic from current work and semester from thematic marks", () => {
+  const gradedSubject = {
+    grades: [
+      { date: "2026-09-03", grade: 8, workTypeCode: "CLASSWORK" },
+      { date: "2026-09-10", grade: 10, workTypeCode: "CONTROL" },
+      { date: "2026-09-30", grade: 11, workTypeCode: "THEMATIC" },
+      { date: "2026-10-02", grade: 7, workTypeCode: "CLASSWORK" },
+      { date: "2026-10-30", grade: 9, workTypeCode: "THEMATIC" },
+      { date: "2026-12-20", grade: 10, workTypeCode: "SEMESTER" },
+      { date: "2027-02-01", grade: 6, workTypeCode: "CLASSWORK" },
+      { date: "2027-02-28", grade: 8, workTypeCode: "THEMATIC" },
+      { date: "2027-05-30", grade: 7, workTypeCode: "SEMESTER" },
+    ],
+    attendance: [],
+    homework: [],
+  };
+  assert.deepEqual(getGradeForecast(gradedSubject, "2026/2027", "2026-10"), {
+    thematic: null, semester: "10,00", annual: "10,00",
+  });
+});

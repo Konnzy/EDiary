@@ -5,6 +5,8 @@ import com.ediary.backend.schedule.dto.request.SaveSchoolClassRequest;
 import com.ediary.backend.schedule.dto.response.AdminClassOptionsResponse;
 import com.ediary.backend.schedule.dto.response.AdminClassStudentResponse;
 import com.ediary.backend.schedule.dto.response.AdminSchoolClassResponse;
+import com.ediary.backend.schedule.dto.response.TeacherClassResponse;
+import com.ediary.backend.schedule.dto.response.AdminStudentParentContactResponse;
 import com.ediary.backend.schedule.dto.response.ClassTeacherOptionResponse;
 import com.ediary.backend.schedule.dto.response.ClassDeletionEligibilityResponse;
 import com.ediary.backend.schedule.entity.SchoolClass;
@@ -15,9 +17,11 @@ import com.ediary.backend.schedule.repository.SchoolClassRepository;
 import com.ediary.backend.schedule.repository.StudentClassMembershipRepository;
 import com.ediary.backend.user.entity.TeacherProfile;
 import com.ediary.backend.user.entity.StudentProfile;
+import com.ediary.backend.user.entity.ParentProfile;
 import com.ediary.backend.user.entity.StudentStatus;
 import com.ediary.backend.user.entity.UserStatus;
 import com.ediary.backend.user.repository.StudentProfileRepository;
+import com.ediary.backend.user.repository.StudentParentLinkRepository;
 import com.ediary.backend.user.repository.TeacherProfileRepository;
 import java.util.List;
 import java.util.ArrayList;
@@ -43,8 +47,10 @@ public class AdminSchoolClassService {
     private final SchoolClassRepository schoolClassRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final StudentProfileRepository studentProfileRepository;
+    private final StudentParentLinkRepository studentParentLinkRepository;
     private final StudentClassMembershipRepository membershipRepository;
     private final AcademicYearRepository academicYearRepository;
+    private final TeacherClassService teacherClassService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -93,6 +99,15 @@ public class AdminSchoolClassService {
     }
 
     @Transactional(readOnly = true)
+    public TeacherClassResponse.Statistics findStatistics(Long classId) {
+        SchoolClass schoolClass = requireClass(classId);
+        List<Long> studentIds = membershipRepository
+            .findAllBySchoolClassIdAndActiveTrueOrderByStudentSurnameAscStudentNameAsc(classId).stream()
+            .map(membership -> membership.getStudent().getId()).toList();
+        return teacherClassService.statistics(schoolClass, studentIds);
+    }
+
+    @Transactional(readOnly = true)
     public List<AdminClassStudentResponse> findStudents(Long classId, String query) {
         requireClass(classId);
         String normalizedQuery = normalize(query);
@@ -101,6 +116,25 @@ public class AdminSchoolClassService {
             .map(StudentClassMembership::getStudent)
             .filter(student -> matchesStudentQuery(student, normalizedQuery))
             .map(this::toStudentResponse)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminStudentParentContactResponse> findStudentParents(Long classId, Long studentId) {
+        requireClass(classId);
+        if (membershipRepository.findByStudentIdAndSchoolClassIdAndActiveTrue(studentId, classId).isEmpty()) {
+            throw new ApplicationException(HttpStatus.NOT_FOUND, "STUDENT_NOT_IN_CLASS", "Учня не знайдено в цьому класі");
+        }
+        return studentParentLinkRepository.findAllByStudent_IdOrderByPrimaryContactDesc(studentId).stream()
+            .map(link -> {
+                ParentProfile parent = link.getParent();
+                String fullName = parent.getSurname() + " " + parent.getName()
+                    + (parent.getPatronymic() == null || parent.getPatronymic().isBlank()
+                        ? "" : " " + parent.getPatronymic());
+                return new AdminStudentParentContactResponse(
+                    parent.getId(), fullName, parent.getEmail(), parent.getPhone()
+                );
+            })
             .toList();
     }
 
@@ -486,7 +520,7 @@ public class AdminSchoolClassService {
     private AdminClassStudentResponse toStudentResponse(StudentProfile student) {
         return new AdminClassStudentResponse(
             student.getId(),
-            student.getSurname() + " " + student.getName(),
+            studentFullName(student),
             student.getUser().getLogin(),
             student.getUser().getEmail(),
             student.getStatus()
@@ -495,9 +529,15 @@ public class AdminSchoolClassService {
 
     private boolean matchesStudentQuery(StudentProfile student, String query) {
         if (query == null) return true;
-        return (student.getSurname() + " " + student.getName() + " " + student.getUser().getLogin())
+        return (studentFullName(student) + " " + student.getUser().getLogin())
             .toLowerCase(Locale.ROOT)
             .contains(query);
+    }
+
+    private String studentFullName(StudentProfile student) {
+        return student.getSurname() + " " + student.getName()
+            + (student.getPatronymic() == null || student.getPatronymic().isBlank()
+                ? "" : " " + student.getPatronymic());
     }
 
     private boolean matchesQuery(SchoolClass schoolClass, String query) {

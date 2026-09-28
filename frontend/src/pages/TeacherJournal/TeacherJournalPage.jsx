@@ -52,12 +52,22 @@ const workTypeClasses = {
   YEAR: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800",
 };
 
-export function TeacherJournalPage() {
-  const [academicYear, setAcademicYear] = useState("");
+function sameOptionLabel(left, right) {
+  return Boolean(left && right)
+    && String(left).trim().toLocaleLowerCase("uk-UA") === String(right).trim().toLocaleLowerCase("uk-UA");
+}
+
+export function TeacherJournalPage({ initialClassId = "", initialClassName = "", initialSubjectId = "", initialSubjectName = "", initialMonth = "", initialTarget = null }) {
+  const [academicYear, setAcademicYear] = useState(() => {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(initialMonth)) return "";
+    const year = Number(initialMonth.slice(0, 4));
+    const start = Number(initialMonth.slice(5)) >= 9 ? year : year - 1;
+    return `${start}/${start + 1}`;
+  });
   const [options, setOptions] = useState(null);
-  const [classId, setClassId] = useState("");
-  const [subjectId, setSubjectId] = useState("");
-  const [period, setPeriod] = useState("");
+  const [classId, setClassId] = useState(initialClassId);
+  const [subjectId, setSubjectId] = useState(initialSubjectId);
+  const [period, setPeriod] = useState(initialMonth);
   const [journal, setJournal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,6 +78,12 @@ export function TeacherJournalPage() {
   const [notice, setNotice] = useState("");
   const selectedClass = options?.classes.find((item) => String(item.id) === String(classId));
   const selectedSubject = selectedClass?.subjects.find((item) => String(item.id) === String(subjectId));
+  const matchesLinkedClass = initialClassId
+    ? String(classId) === String(initialClassId)
+    : sameOptionLabel(selectedClass?.label, initialClassName);
+  const matchesLinkedSubject = initialSubjectId
+    ? String(subjectId) === String(initialSubjectId)
+    : sameOptionLabel(selectedSubject?.label, initialSubjectName);
   const periods = useMemo(() => monthPeriods(academicYear), [academicYear]);
 
   useEffect(() => {
@@ -76,15 +92,20 @@ export function TeacherJournalPage() {
       if (!active) return;
       setOptions({ ...result, academicYears: [...new Set([result.currentAcademicYear, ...(result.academicYears || [])].filter(Boolean))] });
       if (!academicYear) setAcademicYear(result.currentAcademicYear || result.academicYears?.[0] || "");
-      setClassId((current) => result.classes.some((item) => String(item.id) === String(current)) ? current : String(result.classes[0]?.id || ""));
+      const linkedClass = result.classes.find((item) => String(item.id) === String(initialClassId))
+        || result.classes.find((item) => sameOptionLabel(item.label, initialClassName));
+      setClassId((current) => result.classes.some((item) => String(item.id) === String(current))
+        ? current : String(linkedClass?.id || result.classes[0]?.id || ""));
     }).catch((requestError) => { if (active) setError(requestError.message || "Не вдалося завантажити класи."); });
     return () => { active = false; };
-  }, [academicYear]);
+  }, [academicYear, initialClassId, initialClassName]);
 
   useEffect(() => {
     setSubjectId((current) => selectedClass?.subjects.some((item) => String(item.id) === String(current))
-      ? current : String(selectedClass?.subjects[0]?.id || ""));
-  }, [selectedClass]);
+      ? current : String(selectedClass?.subjects.find((item) => String(item.id) === String(initialSubjectId))?.id
+        || selectedClass?.subjects.find((item) => sameOptionLabel(item.label, initialSubjectName))?.id
+        || selectedClass?.subjects[0]?.id || ""));
+  }, [selectedClass, initialSubjectId, initialSubjectName]);
 
   useEffect(() => {
     if (!periods.length) return;
@@ -125,7 +146,7 @@ export function TeacherJournalPage() {
     setError("");
     try {
       await teacherJournalApi.saveLesson(lesson.scheduleId, lesson.date, {
-        ...value, homeworkDeadline: value.homeworkDeadline || null,
+        ...value, workType: value.workType || null, homeworkDeadline: value.homeworkDeadline || null,
       });
       setLessonEditor(null);
       setReload((current) => current + 1);
@@ -157,6 +178,11 @@ export function TeacherJournalPage() {
   });
 
   const markAllPresent = async (lesson) => {
+    if (!lesson.workType) {
+      setError("Спочатку вкажіть тип роботи уроку.");
+      setLessonEditor(lesson);
+      return;
+    }
     if (!lesson.topic?.trim()) {
       setError("Спочатку вкажіть тему уроку.");
       setLessonEditor(lesson);
@@ -239,14 +265,23 @@ export function TeacherJournalPage() {
                 </div>
 
                 <JournalTable
-                  journal={journal}
+                  key={`${classId}:${subjectId}:${period}`}
                   lessons={journal.lessons}
                   students={journal.students}
+                  initialTarget={matchesLinkedClass
+                    && matchesLinkedSubject
+                    && period === initialMonth ? initialTarget : null}
                   onLessonClick={setLessonEditor}
                   onMarkAllPresent={markAllPresent}
                   onClearAttendance={clearAttendance}
+                  onPageChange={() => setGradeEditor(null)}
                   saving={saving}
                   onGradeClick={(event, student, lesson) => {
+                    if (!lesson.workType) {
+                      setError("Спочатку вкажіть тип роботи уроку.");
+                      setLessonEditor(lesson);
+                      return;
+                    }
                     if (!lesson.id || !lesson.topic?.trim()) {
                       setError("Спочатку вкажіть тему уроку.");
                       setLessonEditor(lesson);
@@ -428,17 +463,59 @@ function SelectField({ label, value, onChange, children }) {
   );
 }
 
-function JournalTable({ lessons, students, onLessonClick, onGradeClick, onMarkAllPresent, onClearAttendance, saving }) {
-  if (!lessons.length) {
+function JournalTable({ lessons, students, initialTarget, onLessonClick, onGradeClick, onMarkAllPresent, onClearAttendance, onPageChange, saving }) {
+  const tableContainer = useRef(null);
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const [page, setPage] = useState(null);
+  const hasLessons = lessons.length > 0;
+
+  useLayoutEffect(() => {
+    const element = tableContainer.current;
+    if (!element) return undefined;
+    const updateWidth = () => setAvailableWidth(element.clientWidth);
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [hasLessons]);
+
+  const studentColumnWidth = Math.min(210, Math.max(120, Math.floor(availableWidth * 0.18)));
+  const estimateColumnWidth = Math.min(140, Math.max(80, Math.floor(availableWidth * 0.1)));
+  const lessonColumnWidth = 140;
+  const pageSize = Math.min(8, Math.max(1, Math.floor((availableWidth - studentColumnWidth - estimateColumnWidth) / lessonColumnWidth)));
+  const pageCount = Math.ceil(lessons.length / pageSize);
+  const targetIndex = findTargetLessonIndex(lessons, initialTarget);
+  const initialPage = targetIndex >= 0 ? Math.floor(targetIndex / pageSize) : 0;
+  const activePage = Math.min(page ?? initialPage, Math.max(0, pageCount - 1));
+  const firstLesson = Math.min(activePage * pageSize, Math.max(0, lessons.length - pageSize));
+  const visibleLessons = lessons.slice(firstLesson, firstLesson + pageSize);
+  const lastLesson = firstLesson + visibleLessons.length;
+  const changePage = (nextPage) => {
+    onPageChange();
+    setPage(nextPage);
+  };
+
+  if (!hasLessons) {
     return <div className="flex min-h-[220px] items-center justify-center px-4 text-center text-sm text-slate-500">У цьому місяці немає уроків за розкладом.</div>;
   }
   return (
-    <div className="max-h-[calc(100vh-330px)] min-h-[360px] overflow-auto">
-      <table className="w-max min-w-full border-separate border-spacing-0 text-left">
+    <div ref={tableContainer} className="min-w-0">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-slate-200 px-3 py-2.5 sm:px-5">
+        <button type="button" onClick={() => changePage(activePage - 1)} disabled={activePage === 0} className="inline-flex h-9 items-center gap-1 rounded-md border border-slate-200 px-2 text-[0.75rem] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3" aria-label="Попередні уроки"><ChevronLeft className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Попередні уроки</span></button>
+        <div className="min-w-0 text-center" aria-live="polite"><p className="text-[0.8rem] font-bold text-slate-800">Уроки {firstLesson + 1}–{lastLesson} з {lessons.length}</p><p className="truncate text-[0.7rem] text-slate-500">{formatJournalDate(visibleLessons[0].date)} — {formatJournalDate(visibleLessons.at(-1).date)}</p></div>
+        <button type="button" onClick={() => changePage(activePage + 1)} disabled={activePage === pageCount - 1} className="inline-flex h-9 items-center gap-1 rounded-md border border-slate-200 px-2 text-[0.75rem] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3" aria-label="Наступні уроки"><span className="hidden sm:inline">Наступні уроки</span><ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
+      </div>
+      <div className="max-h-[calc(100vh-330px)] min-h-[360px] overflow-y-auto overflow-x-hidden">
+      <table className="w-full table-fixed border-separate border-spacing-0 text-left">
+        <colgroup>
+          <col style={{ width: studentColumnWidth }} />
+          {visibleLessons.map((lesson) => <col key={`${lesson.scheduleId}:${lesson.date}`} />)}
+          <col style={{ width: estimateColumnWidth }} />
+        </colgroup>
         <thead className="sticky top-0 z-30 bg-slate-50">
           <tr>
-            <th className="sticky left-0 z-40 min-w-[210px] border-b border-r border-slate-200 bg-slate-50 px-4 py-3 text-[0.72rem] font-semibold text-slate-500">Учень</th>
-            {lessons.map((lesson) => (
+            <th className="sticky left-0 z-40 border-b border-r border-slate-200 bg-slate-50 px-2 py-3 text-[0.72rem] font-semibold text-slate-500 sm:px-4">Учень</th>
+            {visibleLessons.map((lesson) => (
               <DateHeader
                 key={`${lesson.scheduleId}:${lesson.date}`}
                 date={lesson.date}
@@ -450,37 +527,54 @@ function JournalTable({ lessons, students, onLessonClick, onGradeClick, onMarkAl
                 saving={saving}
               />
             ))}
-            <th className="min-w-[86px] border-b border-l border-slate-200 bg-slate-50 px-2 py-3 text-center text-[0.7rem] font-semibold text-slate-500">Середній Бал</th>
+            <th className="sticky right-0 z-40 border-b border-l border-slate-200 bg-slate-50 px-1 py-3 text-center text-[0.7rem] font-semibold text-slate-500" title="Середнє поточних оцінок після останньої виставленої тематичної до кінця вибраного місяця">Орієнтовна тематична</th>
           </tr>
         </thead>
         <tbody>
           {students.map((student, studentIndex) => (
             <tr key={student.id} className="group/row">
-              <th className="sticky left-0 z-20 border-b border-r border-slate-200 bg-white px-4 py-3.5">
-                <div className="flex items-center gap-3">
+              <th className="sticky left-0 z-20 border-b border-r border-slate-200 bg-white px-2 py-3.5 sm:px-4" title={student.name}>
+                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-slate-100 text-[0.68rem] font-bold text-slate-500">{studentIndex + 1}</span>
-                  <span className="whitespace-nowrap text-[0.8rem] font-semibold text-slate-800">{student.name}</span>
+                  <span className="min-w-0 truncate text-left text-[0.8rem] font-semibold text-slate-800">{student.name}</span>
                 </div>
               </th>
-              {lessons.map((lesson) => {
+              {visibleLessons.map((lesson) => {
                 const cell = lesson.cells.find((item) => item.studentId === student.id);
                 return <GradeCell key={`${lesson.scheduleId}:${lesson.date}`} grade={cell} onClick={(event) => onGradeClick(event, student, lesson)} />;
               })}
-              <td className="border-b border-l border-slate-200 bg-slate-50/50 px-2 text-center text-[0.8rem] font-bold text-slate-700">
-                {averageForStudent(lessons, student.id)}
+              <td className="sticky right-0 z-10 border-b border-l border-slate-200 bg-slate-50 px-1 text-center text-[0.8rem] font-bold text-slate-700">
+                {formatThematicEstimate(student.thematicEstimate)}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
 
-function averageForStudent(lessons, studentId) {
-  const scores = lessons.map((lesson) => lesson.cells.find((cell) => cell.studentId === studentId)?.score)
-    .filter((score) => Number.isInteger(score));
-  return scores.length ? (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1) : "—";
+function findTargetLessonIndex(lessons, target) {
+  if (!target?.date) return -1;
+  if (target.lessonId) {
+    const index = lessons.findIndex((lesson) => String(lesson.id) === String(target.lessonId));
+    if (index >= 0) return index;
+  }
+  if (target.scheduleId) {
+    const index = lessons.findIndex((lesson) => lesson.date === target.date
+      && String(lesson.scheduleId) === String(target.scheduleId));
+    if (index >= 0) return index;
+  }
+  return lessons.findIndex((lesson) => lesson.date === target.date
+    && String(lesson.lessonNumber) === String(target.lessonNumber));
+}
+
+function formatThematicEstimate(value) {
+  return Number.isFinite(value) ? value.toLocaleString("uk-UA", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }) : "—";
 }
 
 function monthPeriods(academicYear) {
@@ -541,19 +635,19 @@ function DateHeader({ date, lesson, onClick, onMarkAllPresent, onClearAttendance
   };
 
   return (
-    <th className={cn("w-[168px] min-w-[168px] max-w-[168px] border-b border-r border-slate-200 p-0 text-center align-top", today && "bg-emerald-50")}>
+    <th className={cn("border-b border-r border-slate-200 p-0 text-center align-top", today && "bg-emerald-50")}>
       <div className="relative">
         <button type="button" onClick={onClick} className="group/date flex min-h-[154px] w-full flex-col items-center px-2 py-2.5 text-left hover:bg-slate-100" title="Редагувати дані уроку">
-          <span className="text-[0.64rem] font-semibold text-slate-500">{parts.weekday}</span>
+          <span className="max-w-full truncate text-[0.64rem] font-semibold text-slate-500">{parts.weekday}</span>
           <span className="mt-0.5 text-[0.82rem] font-bold text-slate-800">{parts.day}.{parts.month}</span>
           <span className="text-[0.61rem] font-medium text-slate-500">{lesson.lessonNumber}-й урок</span>
           <span className={cn(
-            "mt-1 flex h-5 max-w-full items-center rounded px-1.5 text-[0.6rem] font-bold",
+            "mt-1 flex h-5 max-w-full items-center truncate rounded px-1.5 text-[0.6rem] font-bold",
             type
               ? cn("border", workTypeClasses[type.value])
               : "text-slate-300 group-hover/date:bg-white group-hover/date:text-slate-500",
           )}>
-            {type?.label || <Pencil className="h-3 w-3" aria-hidden="true" />}
+            {type?.label || (lesson?.id ? "Не вказано" : <Pencil className="h-3 w-3" aria-hidden="true" />)}
           </span>
           <span className="mt-2.5 w-full border-t border-slate-200 pt-2 text-[0.66rem] font-normal leading-4 text-slate-600" title={`Тема: ${topic}`}>
             <span className="block truncate"><span className="font-semibold">Тема:</span> {topic}</span>
@@ -648,6 +742,13 @@ function LessonDetailsDialog({ date, className, subject, initialValue, requestEr
   const [deadlineText, setDeadlineText] = useState(() => isoDateToUkrainian(form.homeworkDeadline));
   const [deadlineError, setDeadlineError] = useState("");
   const [topicError, setTopicError] = useState("");
+  const [workTypeError, setWorkTypeError] = useState("");
+  const hasPersistedJournalData = Boolean(
+    initialValue?.topic?.trim()
+    || initialValue?.homework?.trim()
+    || initialValue?.cells?.some((cell) => cell.score != null || cell.attendanceStatus || cell.homeworkStatus || cell.comment?.trim()),
+  );
+  const hasLessonData = hasPersistedJournalData || Boolean(form.topic.trim() || form.homework.trim());
   const formattedDate = new Intl.DateTimeFormat("uk-UA", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     .format(new Date(`${date}T12:00:00`));
 
@@ -666,6 +767,10 @@ function LessonDetailsDialog({ date, className, subject, initialValue, requestEr
     }
     if (deadlineText && !ukrainianDateToIso(deadlineText)) {
       setDeadlineError("Введіть коректну дату у форматі дд.мм.рррр.");
+      return;
+    }
+    if (!form.workType && hasLessonData) {
+      setWorkTypeError("Порожній тип можна зберегти лише якщо в уроці немає теми, ДЗ, відвідування чи оцінок.");
       return;
     }
     onSave({
@@ -689,9 +794,11 @@ function LessonDetailsDialog({ date, className, subject, initialValue, requestEr
         <form onSubmit={submit} className="mt-5 space-y-4">
           {requestError ? <p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{requestError}</p> : null}
           {topicError ? <p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">{topicError}</p> : null}
-          <SelectField label="Тип роботи" value={form.workType} onChange={(value) => setForm((current) => ({ ...current, workType: value }))}>
+          <SelectField label="Тип роботи" value={form.workType} onChange={(value) => { setWorkTypeError(""); setForm((current) => ({ ...current, workType: value })); }}>
+            <option value="" disabled={hasLessonData}>Не вказано</option>
             {workTypes.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </SelectField>
+          {workTypeError ? <p role="alert" className="-mt-2 text-[0.68rem] text-red-600">{workTypeError}</p> : !form.workType ? <p className="-mt-2 text-[0.68rem] text-slate-500">Порожній тип доступний лише для уроку без теми, ДЗ, відвідування та оцінок.</p> : null}
           <TextAreaField label="Тема уроку" value={form.topic} maxLength={200} rows={3} placeholder="Вкажіть тему уроку" onChange={(value) => { setTopicError(""); setForm((current) => ({ ...current, topic: value })); }} />
           <TextAreaField label="Домашнє завдання" value={form.homework} maxLength={500} rows={4} placeholder="Вкажіть домашнє завдання" onChange={(value) => setForm((current) => ({ ...current, homework: value }))} />
           <label className="block">
@@ -851,7 +958,7 @@ function GradePopover({ editor, initialValue, lesson, requestError, saving, onCl
             </button>
           ))}
         </div>
-        <p className="mt-3 text-[0.7rem] text-slate-500">Тип роботи: <span className="font-semibold text-slate-700">{workTypes.find((item) => item.value === lesson.workType)?.label || "Класна робота"}</span></p>
+        <p className="mt-3 text-[0.7rem] text-slate-500">Тип роботи: <span className="font-semibold text-slate-700">{workTypes.find((item) => item.value === lesson.workType)?.label || "Не вказано"}</span></p>
         <textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={2} maxLength={200} placeholder="Коментар до оцінки" className="mt-3 w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.76rem] leading-5 text-slate-800 outline-hidden placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200" />
         <p className="mb-2 mt-3 text-[0.7rem] font-semibold text-slate-600">Відвідування</p>
         <div className="grid grid-cols-5 gap-1.5" aria-label="Статус відвідування">
@@ -871,7 +978,7 @@ function GradePopover({ editor, initialValue, lesson, requestError, saving, onCl
         </div>
         <p className="mt-2 text-[0.64rem] leading-4 text-slate-400">Оцінка та відвідування зберігаються незалежно.</p>
         {hasHomework ? (
-          <div className="mt-3 border-t border-slate-200 pt-3">
+          <div className="mt-3 border-t border-slate-200 pb-3 pt-3">
             <p className="text-[0.7rem] font-semibold text-slate-600">Статус домашнього завдання</p>
             <p className="mt-1 line-clamp-2 text-[0.68rem] leading-4 text-slate-500" title={lesson.homework}>{lesson.homework}</p>
             {lesson.homeworkDeadline ? <p className="mt-1 text-[0.64rem] text-slate-400">Виконати до {formatJournalDate(lesson.homeworkDeadline)}</p> : null}

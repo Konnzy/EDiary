@@ -128,6 +128,12 @@
     border-color: #34414d;
   }
 
+  /* Tailwind 4 draws divide-y on each preceding child, including the first row. */
+  html.dark [class~="divide-slate-100"] > :not(:last-child),
+  html.dark [class~="divide-slate-200"] > :not(:last-child) {
+    border-color: #34414d;
+  }
+
   html.dark :is([class~="border-slate-200"], [class~="border-slate-200/80"], [class~="border-slate-200/85"], [class~="border-slate-200/90"], [class~="lg:border-slate-200/80"]) {
     border-color: #46535f;
   }

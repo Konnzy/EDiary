@@ -10,10 +10,8 @@ import {
   Loader2,
   LogOut,
   Mail,
-  Plus,
   User,
   UserRound,
-  X,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { LearnerNavigation } from "@/components/LearnerNavigation.jsx";
@@ -22,7 +20,7 @@ import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Alert } from "@/components/ui/alert.jsx";
 import { Card, CardContent, CardHeader } from "@/components/ui/card.jsx";
 import { ApiError, authApi, parentApi } from "@/lib/api.js";
-import { cn } from "@/lib/utils.js";
+import { childOptionLabel } from "@/lib/childOption.js";
 import { formatToday, useTodaySchedule } from "@/hooks/useTodaySchedule.js";
 
 const navigationItems = [
@@ -40,10 +38,6 @@ export function ParentHomePage() {
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
-  const [linkCode, setLinkCode] = useState("");
-  const [linkError, setLinkError] = useState("");
-  const [isLinking, setIsLinking] = useState(false);
   const progress = useStudentProgress("PARENT", selectedStudentId);
   const todaySchedule = useTodaySchedule("PARENT", selectedStudentId);
 
@@ -68,41 +62,10 @@ export function ParentHomePage() {
 
   const handleChildSelection = (value) => {
     if (value === "__add_child__") {
-      setLinkError("");
-      setLinkCode("");
-      setIsLinkModalOpen(true);
+      window.location.hash = "parent/profile?addChild=1";
       return;
     }
     setSelectedStudentId(value);
-  };
-
-  const closeLinkModal = () => {
-    if (isLinking) return;
-    setIsLinkModalOpen(false);
-    setLinkCode("");
-    setLinkError("");
-  };
-
-  const handleLinkChild = async (event) => {
-    event.preventDefault();
-    if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(linkCode)) {
-      setLinkError("Введіть код у форматі XXXX-XXXX");
-      return;
-    }
-
-    setIsLinking(true);
-    setLinkError("");
-    try {
-      const linkedChild = await parentApi.linkChild(linkCode);
-      setChildren((current) => [...current, linkedChild].sort(compareChildren));
-      setSelectedStudentId(String(linkedChild.studentId));
-      setIsLinkModalOpen(false);
-      setLinkCode("");
-    } catch (requestError) {
-      setLinkError(requestError instanceof ApiError ? requestError.message : "Не вдалося додати дитину.");
-    } finally {
-      setIsLinking(false);
-    }
   };
 
   return (
@@ -144,35 +107,8 @@ export function ParentHomePage() {
           <AppFooter />
         </div>
       </div>
-      {isLinkModalOpen ? (
-        <LinkChildModal
-          code={linkCode}
-          error={linkError}
-          isSubmitting={isLinking}
-          onChange={(value) => {
-            setLinkCode(formatLinkCode(value));
-            setLinkError("");
-          }}
-          onClose={closeLinkModal}
-          onSubmit={handleLinkChild}
-        />
-      ) : null}
     </div>
   );
-}
-
-function compareChildren(first, second) {
-  return `${first.lastName} ${first.firstName}`.localeCompare(
-    `${second.lastName} ${second.firstName}`,
-    "uk",
-  );
-}
-
-function formatLinkCode(value) {
-  const characters = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
-  return characters.length > 4
-    ? `${characters.slice(0, 4)}-${characters.slice(4)}`
-    : characters;
 }
 
 function ChildSelector({ children, value, onChange }) {
@@ -183,54 +119,13 @@ function ChildSelector({ children, value, onChange }) {
         <select id="parent-child-selector" value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-10 text-[0.82rem] font-semibold text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
           {!value ? <option value="" disabled>Оберіть дитину</option> : null}
           {children.map((child) => (
-            <option key={child.studentId} value={child.studentId}>{child.firstName} {child.lastName}{child.className ? ` · ${child.className}` : ""}</option>
+            <option key={child.studentId} value={child.studentId}>{childOptionLabel(child)}</option>
           ))}
           <option value="__add_child__">+ Додати дитину</option>
         </select>
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
       </div>
     </section>
-  );
-}
-
-function LinkChildModal({ code, error, isSubmitting, onChange, onClose, onSubmit }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-4 py-8" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section role="dialog" aria-modal="true" aria-labelledby="link-child-title" className="w-full max-w-[420px] rounded-lg border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 id="link-child-title" className="text-[1.05rem] font-bold text-slate-900">Додати дитину</h2>
-            <p className="mt-1.5 text-[0.78rem] leading-5 text-slate-500">Введіть код прив’язки, отриманий разом із реєстраційними даними дитини.</p>
-          </div>
-          <button type="button" onClick={onClose} disabled={isSubmitting} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50" aria-label="Закрити"><X className="h-4 w-4" aria-hidden="true" /></button>
-        </div>
-
-        <form className="mt-5" onSubmit={onSubmit}>
-          <label htmlFor="parent-link-code" className="text-[0.78rem] font-semibold text-slate-700">Код прив’язки до дитини</label>
-          <input
-            id="parent-link-code"
-            value={code}
-            onChange={(event) => onChange(event.target.value)}
-            placeholder="XXXX-XXXX"
-            maxLength={9}
-            autoComplete="off"
-            autoFocus
-            aria-invalid={Boolean(error)}
-            aria-describedby={error ? "parent-link-code-error" : undefined}
-            className={cn("mt-2 h-11 w-full rounded-md border bg-white px-3 text-[0.9rem] font-semibold uppercase tracking-[0.08em] text-slate-800 outline-hidden transition-colors focus:ring-2", error ? "border-red-300 focus:border-red-400 focus:ring-red-100" : "border-slate-300 focus:border-slate-500 focus:ring-slate-200")}
-          />
-          {error ? <p id="parent-link-code-error" className="mt-2 text-[0.76rem] text-red-600">{error}</p> : null}
-
-          <div className="mt-6 flex justify-end gap-3">
-            <button type="button" onClick={onClose} disabled={isSubmitting} className="h-10 rounded-md border border-slate-300 bg-white px-4 text-[0.8rem] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Скасувати</button>
-            <button type="submit" disabled={isSubmitting || code.length !== 9} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-800 px-4 text-[0.8rem] font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60">
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
-              Додати
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
   );
 }
 
@@ -269,7 +164,7 @@ function LoadingState() {
 }
 
 function EmptyChildren() {
-  return <Card className="rounded-lg px-5 py-12 text-center"><UserRound className="mx-auto h-8 w-8 text-slate-400" aria-hidden="true" /><h2 className="mt-4 text-[0.98rem] font-bold text-slate-900">Немає прив’язаних дітей</h2><p className="mt-2 text-[0.8rem] text-slate-500">Зверніться до адміністратора навчального закладу.</p></Card>;
+  return <Card className="rounded-lg px-5 py-12 text-center"><UserRound className="mx-auto h-8 w-8 text-slate-400" aria-hidden="true" /><h2 className="mt-4 text-[0.98rem] font-bold text-slate-900">Немає прив’язаних дітей</h2><p className="mt-2 text-[0.8rem] text-slate-500">Додайте дитину за кодом прив’язки у профілі.</p><a href="#parent/profile?addChild=1" className="mt-4 inline-flex text-[0.8rem] font-semibold text-slate-800 hover:underline">Додати дитину</a></Card>;
 }
 
 function TopBar() {

@@ -71,7 +71,8 @@ export function mapProfileResponse(response) {
     children: children?.map((child) => ({
       id: String(child.id),
       fullName: child.fullName,
-      className: display(child.className, "Не призначено"),
+      email: child.email,
+      className: display(child.className, "Клас не призначено"),
       teacherName: display(child.teacherName),
       teacherEmail: display(child.teacherEmail),
       teacherPhone: display(formatPhoneForDisplay(child.teacherPhone)),

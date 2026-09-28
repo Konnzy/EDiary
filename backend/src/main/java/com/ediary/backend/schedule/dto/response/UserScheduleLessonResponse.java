@@ -4,6 +4,8 @@ import com.ediary.backend.schedule.entity.Weekday;
 
 public record UserScheduleLessonResponse(
     Long id,
+    Long classId,
+    Long subjectId,
     Weekday weekday,
     Integer lessonNumber,
     String subject,

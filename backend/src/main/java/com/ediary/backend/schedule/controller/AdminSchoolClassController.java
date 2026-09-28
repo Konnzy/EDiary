@@ -5,6 +5,8 @@ import com.ediary.backend.schedule.dto.request.TransferStudentRequest;
 import com.ediary.backend.schedule.dto.response.AdminClassOptionsResponse;
 import com.ediary.backend.schedule.dto.response.AdminClassStudentResponse;
 import com.ediary.backend.schedule.dto.response.AdminSchoolClassResponse;
+import com.ediary.backend.schedule.dto.response.TeacherClassResponse;
+import com.ediary.backend.schedule.dto.response.AdminStudentParentContactResponse;
 import com.ediary.backend.schedule.dto.response.ClassDeletionEligibilityResponse;
 import com.ediary.backend.schedule.service.AdminSchoolClassService;
 import jakarta.validation.Valid;
@@ -50,6 +52,11 @@ public class AdminSchoolClassController {
         return service.findById(classId);
     }
 
+    @GetMapping("/{classId}/statistics")
+    public TeacherClassResponse.Statistics findStatistics(@PathVariable Long classId) {
+        return service.findStatistics(classId);
+    }
+
     @GetMapping("/{classId}/deletion-eligibility")
     public ClassDeletionEligibilityResponse getDeletionEligibility(@PathVariable Long classId) {
         return service.getDeletionEligibility(classId);
@@ -61,6 +68,14 @@ public class AdminSchoolClassController {
         @RequestParam(required = false) String query
     ) {
         return service.findStudents(classId, query);
+    }
+
+    @GetMapping("/{classId}/students/{studentId}/parents")
+    public List<AdminStudentParentContactResponse> findStudentParents(
+        @PathVariable Long classId,
+        @PathVariable Long studentId
+    ) {
+        return service.findStudentParents(classId, studentId);
     }
 
     @GetMapping("/students/unassigned")

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   BookOpenCheck,
   CalendarDays,
@@ -10,60 +11,59 @@ import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card, CardContent, CardHeader } from "@/components/ui/card.jsx";
-import { authApi } from "@/lib/api.js";
+import { authApi, teacherDashboardApi } from "@/lib/api.js";
 import { TeacherNavigation } from "@/components/TeacherNavigation.jsx";
 import { formatToday, useTodaySchedule } from "@/hooks/useTodaySchedule.js";
 
-const homework = [
-  {
-    group: "Алгебра • 10-А",
-    title: "Параграф 14, впр. 245-250",
-    status: "Призначено",
-    due: "До 24.05",
-    submitted: "18/24 здано",
-  },
-  {
-    group: "Геометрія • 9-Б",
-    title: "Контрольна робота №4",
-    status: "Перевірено",
-    due: "До 23.05",
-    submitted: "22/22 здано",
-  },
-  {
-    group: "Геометрія • 9-Б",
-    title: "Контрольна робота №4",
-    status: "Перевірено",
-    due: "До 23.05",
-    submitted: "22/22 здано",
-  },
-  {
-    group: "Геометрія • 9-Б",
-    title: "Контрольна робота №4",
-    status: "Перевірено",
-    due: "До 23.05",
-    submitted: "22/22 здано",
-  },
-];
-
 const hasUnreadNotifications = false;
 
-const classes = [
-  {
-    title: "10-А клас",
-    details: "24 учні • Математика",
-  },
-  {
-    title: "9-Б клас",
-    details: "22 учні • Математика",
-  },
-  {
-    title: "11-В клас",
-    details: "20 учнів • Математика",
-  },
-];
+function journalLink(item, date) {
+  if (!date) return "#teacher/journal";
+  const params = new URLSearchParams({
+    month: date.slice(0, 7),
+    date,
+  });
+  if (item.classId) params.set("classId", String(item.classId));
+  if (item.subjectId) params.set("subjectId", String(item.subjectId));
+  if (item.className) params.set("className", item.className);
+  if (item.subjectName || item.subject) params.set("subjectName", item.subjectName || item.subject);
+  if (item.lessonNumber) params.set("lessonNumber", String(item.lessonNumber));
+  if (item.lessonId) params.set("lessonId", String(item.lessonId));
+  if (item.id && !item.lessonId) params.set("scheduleId", String(item.id));
+  return `#teacher/journal?${params}`;
+}
+
+function todayIsoDate() {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+}
+
+function formatDate(value) {
+  return new Intl.DateTimeFormat("uk-UA", { day: "2-digit", month: "2-digit", year: "numeric" })
+    .format(new Date(`${value}T12:00:00`));
+}
+
+function formatUpdatedAt(value) {
+  return new Intl.DateTimeFormat("uk-UA", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    .format(new Date(value));
+}
 
 export function TeacherHomePage() {
   const todaySchedule = useTodaySchedule("TEACHER");
+  const [dashboard, setDashboard] = useState({ data: null, loading: true, error: "" });
+
+  useEffect(() => {
+    let active = true;
+    teacherDashboardApi.find()
+      .then((data) => {
+        if (!Array.isArray(data?.recentChanges) || !Array.isArray(data?.lessonsWithoutTopic)) {
+          throw new Error("Не вдалося завантажити дані журналу.");
+        }
+        if (active) setDashboard({ data, loading: false, error: "" });
+      })
+      .catch((error) => { if (active) setDashboard({ data: null, loading: false, error: error.message || "Не вдалося завантажити журнал." }); });
+    return () => { active = false; };
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
@@ -87,9 +87,9 @@ export function TeacherHomePage() {
 
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(320px,0.9fr)]">
                 <TodayScheduleCard schedule={todaySchedule} />
-                <HomeworkCard />
+                <RecentChangesCard dashboard={dashboard} />
                 <MessagesCard />
-                <ClassesCard />
+                <LessonsToCompleteCard dashboard={dashboard} />
               </div>
             </div>
           </main>
@@ -183,7 +183,7 @@ function TodayScheduleCard({ schedule }) {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => { window.location.hash = "teacher/journal"; }}
+              onClick={() => { window.location.hash = journalLink(lesson, todayIsoDate()); }}
               className="h-9 justify-self-start rounded-md px-3 text-[0.78rem] font-semibold text-slate-500 hover:bg-slate-100 sm:justify-self-end"
             >
               Журнал
@@ -196,35 +196,32 @@ function TodayScheduleCard({ schedule }) {
   );
 }
 
-function HomeworkCard() {
+function RecentChangesCard({ dashboard }) {
   return (
     <Card className="rounded-lg px-4 py-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] sm:px-5 xl:col-start-3 xl:row-span-2 xl:row-start-1">
       <CardHeader className="mb-4 space-y-0">
-        <SectionTitle>Домашні завдання</SectionTitle>
+        <SectionTitle>Останні зміни в журналі</SectionTitle>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {homework.map((item) => (
-          <article
-            key={`${item.group}-${item.submitted}`}
-            className="rounded-md border border-slate-200/80 bg-slate-50/75 px-4 py-4"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[0.74rem] font-bold text-slate-500">{item.group}</div>
-                <h3 className="mt-2 text-[0.86rem] font-bold leading-5 text-slate-800">{item.title}</h3>
-              </div>
-              <span className="shrink-0 text-[0.7rem] font-semibold text-slate-400">{item.due}</span>
+      <CardContent className="space-y-3">
+        <p className="text-[0.73rem] text-slate-500">Останні оновлені уроки</p>
+        {dashboard.loading ? <p className="py-8 text-center text-sm text-slate-400">Завантаження записів...</p> : null}
+        {dashboard.error ? <p role="alert" className="py-8 text-center text-sm text-red-600">{dashboard.error}</p> : null}
+        {!dashboard.loading && !dashboard.error && !dashboard.data?.recentChanges?.length ? (
+          <p className="py-8 text-center text-sm text-slate-500">Записів у журналі поки немає.</p>
+        ) : null}
+        {(dashboard.data?.recentChanges || []).map((item) => (
+          <a key={item.lessonId} href={journalLink(item, item.lessonDate)}
+            className="block rounded-md border border-slate-200 bg-slate-50/70 px-4 py-3 transition-colors hover:border-sky-200 hover:bg-sky-50/60">
+            <div className="flex items-center justify-between gap-3">
+              <span className="truncate text-[0.76rem] font-semibold text-slate-700">{item.subjectName} · {item.className}</span>
+              <span className="shrink-0 text-[0.69rem] text-slate-400">{formatUpdatedAt(item.updatedAt)}</span>
             </div>
-
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="rounded bg-slate-800 px-2 py-1 text-[0.66rem] font-bold text-white">
-                {item.status}
-              </span>
-              <span className="text-[0.72rem] font-semibold text-slate-400">{item.submitted}</span>
-            </div>
-          </article>
+            <p className="mt-1.5 line-clamp-2 text-[0.82rem] font-medium text-slate-900">{item.topic || "Оновлено запис уроку"}</p>
+            <p className="mt-1 text-[0.72rem] text-slate-500">Урок {formatDate(item.lessonDate)} · {item.lessonNumber}-й урок</p>
+          </a>
         ))}
+        <a href="#teacher/journal" className="inline-flex pt-1 text-[0.76rem] font-semibold text-slate-600 hover:text-slate-900">Відкрити журнал</a>
       </CardContent>
     </Card>
   );
@@ -245,29 +242,32 @@ function MessagesCard() {
   );
 }
 
-function ClassesCard() {
+function LessonsToCompleteCard({ dashboard }) {
   return (
     <Card className="rounded-lg px-4 py-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] sm:px-5">
-      <CardHeader className="mb-4 space-y-0">
-        <SectionTitle>Мої класи</SectionTitle>
+      <CardHeader className="mb-3 flex-row items-center justify-between space-y-0">
+        <SectionTitle>Потрібно заповнити</SectionTitle>
+        {dashboard.data?.lessonsWithoutTopicCount ? <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{dashboard.data.lessonsWithoutTopicCount}</span> : null}
       </CardHeader>
-
-      <CardContent className="space-y-4">
-        {classes.map((item) => (
-          <article key={item.title} className="flex items-center justify-between gap-4">
+      <CardContent className="space-y-2.5">
+        <p className="text-[0.73rem] text-slate-500">Уроки без теми за останні 14 днів</p>
+        {dashboard.loading ? <p className="py-4 text-sm text-slate-400">Завантаження...</p> : null}
+        {dashboard.error ? <p role="alert" className="py-4 text-sm text-red-600">{dashboard.error}</p> : null}
+        {!dashboard.loading && !dashboard.error && !dashboard.data?.lessonsWithoutTopicCount ? (
+          <div className="flex items-center gap-2 py-3 text-[0.8rem] text-emerald-700"><BookOpenCheck className="h-4 w-4" />Уроків без теми немає</div>
+        ) : null}
+        {(dashboard.data?.lessonsWithoutTopic || []).map((item) => (
+          <a key={`${item.classId}-${item.subjectId}-${item.date}-${item.lessonNumber}`} href={journalLink(item, item.date)} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2.5 transition-colors hover:border-amber-200 hover:bg-amber-50/50">
             <div className="min-w-0">
-              <h3 className="truncate text-[0.95rem] font-bold text-slate-900">{item.title}</h3>
-              <p className="mt-0.5 text-[0.74rem] text-slate-500">{item.details}</p>
+              <h3 className="truncate text-[0.8rem] font-semibold text-slate-900">{item.subjectName} · {item.className}</h3>
+              <p className="mt-0.5 text-[0.72rem] text-slate-500">{formatDate(item.date)} · {item.lessonNumber}-й урок</p>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-8 shrink-0 rounded-md bg-slate-100 px-3 text-[0.72rem] font-bold text-slate-600 hover:bg-slate-200"
-            >
-              Відкрити
-            </Button>
-          </article>
+            <span className="shrink-0 text-[0.72rem] font-semibold text-sky-700">Журнал</span>
+          </a>
         ))}
+        {dashboard.data?.lessonsWithoutTopicCount > (dashboard.data?.lessonsWithoutTopic || []).length ? (
+          <p className="text-[0.71rem] text-slate-500">Ще {dashboard.data.lessonsWithoutTopicCount - dashboard.data.lessonsWithoutTopic.length} уроків у журналі</p>
+        ) : null}
       </CardContent>
     </Card>
   );
