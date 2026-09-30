@@ -15,6 +15,7 @@ import com.ediary.backend.schedule.entity.StudentClassMembership;
 import com.ediary.backend.schedule.repository.AcademicYearRepository;
 import com.ediary.backend.schedule.repository.SchoolClassRepository;
 import com.ediary.backend.schedule.repository.StudentClassMembershipRepository;
+import com.ediary.backend.notification.service.UserNotificationService;
 import com.ediary.backend.user.entity.TeacherProfile;
 import com.ediary.backend.user.entity.StudentProfile;
 import com.ediary.backend.user.entity.ParentProfile;
@@ -51,6 +52,7 @@ public class AdminSchoolClassService {
     private final StudentClassMembershipRepository membershipRepository;
     private final AcademicYearRepository academicYearRepository;
     private final TeacherClassService teacherClassService;
+    private final UserNotificationService notificationService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -265,7 +267,11 @@ public class AdminSchoolClassService {
         ensureStudentCanBeAssigned(student);
         createMembership(student, targetClass);
         student.setSchoolClass(targetClass);
-        return toStudentResponse(studentProfileRepository.saveAndFlush(student));
+        AdminClassStudentResponse response = toStudentResponse(studentProfileRepository.saveAndFlush(student));
+        notificationService.forTeacher(targetClass.getClassTeacher(), "CLASS_ROSTER", "Зміна складу класу",
+            student.getSurname() + " " + student.getName() + " додано до " + targetClass.getDisplayName() + " класу",
+            "teacher/my-class?classId=" + targetClass.getId(), null);
+        return response;
     }
 
     @Transactional
@@ -295,7 +301,15 @@ public class AdminSchoolClassService {
         closeMembership(studentId, sourceClassId);
         createMembership(student, targetClass);
         student.setSchoolClass(targetClass);
-        return toStudentResponse(studentProfileRepository.saveAndFlush(student));
+        AdminClassStudentResponse response = toStudentResponse(studentProfileRepository.saveAndFlush(student));
+        String studentName = student.getSurname() + " " + student.getName();
+        notificationService.forTeacher(sourceClass.getClassTeacher(), "CLASS_ROSTER", "Зміна складу класу",
+            studentName + " переведено до " + targetClass.getDisplayName() + " класу",
+            "teacher/my-class?classId=" + sourceClassId, null);
+        notificationService.forTeacher(targetClass.getClassTeacher(), "CLASS_ROSTER", "Зміна складу класу",
+            studentName + " переведено з " + sourceClass.getDisplayName() + " класу",
+            "teacher/my-class?classId=" + targetClassId, null);
+        return response;
     }
 
     @Transactional
@@ -307,6 +321,9 @@ public class AdminSchoolClassService {
         closeMembership(studentId, classId);
         student.setSchoolClass(null);
         studentProfileRepository.saveAndFlush(student);
+        notificationService.forTeacher(schoolClass.getClassTeacher(), "CLASS_ROSTER", "Зміна складу класу",
+            student.getSurname() + " " + student.getName() + " вилучено з " + schoolClass.getDisplayName() + " класу",
+            "teacher/my-class?classId=" + classId, null);
     }
 
     private void ensureUniqueClass(String academicYear, Integer number, String letter, Long excludedId) {

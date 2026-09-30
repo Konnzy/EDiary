@@ -172,11 +172,15 @@ public class ProfileService {
                 preferences.setClassRosterChangeEmailEnabled(request.classRosterChange());
             }
         } else {
-            if (request.newGrade() == null || request.newHomework() == null || request.absence() == null || request.scheduleChange() == null) throw invalidPreferences();
+            if (request.newGrade() == null || request.newHomework() == null || request.absence() == null
+                || request.scheduleChange() == null || request.newMessage() == null
+                || request.homeworkDeadlineReminder() == null) throw invalidPreferences();
             preferences.setGradeEmailEnabled(request.newGrade());
             preferences.setHomeworkEmailEnabled(request.newHomework());
             preferences.setAttendanceEmailEnabled(request.absence());
             preferences.setScheduleChangeEmailEnabled(request.scheduleChange());
+            preferences.setMessageEmailEnabled(request.newMessage());
+            preferences.setHomeworkDeadlineReminderEmailEnabled(request.homeworkDeadlineReminder());
         }
         settings.save(preferences);
         return find(login);
@@ -235,12 +239,12 @@ public class ProfileService {
 
     private static ProfileDetailsResponse.NotificationPreferences toPreferences(UserNotificationSettings value) {
         return value == null
-            ? new ProfileDetailsResponse.NotificationPreferences(true, true, true, true, true, true, true, true)
+            ? new ProfileDetailsResponse.NotificationPreferences(true, true, true, true, true, true, true, true, true)
             : new ProfileDetailsResponse.NotificationPreferences(value.isGradeEmailEnabled(),
                 value.isHomeworkEmailEnabled(), value.isAttendanceEmailEnabled(),
                 value.isMessageEmailEnabled(), value.isScheduleChangeEmailEnabled(),
                 value.isClassScheduleChangeEmailEnabled(), value.isProlongedAbsenceEmailEnabled(),
-                value.isClassRosterChangeEmailEnabled());
+                value.isClassRosterChangeEmailEnabled(), value.isHomeworkDeadlineReminderEmailEnabled());
     }
 
     private boolean isHomeroomTeacher(AppUser user) {

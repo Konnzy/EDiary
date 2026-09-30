@@ -113,7 +113,7 @@ export function ParentHomePage() {
 
 function ChildSelector({ children, value, onChange }) {
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] sm:flex-row sm:items-center sm:px-5" aria-label="Вибір дитини">
+    <section className="flex w-full max-w-[480px] flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] sm:flex-row sm:items-center sm:px-5" aria-label="Вибір дитини">
       <label htmlFor="parent-child-selector" className="shrink-0 text-[0.8rem] font-bold text-slate-700">Перегляд даних:</label>
       <div className="relative w-full sm:max-w-[310px]">
         <select id="parent-child-selector" value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pr-10 text-[0.82rem] font-semibold text-slate-700 outline-hidden transition-colors hover:border-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">

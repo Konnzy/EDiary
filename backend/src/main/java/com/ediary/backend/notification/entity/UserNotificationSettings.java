@@ -36,6 +36,9 @@ public class UserNotificationSettings {
     @Column(name = "homework_email_enabled", nullable = false)
     private boolean homeworkEmailEnabled = true;
 
+    @Column(name = "homework_deadline_reminder_email_enabled", nullable = false)
+    private boolean homeworkDeadlineReminderEmailEnabled = true;
+
     @Column(name = "attendance_email_enabled", nullable = false)
     private boolean attendanceEmailEnabled = true;
 

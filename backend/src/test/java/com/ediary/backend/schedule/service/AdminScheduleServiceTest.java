@@ -48,6 +48,8 @@ class AdminScheduleServiceTest {
     @Mock private SubjectRepository subjectRepository;
     @Mock private TeacherProfileRepository teacherProfileRepository;
     @Mock private AcademicYearRepository academicYearRepository;
+    @Mock private com.ediary.backend.user.repository.StudentProfileRepository studentProfileRepository;
+    @Mock private com.ediary.backend.notification.service.UserNotificationService notificationService;
 
     private AdminScheduleService service;
 
@@ -59,6 +61,8 @@ class AdminScheduleServiceTest {
             subjectRepository,
             teacherProfileRepository,
             academicYearRepository,
+            studentProfileRepository,
+            notificationService,
             Clock.fixed(Instant.parse("2026-09-12T09:00:00Z"), ZoneOffset.UTC)
         );
     }

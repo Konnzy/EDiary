@@ -14,6 +14,8 @@ import com.ediary.backend.schedule.repository.AcademicYearRepository;
 import com.ediary.backend.schedule.repository.ScheduleRepository;
 import com.ediary.backend.schedule.repository.SchoolClassRepository;
 import com.ediary.backend.schedule.repository.SubjectRepository;
+import com.ediary.backend.notification.service.UserNotificationService;
+import com.ediary.backend.user.repository.StudentProfileRepository;
 import com.ediary.backend.user.entity.TeacherProfile;
 import com.ediary.backend.user.entity.UserStatus;
 import com.ediary.backend.user.repository.TeacherProfileRepository;
@@ -50,6 +52,8 @@ public class AdminScheduleService {
     private final SubjectRepository subjectRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final AcademicYearRepository academicYearRepository;
+    private final StudentProfileRepository studentProfileRepository;
+    private final UserNotificationService notificationService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -136,6 +140,17 @@ public class AdminScheduleService {
         validateTeacherConflicts(classId, academicYear, week, request.lessons());
 
         List<ScheduleEntry> currentEntries = scheduleRepository.findActiveForUpdate(classId, academicYear, week);
+        Map<Slot, ScheduleDefinition> previousDefinitions = currentEntries.stream().collect(Collectors.toMap(
+            this::slot, entry -> new ScheduleDefinition(entry.getSubject().getId(),
+                entry.getTeacher().getId(), entry.getRoom())
+        ));
+        Map<Slot, ScheduleDefinition> requestedDefinitions = requestedBySlot.entrySet().stream().collect(Collectors.toMap(
+            Map.Entry::getKey, item -> new ScheduleDefinition(item.getValue().subjectId(),
+                item.getValue().teacherId(), normalizeRoom(item.getValue().room()))
+        ));
+        boolean changed = !previousDefinitions.equals(requestedDefinitions);
+        Map<Long, TeacherProfile> previousTeachers = currentEntries.stream().map(ScheduleEntry::getTeacher)
+            .collect(Collectors.toMap(TeacherProfile::getId, Function.identity(), (first, ignored) -> first));
         Set<Long> referencedIds = currentEntries.isEmpty()
             ? Set.of()
             : new HashSet<>(scheduleRepository.findIdsReferencedByLessons(
@@ -193,6 +208,17 @@ public class AdminScheduleService {
         }
         savedEntries = scheduleRepository.saveAllAndFlush(savedEntries);
         savedEntries.sort(Comparator.comparing(ScheduleEntry::getWeekday).thenComparingInt(ScheduleEntry::getLessonNumber));
+        if (changed) {
+            String body = schoolClass.getDisplayName() + " клас · " + academicYear + " · " + week + "-й тиждень";
+            Map<Long, TeacherProfile> affectedTeachers = new HashMap<>(previousTeachers);
+            savedEntries.stream().map(ScheduleEntry::getTeacher).forEach(teacher -> affectedTeachers.put(teacher.getId(), teacher));
+            affectedTeachers.values().forEach(teacher -> notificationService.forTeacher(teacher,
+                "SCHEDULE", "Зміна розкладу", body, "teacher/schedule", null));
+            notificationService.forTeacher(schoolClass.getClassTeacher(), "CLASS_SCHEDULE",
+                "Зміна розкладу класу", body, "teacher/schedule?classId=" + classId, null);
+            studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(classId).forEach(student ->
+                notificationService.forStudent(student, "SCHEDULE", "Зміна розкладу", body, null));
+        }
         return toResponse(classId, academicYear, week, savedEntries);
     }
 
@@ -411,6 +437,9 @@ public class AdminScheduleService {
     }
 
     private record Slot(Weekday weekday, Integer lessonNumber) {
+    }
+
+    private record ScheduleDefinition(Long subjectId, Long teacherId, String room) {
     }
 
     private record TeacherSlot(Long teacherId, Weekday weekday, Integer lessonNumber) {

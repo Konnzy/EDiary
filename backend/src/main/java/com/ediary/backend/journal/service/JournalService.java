@@ -17,6 +17,7 @@ import com.ediary.backend.journal.repository.AttendanceRepository;
 import com.ediary.backend.journal.repository.GradeRepository;
 import com.ediary.backend.journal.repository.HomeworkRepository;
 import com.ediary.backend.journal.repository.StudentHomeworkRepository;
+import com.ediary.backend.notification.service.UserNotificationService;
 import com.ediary.backend.schedule.entity.Lesson;
 import com.ediary.backend.schedule.entity.LessonStatus;
 import com.ediary.backend.schedule.entity.ScheduleEntry;
@@ -41,9 +42,11 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,6 +66,7 @@ public class JournalService {
     private final GradeService gradeService;
     private final AttendanceService attendanceService;
     private final LessonService lessonService;
+    private final UserNotificationService notificationService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -273,6 +277,8 @@ public class JournalService {
                 homeworkRepository.delete(homework);
             }
         } else {
+            boolean homeworkChanged = homework == null || !Objects.equals(homework.getDescription(), homeworkText)
+                || !Objects.equals(homework.getDeadline(), request.homeworkDeadline());
             if (homework == null) {
                 homework = new Homework();
                 homework.setLesson(lesson);
@@ -280,7 +286,20 @@ public class JournalService {
             }
             homework.setDescription(homeworkText);
             homework.setDeadline(request.homeworkDeadline());
-            homeworkRepository.save(homework);
+            homework = homeworkRepository.save(homework);
+            if (homeworkChanged) {
+                String description = lesson.getScheduleEntry().getSubject().getTitle()
+                    + (homework.getDeadline() == null ? "" : " · до " + homework.getDeadline());
+                for (StudentProfile student : studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(
+                    lesson.getScheduleEntry().getSchoolClass().getId())) {
+                    notificationService.forStudent(student, "HOMEWORK", "Нове домашнє завдання", description, null);
+                    if (LocalDate.now(clock).plusDays(1).equals(homework.getDeadline())) {
+                        notificationService.forStudent(student, "HOMEWORK_DEADLINE", "Дедлайн домашнього завдання",
+                            lesson.getScheduleEntry().getSubject().getTitle() + " · виконати до " + homework.getDeadline(),
+                            "homework-deadline:" + homework.getId() + ":" + homework.getDeadline());
+                    }
+                }
+            }
         }
     }
 
@@ -310,6 +329,10 @@ public class JournalService {
         if (request.score() != null || request.attendanceStatus() != null || request.homeworkStatus() != null) {
             LessonTopicPolicy.requireTopic(lesson.getTopic());
         }
+        Integer previousScore = gradeRepository.findAllByStudentIdAndLessonId(studentId, lessonId).stream()
+            .map(Grade::getScore).findFirst().orElse(null);
+        AttendanceStatus previousAttendance = attendanceRepository.findByStudentIdAndLessonId(studentId, lessonId)
+            .map(Attendance::getStatus).orElse(null);
         gradeService.save(student, lesson, request.score(), gradeType(lesson.getWorkType()), request.comment());
         attendanceService.save(student, lesson, request.attendanceStatus());
 
@@ -335,6 +358,26 @@ public class JournalService {
             }
         }
         lesson.setUpdatedAt(LocalDateTime.now(clock));
+        String subject = lesson.getScheduleEntry().getSubject().getTitle();
+        if (request.score() != null && !Objects.equals(previousScore, request.score())) {
+            notificationService.forStudent(student, "GRADE", "Нова оцінка",
+                subject + " · " + request.score() + " балів", null);
+        }
+        if (request.attendanceStatus() == AttendanceStatus.ABSENT
+            && previousAttendance != AttendanceStatus.ABSENT) {
+            notificationService.forStudent(student, "ABSENCE", "Відсутність на уроці",
+                subject + " · " + lesson.getDate(), null);
+            List<Attendance> recent = attendanceRepository.findRecentByStudentId(studentId, PageRequest.of(0, 3));
+            if (recent.size() == 3 && recent.getFirst().getLesson().getId().equals(lessonId)
+                && recent.stream().allMatch(item -> item.getStatus() == AttendanceStatus.ABSENT)) {
+                var schoolClass = lesson.getScheduleEntry().getSchoolClass();
+                notificationService.forTeacher(schoolClass.getClassTeacher(), "PROLONGED_ABSENCE",
+                    "Тривалі пропуски", student.getSurname() + " " + student.getName()
+                        + " пропустив(-ла) щонайменше 3 уроки поспіль",
+                    "teacher/my-class?classId=" + schoolClass.getId(),
+                    "absence:" + studentId + ":" + lessonId);
+            }
+        }
     }
 
     @Transactional

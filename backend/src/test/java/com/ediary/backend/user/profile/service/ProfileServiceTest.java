@@ -160,7 +160,7 @@ class ProfileServiceTest {
         when(users.findByLoginIgnoreCase("student.test")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> service.updateNotifications("student.test",
-            new UpdateNotificationPreferencesRequest(true, null, true, null, null, null, null, null)))
+            new UpdateNotificationPreferencesRequest(true, null, true, null, null, null, null, null, null)))
             .isInstanceOf(ApplicationException.class);
     }
 }

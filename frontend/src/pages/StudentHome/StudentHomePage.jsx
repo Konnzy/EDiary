@@ -28,8 +28,6 @@ const navigationItems = [
 
 
 
-const hasUnreadNotifications = false;
-
 export function StudentHomePage() {
   const progress = useStudentProgress("STUDENT");
   const todaySchedule = useTodaySchedule("STUDENT");
@@ -98,7 +96,7 @@ function TopBar() {
       </a>
 
       <div className="flex items-center gap-1.5 sm:gap-4">
-        <NotificationButton hasUnread={hasUnreadNotifications} />
+        <NotificationButton />
 
         <CurrentUserBadge />
 

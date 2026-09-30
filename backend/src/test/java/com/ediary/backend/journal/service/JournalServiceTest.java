@@ -59,6 +59,7 @@ class JournalServiceTest {
     @Mock private GradeService gradeService;
     @Mock private AttendanceService attendanceService;
     @Mock private LessonService lessonService;
+    @Mock private com.ediary.backend.notification.service.UserNotificationService notificationService;
     @Mock private Clock clock;
     @InjectMocks private JournalService service;
 

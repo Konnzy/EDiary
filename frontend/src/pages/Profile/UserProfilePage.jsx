@@ -89,17 +89,18 @@ const notificationOptions = {
   STUDENT: [
     { key: "newGrade", title: "Нова оцінка", description: "Сповіщати після виставлення нової оцінки", icon: GraduationCap },
     { key: "newHomework", title: "Нове домашнє завдання", description: "Сповіщати про нове призначене завдання", icon: BookOpen },
+    { key: "homeworkDeadlineReminder", title: "Дедлайн домашнього завдання", description: "Нагадувати за день до терміну виконання завдання", icon: CalendarDays },
     { key: "absence", title: "Відсутність на уроці", description: "Сповіщати, коли викладач виставив статус «Н»", icon: CalendarX2 },
     { key: "scheduleChange", title: "Зміна розкладу", description: "Сповіщати про зміни у розкладі занять", icon: CalendarDays },
   ],
   PARENT: [
     { key: "newGrade", title: "Нова оцінка", description: "Сповіщати після виставлення нової оцінки", icon: GraduationCap },
     { key: "newHomework", title: "Нове домашнє завдання", description: "Сповіщати про нове призначене завдання", icon: BookOpen },
+    { key: "homeworkDeadlineReminder", title: "Дедлайн домашнього завдання", description: "Нагадувати за день до терміну виконання завдання дитини", icon: CalendarDays },
     { key: "absence", title: "Відсутність на уроці", description: "Сповіщати, коли викладач виставив статус «Н»", icon: CalendarX2 },
     { key: "scheduleChange", title: "Зміна розкладу", description: "Сповіщати про зміни у розкладі занять дитини", icon: CalendarDays },
   ],
   TEACHER: [
-    { key: "newMessage", title: "Нове повідомлення", description: "Сповіщати про нові повідомлення від учнів і батьків", icon: Mail },
     { key: "scheduleChange", title: "Зміна розкладу", description: "Сповіщати про зміни у розкладі занять", icon: CalendarDays },
     { key: "classScheduleChange", title: "Зміни розкладу класу", description: "Сповіщати про зміни у розкладі класу", icon: CalendarDays, homeroomOnly: true },
     { key: "prolongedAbsence", title: "Тривалі пропуски", description: "Сповіщати про тривалі пропуски учнів класу", icon: CalendarX2, homeroomOnly: true },
@@ -107,7 +108,7 @@ const notificationOptions = {
   ],
 };
 
-export function UserProfilePage({ role, openAddChild = false }) {
+export function UserProfilePage({ role, openAddChild = false, focusNotifications = false }) {
   const config = roleConfig[role];
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -132,6 +133,12 @@ export function UserProfilePage({ role, openAddChild = false }) {
   useEffect(() => {
     if (role === "PARENT" && openAddChild) setIsLinkModalOpen(true);
   }, [role, openAddChild]);
+
+  useEffect(() => {
+    if (!data || !focusNotifications) return undefined;
+    const frame = window.requestAnimationFrame(() => document.getElementById("profile-notifications")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [data, focusNotifications]);
 
   useEffect(() => {
     let active = true;
@@ -222,6 +229,10 @@ export function UserProfilePage({ role, openAddChild = false }) {
     setNotificationNotice("");
     try {
       const response = await userProfileApi.updateNotifications(notificationDraft);
+      const visibleOptions = notificationOptions[role].filter((option) => !option.homeroomOnly || Boolean(data.professional?.homeroomClass));
+      if (!visibleOptions.every((option) => response.notifications?.[option.key] === notificationDraft[option.key])) {
+        throw new Error("Не вдалося підтвердити збереження налаштувань. Спробуйте ще раз.");
+      }
       const profile = mapProfileResponse(response);
       setData(profile);
       setNotificationDraft(profile.notifications);
@@ -562,7 +573,7 @@ function LinkChildModal({ code, error, isSubmitting, onChange, onClose, onSubmit
 
 function NotificationSettings({ className, options, settings, notice, error, busy, onChange, onSave }) {
   return (
-    <Section className={className} title="Налаштування сповіщень" icon={Bell}>
+    <Section id="profile-notifications" className={className} title="Налаштування сповіщень" icon={Bell}>
       <div className="divide-y divide-slate-100">
         {options.map((option) => {
           const Icon = option.icon;
@@ -675,9 +686,9 @@ function InformationGrid({ fields }) {
   );
 }
 
-function Section({ className, title, icon: Icon, children }) {
+function Section({ id, className, title, icon: Icon, children }) {
   return (
-    <Card className={cn("h-full rounded-lg px-4 py-5 sm:px-5", className)}>
+    <Card id={id} className={cn("h-full scroll-mt-20 rounded-lg px-4 py-5 sm:px-5", className)}>
       <div className="mb-5 flex items-center gap-2.5 border-b border-slate-200 pb-4">
         <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-700"><Icon className="h-4 w-4" aria-hidden="true" /></span>
         <h2 className="text-[0.92rem] font-bold text-slate-900">{title}</h2>

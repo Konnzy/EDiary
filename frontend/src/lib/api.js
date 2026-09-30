@@ -103,6 +103,12 @@ export const userProfileApi = {
   deleteAvatar: () => request("/users/me/avatar", { method: "DELETE", csrf: true }),
 };
 
+export const userNotificationApi = {
+  feed: () => request("/notifications"),
+  markRead: (id) => request(`/notifications/${id}/read`, { method: "POST", csrf: true }),
+  markAllRead: () => request("/notifications/read-all", { method: "POST", csrf: true }),
+};
+
 export const parentApi = {
   findChildren: () => request("/parent/children"),
   findChild: (studentId) => request(`/parent/children/${studentId}`),

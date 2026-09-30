@@ -15,8 +15,6 @@ import { authApi, teacherDashboardApi } from "@/lib/api.js";
 import { TeacherNavigation } from "@/components/TeacherNavigation.jsx";
 import { formatToday, useTodaySchedule } from "@/hooks/useTodaySchedule.js";
 
-const hasUnreadNotifications = false;
-
 function journalLink(item, date) {
   if (!date) return "#teacher/journal";
   const params = new URLSearchParams({
@@ -124,7 +122,7 @@ function TopBar() {
       </a>
 
       <div className="flex items-center gap-1.5 sm:gap-4">
-        <NotificationButton hasUnread={hasUnreadNotifications} />
+        <NotificationButton />
 
         <CurrentUserBadge />
 

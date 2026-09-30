@@ -195,7 +195,7 @@ export function AdminLoginPage() {
                       Перевірка...
                     </>
                   ) : (
-                    "Увійти до адмін-панелі"
+                    "Увійти"
                   )}
                 </Button>
 

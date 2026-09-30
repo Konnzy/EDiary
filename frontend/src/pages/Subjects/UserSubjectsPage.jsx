@@ -113,7 +113,7 @@ const roleConfig = {
   },
 };
 
-export function UserSubjectsPage({ role }) {
+export function UserSubjectsPage({ role, initialStudentId = "" }) {
   const config = roleConfig[role];
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
@@ -128,7 +128,7 @@ export function UserSubjectsPage({ role }) {
                 <h1 className="text-[1.45rem] font-bold leading-tight text-slate-900 sm:text-[1.65rem]">Предмети</h1>
                 <p className="mt-2 text-[0.9rem] text-slate-500">{config.subtitle}</p>
               </header>
-              <SubjectProgressView role={role} />
+              <SubjectProgressView role={role} initialStudentId={initialStudentId} />
             </div>
           </main>
           <AppFooter />
@@ -138,7 +138,7 @@ export function UserSubjectsPage({ role }) {
   );
 }
 
-export function SubjectProgressView({ role, adminStudentId, classId, initialAcademicYear = "" }) {
+export function SubjectProgressView({ role, adminStudentId, classId, initialAcademicYear = "", initialStudentId = "" }) {
   const staffView = role === "ADMIN" || role === "HOMEROOM";
   const [subjectId, setSubjectId] = useState("");
   const [academicYear, setAcademicYear] = useState(initialAcademicYear);
@@ -160,7 +160,8 @@ export function SubjectProgressView({ role, adminStudentId, classId, initialAcad
       .then((items) => {
         if (!active) return;
         setChildren(items);
-        setStudentId(items[0] ? String(items[0].studentId) : "");
+        const requestedChild = items.find((child) => String(child.studentId) === String(initialStudentId));
+        setStudentId(requestedChild ? String(requestedChild.studentId) : items[0] ? String(items[0].studentId) : "");
       })
       .catch((requestError) => {
         if (active) setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити дані дітей.");
@@ -168,7 +169,7 @@ export function SubjectProgressView({ role, adminStudentId, classId, initialAcad
       .finally(() => active && setLoadingChildren(false));
 
     return () => { active = false; };
-  }, [role]);
+  }, [role, initialStudentId]);
 
   useEffect(() => {
     if (role === "PARENT" && !studentId) return undefined;

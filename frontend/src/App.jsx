@@ -225,8 +225,9 @@ function AppContent() {
     return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserMessagesPage role="STUDENT" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} /></ProtectedRoute>;
   }
 
-  if (route === "student/profile") {
-    return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserProfilePage role="STUDENT" /></ProtectedRoute>;
+  if (route === "student/profile" || route.startsWith("student/profile?")) {
+    const params = new URLSearchParams(route.split("?")[1] || "");
+    return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserProfilePage role="STUDENT" focusNotifications={params.get("notifications") === "1"} /></ProtectedRoute>;
   }
 
   if (route === "teacher") {
@@ -274,20 +275,23 @@ function AppContent() {
     return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><UserMessagesPage role="TEACHER" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} /></ProtectedRoute>;
   }
 
-  if (route === "teacher/profile") {
-    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><UserProfilePage role="TEACHER" /></ProtectedRoute>;
+  if (route === "teacher/profile" || route.startsWith("teacher/profile?")) {
+    const params = new URLSearchParams(route.split("?")[1] || "");
+    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><UserProfilePage role="TEACHER" focusNotifications={params.get("notifications") === "1"} /></ProtectedRoute>;
   }
 
   if (route === "parent") {
     return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><ParentHomePage /></ProtectedRoute>;
   }
 
-  if (route === "parent/schedule") {
-    return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserSchedulePage role="PARENT" /></ProtectedRoute>;
+  if (route === "parent/schedule" || route.startsWith("parent/schedule?")) {
+    const params = new URLSearchParams(route.split("?")[1] || "");
+    return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserSchedulePage role="PARENT" initialStudentId={params.get("childId") || ""} /></ProtectedRoute>;
   }
 
-  if (route === "parent/subjects") {
-    return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserSubjectsPage role="PARENT" /></ProtectedRoute>;
+  if (route === "parent/subjects" || route.startsWith("parent/subjects?")) {
+    const params = new URLSearchParams(route.split("?")[1] || "");
+    return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserSubjectsPage role="PARENT" initialStudentId={params.get("childId") || ""} /></ProtectedRoute>;
   }
 
   if (route === "parent/teachers") {
@@ -301,7 +305,7 @@ function AppContent() {
 
   if (route === "parent/profile" || route.startsWith("parent/profile?")) {
     const params = new URLSearchParams(route.split("?")[1] || "");
-    return <ProtectedRoute key="parent/profile" allowedRole="PARENT" loginRoute="login"><UserProfilePage role="PARENT" openAddChild={params.get("addChild") === "1"} /></ProtectedRoute>;
+    return <ProtectedRoute key="parent/profile" allowedRole="PARENT" loginRoute="login"><UserProfilePage role="PARENT" openAddChild={params.get("addChild") === "1"} focusNotifications={params.get("notifications") === "1"} /></ProtectedRoute>;
   }
 
   return <LoginPage />;

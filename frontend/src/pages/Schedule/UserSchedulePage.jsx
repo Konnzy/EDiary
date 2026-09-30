@@ -77,7 +77,7 @@ const roleConfig = {
   },
 };
 
-export function UserSchedulePage({ role, initialClassId = "" }) {
+export function UserSchedulePage({ role, initialClassId = "", initialStudentId = "" }) {
   const config = roleConfig[role];
   const [options, setOptions] = useState(null);
   const [academicYear, setAcademicYear] = useState("");
@@ -123,7 +123,8 @@ export function UserSchedulePage({ role, initialClassId = "" }) {
           setClassId(String(selectedClass?.id || nextClasses[0]?.id || ""));
           setScheduleView(selectedClass ? "class" : "own");
         }
-        setStudentId(nextChildren[0] ? String(nextChildren[0].studentId) : "");
+        const requestedChild = nextChildren.find((child) => String(child.studentId) === String(initialStudentId));
+        setStudentId(requestedChild ? String(requestedChild.studentId) : nextChildren[0] ? String(nextChildren[0].studentId) : "");
         if (!selectedYear || (role === "PARENT" && !nextChildren.length)) {
           setLoading(false);
         }
@@ -137,7 +138,7 @@ export function UserSchedulePage({ role, initialClassId = "" }) {
     return () => {
       active = false;
     };
-  }, [role, initialClassId]);
+  }, [role, initialClassId, initialStudentId]);
 
   useEffect(() => {
     if (!academicYear || (role === "PARENT" && !studentId) || (role === "TEACHER" && scheduleView === "class" && !classId)) return undefined;
@@ -319,7 +320,7 @@ function ScheduleFilters({ role, academicYear, week, children, studentId, homero
         && "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,.8fr)_minmax(0,1.5fr)]",
       role === "TEACHER" && !homeroomClasses.length
         && "lg:grid-cols-[minmax(0,1.2fr)_minmax(0,.8fr)_minmax(0,1.5fr)]",
-      role === "PARENT" && "max-w-[760px] sm:grid-cols-[minmax(0,1fr)_310px] sm:items-end",
+      role === "PARENT" && "max-w-[620px] sm:grid-cols-[minmax(0,1fr)_310px] sm:items-end",
       role === "STUDENT" && "max-w-[380px]",
     )}>
       {role === "TEACHER" && homeroomClasses.length ? (
