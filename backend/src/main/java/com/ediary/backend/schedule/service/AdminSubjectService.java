@@ -1,4 +1,6 @@
 package com.ediary.backend.schedule.service;
+import com.ediary.backend.common.audit.AuditService;
+import static com.ediary.backend.common.audit.AuditValues.of;
 
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.schedule.dto.request.SaveSubjectRequest;
@@ -31,6 +33,7 @@ public class AdminSubjectService {
     private final SubjectRepository subjectRepository;
     private final TeacherProfileRepository teacherProfileRepository;
     private final ScheduleRepository scheduleRepository;
+    private final AuditService audit;
 
     @Transactional(readOnly = true)
     public List<AdminSubjectResponse> findAll(String query) {
@@ -83,18 +86,24 @@ public class AdminSubjectService {
         subject.setTitle(title);
         subject = subjectRepository.saveAndFlush(subject);
         List<TeacherProfile> assignedTeachers = synchronizeTeachers(subject, input.teacherIds());
+        audit.record("SUBJECT_CREATED", "SUBJECT", subject.getId(), of(),
+            of("title", subject.getTitle(), "teacherIds", input.teacherIds()));
         return toResponse(subject, assignedTeachers);
     }
 
     @Transactional
     public AdminSubjectResponse update(Long subjectId, SaveSubjectRequest input) {
         Subject subject = requireSubjectForUpdate(subjectId);
+        var beforeSubject = of("title", subject.getTitle(), "teacherIds",
+            teacherProfileRepository.findAllAssignedToSubject(subjectId).stream().map(TeacherProfile::getId).sorted().toList());
         String title = normalizeTitle(input.title());
         ensureUniqueTitle(title, subjectId);
         subject.setTitle(title);
 
         List<TeacherProfile> assignedTeachers = synchronizeTeachers(subject, input.teacherIds());
         subjectRepository.saveAndFlush(subject);
+        audit.record("SUBJECT_UPDATED", "SUBJECT", subjectId, beforeSubject,
+            of("title", subject.getTitle(), "teacherIds", input.teacherIds().stream().sorted().toList()));
         return toResponse(subject, assignedTeachers);
     }
 
@@ -118,6 +127,7 @@ public class AdminSubjectService {
         }
         subjectRepository.delete(subject);
         subjectRepository.flush();
+        audit.record("SUBJECT_DELETED", "SUBJECT", subjectId, of("title", subject.getTitle()), of("deleted", true));
     }
 
     private List<TeacherProfile> synchronizeTeachers(Subject subject, Set<Long> requestedTeacherIds) {

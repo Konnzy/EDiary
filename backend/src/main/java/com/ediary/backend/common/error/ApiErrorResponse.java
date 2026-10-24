@@ -8,6 +8,10 @@ public record ApiErrorResponse(
     String message,
     Map<String, String> fieldErrors,
     String path,
-    LocalDateTime timestamp
+    LocalDateTime timestamp,
+    String requestId
 ) {
+    public ApiErrorResponse(String code, String message, Map<String, String> fieldErrors, String path, LocalDateTime timestamp) {
+        this(code, message, fieldErrors, path, timestamp, null);
+    }
 }

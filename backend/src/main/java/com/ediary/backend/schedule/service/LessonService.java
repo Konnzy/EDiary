@@ -1,4 +1,6 @@
 package com.ediary.backend.schedule.service;
+import com.ediary.backend.common.audit.AuditService;
+import static com.ediary.backend.common.audit.AuditValues.of;
 
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.schedule.dto.request.UpdateLessonRequest;
@@ -28,6 +30,7 @@ public class LessonService {
     private final LessonRepository lessonRepository;
     private final ScheduleRepository scheduleRepository;
     private final Clock clock;
+    private final AuditService audit;
 
     @Transactional
     public LessonResponse openForTeacher(String teacherLogin, Long scheduleId, LocalDate date) {
@@ -57,7 +60,9 @@ public class LessonService {
         lesson.setStatus(LessonStatus.PLANNED);
         lesson.setCreatedAt(now);
         lesson.setUpdatedAt(now);
-        return toResponse(lessonRepository.saveAndFlush(lesson));
+        var saved = lessonRepository.saveAndFlush(lesson);
+        audit.record("LESSON_OPENED", "LESSON", saved.getId(), of(), of("created", true, "status", saved.getStatus()));
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -79,6 +84,7 @@ public class LessonService {
         UpdateLessonRequest request
     ) {
         Lesson lesson = requireTeacherLesson(teacherLogin, lessonId);
+        var beforeLesson = of("topic", lesson.getTopic(), "status", lesson.getStatus());
         String topic = normalizeTopic(request.topic());
         validateStatusTransition(lesson.getStatus(), request.status());
         if (request.status() == LessonStatus.COMPLETED && topic == null) {
@@ -100,7 +106,9 @@ public class LessonService {
         lesson.setTopic(topic);
         lesson.setStatus(request.status());
         lesson.setUpdatedAt(LocalDateTime.now(clock));
-        return toResponse(lessonRepository.saveAndFlush(lesson));
+        var saved = lessonRepository.saveAndFlush(lesson);
+        audit.record("LESSON_STATUS_UPDATED", "LESSON", lessonId, beforeLesson, of("topic", saved.getTopic(), "status", saved.getStatus()));
+        return toResponse(saved);
     }
 
     private Lesson requireTeacherLesson(String teacherLogin, Long lessonId) {

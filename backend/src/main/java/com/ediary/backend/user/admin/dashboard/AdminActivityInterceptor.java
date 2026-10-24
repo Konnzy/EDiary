@@ -42,7 +42,7 @@ public class AdminActivityInterceptor implements HandlerInterceptor {
         try {
             recorder.record(login, action);
         } catch (RuntimeException error) {
-            log.error("Could not record administrator action {} for {}", action.title(), login, error);
+            log.error("event=admin_activity.failed", com.ediary.backend.common.logging.SafeExceptions.forLogging(error));
         }
     }
 }

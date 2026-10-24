@@ -1,4 +1,6 @@
 package com.ediary.backend.schedule.service;
+import com.ediary.backend.common.audit.AuditService;
+import static com.ediary.backend.common.audit.AuditValues.of;
 
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.schedule.dto.request.SaveSchoolClassRequest;
@@ -54,6 +56,7 @@ public class AdminSchoolClassService {
     private final TeacherClassService teacherClassService;
     private final UserNotificationService notificationService;
     private final Clock clock;
+    private final AuditService audit;
 
     @Transactional(readOnly = true)
     public List<AdminSchoolClassResponse> findAll(String query, Integer number, String academicYear) {
@@ -173,12 +176,14 @@ public class AdminSchoolClassService {
         schoolClass.setAcademicYear(academicYear);
         apply(schoolClass, input, letter);
         SchoolClass saved = schoolClassRepository.saveAndFlush(schoolClass);
+        audit.record("CLASS_CREATED", "CLASS", saved.getId(), of(), auditClass(saved));
         return toResponse(saved, 0L);
     }
 
     @Transactional
     public AdminSchoolClassResponse update(Long classId, SaveSchoolClassRequest input) {
         SchoolClass schoolClass = requireClassForUpdate(classId);
+        var beforeClass = auditClass(schoolClass);
         ensureEditable(schoolClass);
         String letter = normalizeRequiredLetter(input.letter());
         ensureSameAcademicYear(schoolClass, input.academicYear());
@@ -196,6 +201,7 @@ public class AdminSchoolClassService {
         }
         apply(schoolClass, input, letter);
         SchoolClass saved = schoolClassRepository.saveAndFlush(schoolClass);
+        audit.record("CLASS_UPDATED", "CLASS", classId, beforeClass, auditClass(saved));
         return toResponse(saved, studentCount);
     }
 
@@ -215,6 +221,7 @@ public class AdminSchoolClassService {
         membershipRepository.flush();
         schoolClassRepository.delete(schoolClass);
         schoolClassRepository.flush();
+        audit.record("CLASS_DELETED", "CLASS", classId, auditClass(schoolClass), of("deleted", true));
     }
 
     private void apply(SchoolClass schoolClass, SaveSchoolClassRequest input, String letter) {
@@ -271,6 +278,7 @@ public class AdminSchoolClassService {
         notificationService.forTeacher(targetClass.getClassTeacher(), "CLASS_ROSTER", "Зміна складу класу",
             student.getSurname() + " " + student.getName() + " додано до " + targetClass.getDisplayName() + " класу",
             "teacher/my-class?classId=" + targetClass.getId(), null);
+        audit.record("STUDENT_ASSIGNED", "STUDENT", studentId, of("classId", null), of("classId", classId));
         return response;
     }
 
@@ -309,6 +317,7 @@ public class AdminSchoolClassService {
         notificationService.forTeacher(targetClass.getClassTeacher(), "CLASS_ROSTER", "Зміна складу класу",
             studentName + " переведено з " + sourceClass.getDisplayName() + " класу",
             "teacher/my-class?classId=" + targetClassId, null);
+        audit.record("STUDENT_TRANSFERRED", "STUDENT", studentId, of("classId", sourceClassId), of("classId", targetClassId));
         return response;
     }
 
@@ -321,9 +330,15 @@ public class AdminSchoolClassService {
         closeMembership(studentId, classId);
         student.setSchoolClass(null);
         studentProfileRepository.saveAndFlush(student);
+        audit.record("STUDENT_REMOVED_FROM_CLASS", "STUDENT", studentId, of("classId", classId), of("classId", null));
         notificationService.forTeacher(schoolClass.getClassTeacher(), "CLASS_ROSTER", "Зміна складу класу",
             student.getSurname() + " " + student.getName() + " вилучено з " + schoolClass.getDisplayName() + " класу",
             "teacher/my-class?classId=" + classId, null);
+    }
+
+    private Map<String, Object> auditClass(SchoolClass value) {
+        return of("classNumber", value.getNumber(), "classLetter", value.getLetter(), "academicYear", value.getAcademicYear().getValue(),
+            "teacherId", value.getClassTeacher() == null ? null : value.getClassTeacher().getId());
     }
 
     private void ensureUniqueClass(String academicYear, Integer number, String letter, Long excludedId) {

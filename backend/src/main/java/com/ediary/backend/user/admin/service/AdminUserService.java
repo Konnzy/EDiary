@@ -1,4 +1,6 @@
 package com.ediary.backend.user.admin.service;
+import com.ediary.backend.common.audit.AuditService;
+import static com.ediary.backend.common.audit.AuditValues.of;
 
 import com.ediary.backend.common.dto.PageResponse;
 import com.ediary.backend.common.error.ApplicationException;
@@ -95,6 +97,7 @@ public class AdminUserService {
     private final ApplicationEventPublisher eventPublisher;
     private final SessionRegistry sessionRegistry;
     private final Clock clock;
+    private final AuditService audit;
 
     @Transactional
     public AdminUserCreationResponse create(CreateAdminUserRequest input) {
@@ -137,6 +140,7 @@ public class AdminUserService {
             parentLinkCode
         ));
 
+        audit.record("USER_CREATED", "USER", user.getId(), of(), of("role", user.getRole(), "status", user.getStatus()));
         return new AdminUserCreationResponse(
             toResponse(user),
             "Користувача створено. Лист із даними для входу передано на надсилання."
@@ -228,6 +232,7 @@ public class AdminUserService {
             );
         }
 
+        UserStatus previousStatus = user.getStatus();
         if (user.getStatus() != nextStatus) {
             user.setStatus(nextStatus);
             user.setUpdatedAt(LocalDateTime.now(clock));
@@ -236,6 +241,7 @@ public class AdminUserService {
         if (nextStatus == UserStatus.BLOCKED) {
             expireSessions(user.getLogin());
         }
+        audit.record("USER_STATUS_CHANGED", "USER", userId, of("status", previousStatus), of("status", user.getStatus()));
         return toResponse(user);
     }
 
@@ -265,6 +271,7 @@ public class AdminUserService {
         }
 
         String previousLogin = user.getLogin();
+        boolean emailChanged = !user.getEmail().equalsIgnoreCase(email);
         String parentLinkCode = null;
         if (previousRole == input.role()) {
             updateRoleProfile(
@@ -323,6 +330,8 @@ public class AdminUserService {
                 parentLinkCode
             ));
         }
+        audit.record("USER_UPDATED", "USER", userId, of("role", previousRole),
+            of("role", user.getRole(), "loginChanged", !previousLogin.equalsIgnoreCase(login), "emailChanged", emailChanged, "profileChanged", true));
         return toResponse(user);
     }
 
@@ -356,6 +365,7 @@ public class AdminUserService {
             temporaryPassword
         ));
 
+        audit.record("USER_PASSWORD_RESET", "USER", userId, of(), of("passwordChanged", true, "mustChangePassword", true));
         return new AdminUserActionResponse(
             "Новий тимчасовий пароль передано на надсилання користувачу"
         );
@@ -395,6 +405,7 @@ public class AdminUserService {
         teacherProfileRepository.deleteByUser_Id(userId);
         studentProfileRepository.deleteByUser_Id(userId);
         userRepository.delete(user);
+        audit.record("USER_DELETED", "USER", userId, of("role", user.getRole(), "status", user.getStatus()), of("deleted", true));
     }
 
     private AppUser requireUser(Long userId) {

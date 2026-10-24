@@ -33,12 +33,12 @@ public class PasswordResetController {
     public Map<String, String> forgot(@Valid @RequestBody ForgotPasswordRequest input, HttpServletRequest request) {
         limit(request.getRemoteAddr(), 5, "forgot");
         try {
-            executor.execute(() -> {
+            executor.execute(com.ediary.backend.common.logging.DiagnosticContext.capture(() -> {
                 try { service.request(input.email()); }
                 catch (Exception exception) {
-                    LoggerFactory.getLogger(getClass()).error("Password reset request processing failed ({})", exception.getClass().getSimpleName());
+                    LoggerFactory.getLogger(getClass()).error("event=password_reset.processing_failed", com.ediary.backend.common.logging.SafeExceptions.forLogging(exception));
                 }
-            });
+            }));
         } catch (RejectedExecutionException exception) {
             throw new ApplicationException(HttpStatus.SERVICE_UNAVAILABLE, "RESET_BUSY", "Сервіс тимчасово зайнятий. Спробуйте пізніше.");
         }

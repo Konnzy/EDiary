@@ -1,27 +1,24 @@
+import { newRequestId, validRequestId, reportApiFailure } from "@/lib/diagnostics.js";
+
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8081/api").replace(/\/$/, "");
 
 let csrfToken = null;
 let csrfHeaderName = "X-XSRF-TOKEN";
 
 export class ApiError extends Error {
-  constructor(message, { status = 0, code = "REQUEST_FAILED", fieldErrors = {} } = {}) {
+  constructor(message, { status = 0, code = "REQUEST_FAILED", fieldErrors = {}, requestId = null } = {}) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.fieldErrors = fieldErrors;
+    this.requestId = requestId;
+    this.isDiagnosed = true;
   }
 }
 
 async function loadCsrfToken() {
-  const response = await fetch(`${API_BASE_URL}/security/csrf`, {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) {
-    throw new ApiError("Не вдалося встановити захищене з'єднання", { status: response.status });
-  }
-  const body = await response.json();
+  const body = await request("/security/csrf");
   csrfToken = body.token;
   csrfHeaderName = body.headerName || csrfHeaderName;
 }
@@ -31,7 +28,8 @@ async function request(path, { method = "GET", body, csrf = false } = {}) {
     await loadCsrfToken();
   }
 
-  const headers = { Accept: "application/json" };
+  const requestId = newRequestId();
+  const headers = { Accept: "application/json", "X-Request-ID": requestId };
   if (body !== undefined && !(body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
@@ -48,7 +46,8 @@ async function request(path, { method = "GET", body, csrf = false } = {}) {
       body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError("Сервер тимчасово недоступний. Спробуйте пізніше.");
+    reportApiFailure({ requestId, method, path, status: 0, code: "NETWORK_ERROR" });
+    throw new ApiError("Сервер тимчасово недоступний. Спробуйте пізніше.", { requestId, code: "NETWORK_ERROR" });
   }
 
   if (response.status === 204) {
@@ -56,7 +55,9 @@ async function request(path, { method = "GET", body, csrf = false } = {}) {
   }
 
   const payload = await response.json().catch(() => ({}));
+  const responseId = validRequestId(response.headers.get("X-Request-ID"), validRequestId(payload.requestId, requestId));
   if (!response.ok) {
+    reportApiFailure({ requestId: responseId, method, path, status: response.status, code: payload.code || "REQUEST_FAILED" });
     if (response.status === 403 && csrf) {
       csrfToken = null;
     }
@@ -69,6 +70,7 @@ async function request(path, { method = "GET", body, csrf = false } = {}) {
       status: response.status,
       code: payload.code,
       fieldErrors: payload.fieldErrors,
+      requestId: responseId,
     });
   }
   return payload;
@@ -107,6 +109,7 @@ export const userNotificationApi = {
   feed: () => request("/notifications"),
   markRead: (id) => request(`/notifications/${id}/read`, { method: "POST", csrf: true }),
   markAllRead: () => request("/notifications/read-all", { method: "POST", csrf: true }),
+  dismiss: (id) => request(`/notifications/${id}`, { method: "DELETE", csrf: true }),
 };
 
 export const parentApi = {

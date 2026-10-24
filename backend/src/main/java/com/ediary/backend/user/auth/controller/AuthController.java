@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
     private final AuthService authService;
@@ -37,7 +39,8 @@ public class AuthController {
         HttpServletResponse httpResponse
     ) {
         AuthService.UserAuthentication result = authService.authenticateUser(request);
-        saveAuthentication(result.authentication(), httpRequest, httpResponse);
+        saveAuthentication(result.authentication(), result.response().userId(), httpRequest, httpResponse);
+        log.info("event=auth.login_succeeded actorId={} role={}", result.response().userId(), result.response().role());
         return result.response();
     }
 
@@ -48,7 +51,8 @@ public class AuthController {
         HttpServletResponse httpResponse
     ) {
         AuthService.AdminAuthentication result = authService.authenticateAdministrator(request);
-        saveAuthentication(result.authentication(), httpRequest, httpResponse);
+        saveAuthentication(result.authentication(), result.response().userId(), httpRequest, httpResponse);
+        log.info("event=auth.admin_login_succeeded actorId={} role={}", result.response().userId(), result.response().role());
         return result.response();
     }
 
@@ -59,11 +63,14 @@ public class AuthController {
 
     private void saveAuthentication(
         Authentication authentication,
+        Long userId,
         HttpServletRequest request,
         HttpServletResponse response
     ) {
         HttpSession session = request.getSession(true);
         request.changeSessionId();
+        session.setAttribute("logging.actorId", userId);
+        org.slf4j.MDC.put("actorId", String.valueOf(userId));
         session.setMaxInactiveInterval(30 * 60);
 
         SecurityContext context = SecurityContextHolder.createEmptyContext();
@@ -87,7 +94,9 @@ public class AuthController {
         if (authentication != null) {
             HttpSession session = request.getSession(false);
             if (session != null) {
+                Object actorId = session.getAttribute("logging.actorId");
                 session.invalidate();
+                log.info("event=auth.logout actorId={}", actorId instanceof Long ? actorId : null);
             }
             SecurityContextHolder.clearContext();
         }

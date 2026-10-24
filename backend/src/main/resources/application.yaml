@@ -1,4 +1,6 @@
 spring:
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   application:
     name: backend
   datasource:
@@ -6,6 +8,7 @@ spring:
     username: ${EDIARY_DB_USERNAME:ediary}
     password: ${EDIARY_DB_PASSWORD:ediary}
   jpa:
+    show-sql: false
     open-in-view: false
     hibernate:
       ddl-auto: validate
@@ -42,7 +45,30 @@ server:
         secure: ${EDIARY_SECURE_COOKIE:false}
         same-site: strict
 
+logging:
+  file:
+    name: ${EDIARY_LOG_FILE:logs/ediary.log}
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 14
+      total-size-cap: 200MB
+      clean-history-on-start: true
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{48} requestId=%X{requestId:-none} actorId=%X{actorId:-none} job=%X{job:-none} %msg%n"
+    file: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{48} requestId=%X{requestId:-none} actorId=%X{actorId:-none} job=%X{job:-none} %msg%n"
+  level:
+    com.ediary.backend: ${EDIARY_LOG_LEVEL:INFO}
+    org.hibernate.SQL: "OFF"
+    org.hibernate.orm.jdbc.bind: "OFF"
+    org.hibernate.orm.jdbc.extract: "OFF"
+    org.hibernate.orm.jdbc.error: "OFF"
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: ERROR
+
 app:
+  notifications:
+    absence-email-delay: ${EDIARY_ABSENCE_EMAIL_DELAY:PT1M}
+    email-poll-interval: ${EDIARY_NOTIFICATION_EMAIL_POLL_INTERVAL:10000}
   parent-link-code:
     secret: ${EDIARY_PARENT_LINK_CODE_SECRET:local-development-parent-code-secret-change-me}
   password-reset:

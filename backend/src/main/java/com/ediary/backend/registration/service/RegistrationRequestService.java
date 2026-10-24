@@ -1,4 +1,6 @@
 package com.ediary.backend.registration.service;
+import com.ediary.backend.common.audit.AuditService;
+import static com.ediary.backend.common.audit.AuditValues.of;
 
 import com.ediary.backend.common.dto.PageResponse;
 import com.ediary.backend.common.error.ApplicationException;
@@ -56,6 +58,7 @@ public class RegistrationRequestService {
     private final RegistrationRequestMapper mapper;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
+    private final AuditService audit;
 
     @Transactional
     public RegistrationSubmissionResponse submit(CreateRegistrationRequest input) {
@@ -103,6 +106,7 @@ public class RegistrationRequestService {
             now
         );
         request = registrationRequestRepository.saveAndFlush(request);
+        audit.record("REGISTRATION_SUBMITTED", "REGISTRATION", request.getId(), of(), of("status", request.getStatus(), "role", request.getRequestedRole()));
 
         return new RegistrationSubmissionResponse(
             request.getId(),
@@ -199,6 +203,8 @@ public class RegistrationRequestService {
 
         request.approve(reviewer, account.user(), now);
         registrationRequestRepository.saveAndFlush(request);
+        audit.record("REGISTRATION_APPROVED", "REGISTRATION", requestId, of("status", RegistrationStatus.PENDING),
+            of("status", request.getStatus(), "processedUserId", account.user().getId()));
         eventPublisher.publishEvent(new RegistrationApprovedEvent(
             request.getEmail(),
             request.getName(),
@@ -225,6 +231,7 @@ public class RegistrationRequestService {
 
         request.reject(reviewer, normalizedReason, now);
         registrationRequestRepository.saveAndFlush(request);
+        audit.record("REGISTRATION_REJECTED", "REGISTRATION", requestId, of("status", RegistrationStatus.PENDING), of("status", request.getStatus()));
         eventPublisher.publishEvent(new RegistrationRejectedEvent(
             request.getEmail(),
             request.getName(),

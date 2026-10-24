@@ -1,4 +1,6 @@
 package com.ediary.backend.user.password.service;
+import com.ediary.backend.common.audit.AuditService;
+import static com.ediary.backend.common.audit.AuditValues.of;
 
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.notification.service.EmailService;
@@ -34,12 +36,13 @@ public class PasswordResetService {
     private final SessionRegistry sessions;
     private final Clock clock;
     private final String frontendUrl;
+    private final AuditService audit;
     private final SecureRandom random = new SecureRandom();
 
     public PasswordResetService(UserRepository users, PasswordResetTokenRepository tokens,
         UserSessionRepository userSessions, TransactionTemplate transactions, PasswordEncoder encoder,
         EmailService email, SessionRegistry sessions, Clock clock,
-        @Value("${app.password-reset.frontend-url:http://127.0.0.1:5174}") String frontendUrl) {
+        @Value("${app.password-reset.frontend-url:http://127.0.0.1:5174}") String frontendUrl, AuditService audit) {
         this.users = users;
         this.tokens = tokens;
         this.userSessions = userSessions;
@@ -49,6 +52,7 @@ public class PasswordResetService {
         this.sessions = sessions;
         this.clock = clock;
         this.frontendUrl = frontendUrl.replaceAll("/+$", "");
+        this.audit = audit;
     }
 
     public void request(String address) {
@@ -67,6 +71,7 @@ public class PasswordResetService {
             resetToken.setExpiresAt(now.plusMinutes(30));
             resetToken.setCreatedAt(now);
             tokens.save(resetToken);
+            audit.record("PASSWORD_RESET_REQUESTED", "USER", user.getId(), of(), of("created", true));
             return raw;
         });
         if (token != null) {
@@ -100,6 +105,7 @@ public class PasswordResetService {
             users.saveAndFlush(user);
             tokens.markAllUnusedAsUsed(user.getId());
             userSessions.revokeActiveSessions(user.getId(), now, "PASSWORD_RESET");
+            audit.record("PASSWORD_RESET_COMPLETED", "USER", user.getId(), of(), of("passwordChanged", true));
             return user.getLogin();
         });
         sessions.getAllSessions(login, false).forEach(session -> session.expireNow());

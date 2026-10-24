@@ -40,7 +40,7 @@ class PasswordResetServiceTest {
         when(manager.getTransaction(any())).thenReturn(transaction);
         service = new PasswordResetService(users, tokens, userSessions, new TransactionTemplate(manager),
             encoder, email, sessions, Clock.fixed(now.toInstant(ZoneOffset.UTC), ZoneOffset.UTC),
-            "https://school.example");
+            "https://school.example", org.mockito.Mockito.mock(com.ediary.backend.common.audit.AuditService.class));
         user = new AppUser();
         user.setId(1L);
         user.setLogin("student.test");

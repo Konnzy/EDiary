@@ -39,6 +39,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -61,9 +62,16 @@ class JournalServiceTest {
     @Mock private LessonService lessonService;
     @Mock private com.ediary.backend.notification.service.UserNotificationService notificationService;
     @Mock private Clock clock;
+    @Mock private com.ediary.backend.common.audit.AuditService audit;
     @InjectMocks private JournalService service;
 
     private static final SaveJournalCellRequest CELL = new SaveJournalCellRequest(10, null, null, null);
+
+    @BeforeEach
+    void defaultClock() {
+        org.mockito.Mockito.lenient().when(clock.instant()).thenReturn(Instant.parse("2026-09-24T10:00:00Z"));
+        org.mockito.Mockito.lenient().when(clock.getZone()).thenReturn(ZoneOffset.UTC);
+    }
 
     @Test
     void rejectsLessonNotOwnedByTeacher() {
@@ -186,6 +194,9 @@ class JournalServiceTest {
         previouslyAbsentStudent.setId(7L);
         StudentProfile unmarkedStudent = new StudentProfile();
         unmarkedStudent.setId(8L);
+        Attendance oldAttendance = new Attendance();
+        oldAttendance.setStatus(AttendanceStatus.ABSENT);
+        when(attendanceRepository.findByStudentIdAndLessonId(7L, 21L)).thenReturn(Optional.of(oldAttendance));
         when(studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(5L))
             .thenReturn(List.of(previouslyAbsentStudent, unmarkedStudent));
 
@@ -193,6 +204,8 @@ class JournalServiceTest {
 
         verify(attendanceService).save(previouslyAbsentStudent, lesson, AttendanceStatus.PRESENT);
         verify(attendanceService).save(unmarkedStudent, lesson, AttendanceStatus.PRESENT);
+        verify(notificationService).attendanceChanged(previouslyAbsentStudent, lesson, AttendanceStatus.ABSENT, AttendanceStatus.PRESENT);
+        verify(notificationService).attendanceChanged(unmarkedStudent, lesson, null, AttendanceStatus.PRESENT);
         verifyNoInteractions(gradeService, homeworkRepository, studentHomeworkRepository);
     }
 
@@ -201,11 +214,15 @@ class JournalServiceTest {
         Lesson lesson = lesson(LocalDate.of(2026, 9, 24), LessonWorkType.CLASSWORK);
         when(lessonRepository.findForTeacher(21L, "teacher.one")).thenReturn(Optional.of(lesson));
         Attendance attendance = new Attendance();
+        StudentProfile student = new StudentProfile();
+        attendance.setStudent(student);
+        attendance.setStatus(AttendanceStatus.ABSENT);
         when(attendanceRepository.findAllByLessonIdIn(List.of(21L))).thenReturn(List.of(attendance));
 
         service.clearAttendance("teacher.one", 21L);
 
         verify(attendanceRepository).deleteAll(List.of(attendance));
+        verify(notificationService).attendanceChanged(student, lesson, AttendanceStatus.ABSENT, null);
         verifyNoInteractions(gradeService, homeworkRepository, studentHomeworkRepository);
     }
 

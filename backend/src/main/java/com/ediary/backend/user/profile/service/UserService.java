@@ -1,4 +1,6 @@
 package com.ediary.backend.user.profile.service;
+import com.ediary.backend.common.audit.AuditService;
+import static com.ediary.backend.common.audit.AuditValues.of;
 
 import com.ediary.backend.user.profile.dto.ChangePasswordRequest;
 import com.ediary.backend.user.profile.dto.UserProfileResponse;
@@ -23,6 +25,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+    private final AuditService audit;
 
     @Transactional
     public UserProfileResponse changeProfilePassword(String login, ChangePasswordRequest request) {
@@ -45,6 +48,7 @@ public class UserService {
         user.setUpdatedAt(LocalDateTime.now(clock));
 
         userRepository.save(user);
+        audit.record("PASSWORD_CHANGED", "USER", user.getId(), of(), of("passwordChanged", true));
 
         return toUserProfileResponse(user);
     }

@@ -81,7 +81,7 @@ class RegistrationRequestServiceTest {
             accountCreationService,
             mapper,
             eventPublisher,
-            CLOCK
+            CLOCK, org.mockito.Mockito.mock(com.ediary.backend.common.audit.AuditService.class)
         );
     }
 

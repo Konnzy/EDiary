@@ -31,6 +31,7 @@ public class AuthService {
 
     public UserAuthentication authenticateUser(LoginRequest request) {
         AppUser user = userRepository.findByLoginIgnoreCase(request.login().strip()).orElse(null);
+        if (user != null && org.slf4j.MDC.get("requestId") != null) org.slf4j.MDC.put("accountId", user.getId().toString());
 
         if (user == null) {
             consumePasswordHashingTime(request.password());
@@ -70,6 +71,7 @@ public class AuthService {
         }
 
         AppUser user = administrator.getUser();
+        if (org.slf4j.MDC.get("requestId") != null) org.slf4j.MDC.put("accountId", user.getId().toString());
         boolean passwordMatches = passwordEncoder.matches(request.password(), user.getPasswordHash());
         boolean codeMatches = passwordEncoder.matches(
             normalizeAccessCode(request.accessCode()),

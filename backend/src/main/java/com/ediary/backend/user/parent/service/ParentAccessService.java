@@ -1,4 +1,6 @@
 package com.ediary.backend.user.parent.service;
+import com.ediary.backend.common.audit.AuditService;
+import static com.ediary.backend.common.audit.AuditValues.of;
 
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.user.parent.dto.ParentChildResponse;
@@ -21,6 +23,7 @@ public class ParentAccessService {
     private final StudentParentLinkRepository studentParentLinkRepository;
     private final ParentProfileRepository parentProfileRepository;
     private final ParentLinkCodeService parentLinkCodeService;
+    private final AuditService audit;
 
     @Transactional(readOnly = true)
     public List<ParentChildResponse> findChildren(String parentLogin) {
@@ -61,6 +64,7 @@ public class ParentAccessService {
         StudentParentLink link = studentParentLinkRepository.save(
             new StudentParentLink(student, parent, primaryContact)
         );
+        audit.record("CHILD_LINKED", "PARENT_CHILD", parent.getId() + ":" + student.getId(), of(), of("linked", true, "studentId", student.getId()));
         return toResponse(link);
     }
 

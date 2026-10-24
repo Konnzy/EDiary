@@ -1,4 +1,6 @@
 package com.ediary.backend.schedule.service;
+import com.ediary.backend.common.audit.AuditService;
+import static com.ediary.backend.common.audit.AuditValues.of;
 
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.schedule.dto.request.SaveScheduleLessonRequest;
@@ -55,6 +57,7 @@ public class AdminScheduleService {
     private final StudentProfileRepository studentProfileRepository;
     private final UserNotificationService notificationService;
     private final Clock clock;
+    private final AuditService audit;
 
     @Transactional(readOnly = true)
     public List<String> findAcademicYears() {
@@ -85,7 +88,9 @@ public class AdminScheduleService {
         }
         AcademicYear academicYear = new AcademicYear();
         academicYear.setValue(value);
-        return academicYearRepository.saveAndFlush(academicYear).getValue();
+        String saved = academicYearRepository.saveAndFlush(academicYear).getValue();
+        audit.record("ACADEMIC_YEAR_CREATED", "ACADEMIC_YEAR", saved, of(), of("created", true));
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -140,6 +145,7 @@ public class AdminScheduleService {
         validateTeacherConflicts(classId, academicYear, week, request.lessons());
 
         List<ScheduleEntry> currentEntries = scheduleRepository.findActiveForUpdate(classId, academicYear, week);
+        var beforeSchedule = auditSchedule(currentEntries);
         Map<Slot, ScheduleDefinition> previousDefinitions = currentEntries.stream().collect(Collectors.toMap(
             this::slot, entry -> new ScheduleDefinition(entry.getSubject().getId(),
                 entry.getTeacher().getId(), entry.getRoom())
@@ -219,7 +225,16 @@ public class AdminScheduleService {
             studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(classId).forEach(student ->
                 notificationService.forStudent(student, "SCHEDULE", "Зміна розкладу", body, null));
         }
+        audit.record("SCHEDULE_SAVED", "SCHEDULE", classId + ":" + academicYear + ":" + week,
+            of("lessons", beforeSchedule, "count", beforeSchedule.size()),
+            of("lessons", auditSchedule(savedEntries), "count", savedEntries.size()));
         return toResponse(classId, academicYear, week, savedEntries);
+    }
+
+    private List<Map<String, Object>> auditSchedule(List<ScheduleEntry> entries) {
+        return entries.stream().sorted(Comparator.comparing(ScheduleEntry::getWeekday).thenComparingInt(ScheduleEntry::getLessonNumber))
+            .map(entry -> of("day", entry.getWeekday(), "number", entry.getLessonNumber(), "subjectId", entry.getSubject().getId(),
+                "teacherId", entry.getTeacher().getId(), "room", entry.getRoom(), "start", entry.getStartTime(), "end", entry.getEndTime())).toList();
     }
 
     private boolean sameDefinition(ScheduleEntry entry, SaveScheduleLessonRequest lesson) {

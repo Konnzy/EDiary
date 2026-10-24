@@ -1,6 +1,7 @@
 package com.ediary.backend.common.error;
 
 import jakarta.servlet.http.HttpServletRequest;
+import com.ediary.backend.common.logging.RequestDiagnostics;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -16,6 +17,17 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
+        org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ApiErrorResponse> handleInvalidRequest(Exception exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Перевірте формат переданих даних", Map.of(), request);
+    }
+
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleNotFound(Exception exception, HttpServletRequest request) {
+        return response(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Ресурс не знайдено", Map.of(), request);
+    }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiErrorResponse> handleOversizedUpload(
@@ -135,6 +147,7 @@ public class GlobalExceptionHandler {
         Exception exception,
         HttpServletRequest request
     ) {
+        RequestDiagnostics.failure(request, 500, "INTERNAL_ERROR", exception);
         return response(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "INTERNAL_ERROR",
@@ -151,12 +164,14 @@ public class GlobalExceptionHandler {
         Map<String, String> fieldErrors,
         HttpServletRequest request
     ) {
+        RequestDiagnostics.failure(request, status.value(), code, null);
         ApiErrorResponse body = new ApiErrorResponse(
             code,
             message,
             fieldErrors,
             request.getRequestURI(),
-            LocalDateTime.now()
+            LocalDateTime.now(),
+            RequestDiagnostics.id(request)
         );
         return ResponseEntity.status(status).body(body);
     }

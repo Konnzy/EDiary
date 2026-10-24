@@ -30,9 +30,11 @@ public class EmailService {
     @Value("${app.mail.from-name:Електронний щоденник}")
     private String fromName;
 
+    public boolean isEnabled() { return enabled; }
+
     public boolean sendText(String recipient, String subject, String body) {
         if (!enabled) {
-            log.warn("Email delivery is disabled; message to {} was not sent", recipient);
+            log.debug("Email delivery is disabled");
             return false;
         }
 
@@ -48,10 +50,10 @@ public class EmailService {
             helper.setSubject(subject);
             helper.setText(body, false);
             mailSender.send(message);
-            log.info("Email delivered to {} with subject '{}'", recipient, subject);
+            log.debug("Email accepted by SMTP server");
             return true;
         } catch (MessagingException | UnsupportedEncodingException | MailException exception) {
-            log.error("Email delivery to {} failed", recipient, exception);
+            log.error("SMTP delivery failed ({})", exception.getClass().getSimpleName());
             return false;
         }
     }

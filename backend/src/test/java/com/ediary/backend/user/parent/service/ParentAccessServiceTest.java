@@ -42,7 +42,7 @@ class ParentAccessServiceTest {
         service = new ParentAccessService(
             studentParentLinkRepository,
             parentProfileRepository,
-            parentLinkCodeService
+            parentLinkCodeService, org.mockito.Mockito.mock(com.ediary.backend.common.audit.AuditService.class)
         );
     }
 

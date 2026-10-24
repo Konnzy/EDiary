@@ -230,7 +230,8 @@ export function UserProfilePage({ role, openAddChild = false, focusNotifications
     try {
       const response = await userProfileApi.updateNotifications(notificationDraft);
       const visibleOptions = notificationOptions[role].filter((option) => !option.homeroomOnly || Boolean(data.professional?.homeroomClass));
-      if (!visibleOptions.every((option) => response.notifications?.[option.key] === notificationDraft[option.key])) {
+      if (!visibleOptions.every((option) => response.notifications?.[option.key] === notificationDraft[option.key]
+        && (response.notifications?.inApp?.[option.key] ?? true) === (notificationDraft.inApp?.[option.key] ?? true))) {
         throw new Error("Не вдалося підтвердити збереження налаштувань. Спробуйте ще раз.");
       }
       const profile = mapProfileResponse(response);
@@ -345,8 +346,10 @@ export function UserProfilePage({ role, openAddChild = false, focusNotifications
                   notice={notificationNotice}
                   error={notificationError}
                   busy={pending === "notifications"}
-                  onChange={(key) => {
-                    setNotificationDraft((current) => ({ ...current, [key]: !current[key] }));
+                  onChange={(key, channel) => {
+                    setNotificationDraft((current) => channel === "inApp"
+                      ? { ...current, inApp: { ...current.inApp, [key]: !(current.inApp?.[key] ?? true) } }
+                      : { ...current, [key]: !current[key] });
                     setNotificationNotice("");
                   }}
                   onSave={saveNotifications}
@@ -578,13 +581,16 @@ function NotificationSettings({ className, options, settings, notice, error, bus
         {options.map((option) => {
           const Icon = option.icon;
           return (
-            <div key={option.key} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+            <div key={option.key} className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600"><Icon className="h-4 w-4" aria-hidden="true" /></span>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-[150px] flex-1">
                 <p className="text-[0.8rem] font-bold text-slate-800">{option.title}</p>
                 <p className="mt-0.5 text-[0.7rem] leading-4 text-slate-500">{option.description}</p>
               </div>
-              <Toggle checked={settings[option.key]} onChange={() => onChange(option.key)} label={option.title} />
+              <div className="ml-auto flex shrink-0 items-center gap-4">
+                <div className="flex flex-col items-center gap-1.5"><span className="text-[0.65rem] text-slate-500">У застосунку</span><Toggle checked={settings.inApp?.[option.key] ?? true} onChange={() => !busy && onChange(option.key, "inApp")} label={`${option.title}: у застосунку`} /></div>
+                <div className="flex flex-col items-center gap-1.5"><span className="text-[0.65rem] text-slate-500">Пошта</span><Toggle checked={settings[option.key]} onChange={() => !busy && onChange(option.key, "email")} label={`${option.title}: пошта`} /></div>
+              </div>
             </div>
           );
         })}

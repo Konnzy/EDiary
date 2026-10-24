@@ -37,7 +37,7 @@ class AdminSubjectServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AdminSubjectService(subjectRepository, teacherProfileRepository, scheduleRepository);
+        service = new AdminSubjectService(subjectRepository, teacherProfileRepository, scheduleRepository, org.mockito.Mockito.mock(com.ediary.backend.common.audit.AuditService.class));
     }
 
     @Test

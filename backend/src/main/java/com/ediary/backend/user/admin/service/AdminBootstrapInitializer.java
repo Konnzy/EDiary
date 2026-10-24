@@ -62,7 +62,7 @@ public class AdminBootstrapInitializer implements ApplicationRunner {
         validateConfiguration(normalizedLogin, normalizedEmail, normalizedCode);
 
         if (administratorProfileRepository.findByUserLoginIgnoreCase(normalizedLogin).isPresent()) {
-            log.info("Bootstrap administrator already exists: {}", normalizedLogin);
+            log.info("event=admin.bootstrap_skipped reason=already_exists");
             return;
         }
         if (userRepository.existsByLoginIgnoreCase(normalizedLogin)
@@ -89,7 +89,8 @@ public class AdminBootstrapInitializer implements ApplicationRunner {
         profile.setCodeHash(passwordEncoder.encode(normalizedCode));
         administratorProfileRepository.save(profile);
 
-        log.info("Bootstrap administrator created: {}", normalizedLogin);
+        Long actorId = user.getId();
+        com.ediary.backend.common.logging.DiagnosticContext.afterCommit(() -> log.info("event=admin.bootstrap_created actorId={}", actorId));
     }
 
     private void validateConfiguration(String normalizedLogin, String normalizedEmail, String normalizedCode) {

@@ -56,7 +56,7 @@ class ProfileServiceTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(Instant.parse("2026-09-22T10:00:00Z"), ZoneOffset.UTC);
-        service = new ProfileService(users, students, parents, teachers, links, classes, schedules, settings, avatars, clock);
+        service = new ProfileService(users, students, parents, teachers, links, classes, schedules, settings, avatars, clock, org.mockito.Mockito.mock(com.ediary.backend.common.audit.AuditService.class));
         user = new AppUser();
         user.setId(7L);
         user.setLogin("student.test");

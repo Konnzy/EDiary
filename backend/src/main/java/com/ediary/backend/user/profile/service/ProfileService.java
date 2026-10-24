@@ -1,4 +1,6 @@
 package com.ediary.backend.user.profile.service;
+import com.ediary.backend.common.audit.AuditService;
+import static com.ediary.backend.common.audit.AuditValues.of;
 
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.notification.entity.UserNotificationSettings;
@@ -51,6 +53,7 @@ public class ProfileService {
     private final UserNotificationSettingsRepository settings;
     private final UserAvatarRepository avatars;
     private final Clock clock;
+    private final AuditService audit;
 
     @Transactional(readOnly = true)
     public ProfileDetailsResponse find(String login) {
@@ -149,6 +152,7 @@ public class ProfileService {
             throw new ApplicationException(HttpStatus.FORBIDDEN, "PHONE_READ_ONLY", "Номер телефону учня не можна змінити");
         }
         user.setUpdatedAt(LocalDateTime.now(clock));
+        audit.record("PROFILE_PHONE_UPDATED", "USER", user.getId(), of(), of("phoneChanged", true));
         return find(login);
     }
 
@@ -182,7 +186,14 @@ public class ProfileService {
             preferences.setMessageEmailEnabled(request.newMessage());
             preferences.setHomeworkDeadlineReminderEmailEnabled(request.homeworkDeadlineReminder());
         }
+        if (request.inApp() != null) {
+            var allowed = java.util.Set.of("newGrade", "newHomework", "absence", "newMessage", "scheduleChange",
+                "classScheduleChange", "prolongedAbsence", "classRosterChange", "homeworkDeadlineReminder");
+            if (!allowed.containsAll(request.inApp().keySet()) || request.inApp().values().stream().anyMatch(java.util.Objects::isNull)) throw invalidPreferences();
+            preferences.getInApp().putAll(request.inApp());
+        }
         settings.save(preferences);
+        audit.record("NOTIFICATION_PREFERENCES_UPDATED", "USER", user.getId(), of(), of("notificationPreferencesChanged", true));
         return find(login);
     }
 
@@ -221,12 +232,15 @@ public class ProfileService {
         avatar.setImageData(bytes);
         avatar.setUpdatedAt(LocalDateTime.now(clock));
         avatars.saveAndFlush(avatar);
+        audit.record("PROFILE_AVATAR_UPDATED", "USER", user.getId(), of(), of("avatarChanged", true));
         return find(login);
     }
 
     @Transactional
     public void deleteAvatar(String login) {
-        avatars.deleteById(requireUser(login).getId());
+        Long userId = requireUser(login).getId();
+        avatars.deleteById(userId);
+        audit.record("PROFILE_AVATAR_REMOVED", "USER", userId, of(), of("avatarChanged", true));
     }
 
     private AppUser requireUser(String login) {
@@ -244,7 +258,8 @@ public class ProfileService {
                 value.isHomeworkEmailEnabled(), value.isAttendanceEmailEnabled(),
                 value.isMessageEmailEnabled(), value.isScheduleChangeEmailEnabled(),
                 value.isClassScheduleChangeEmailEnabled(), value.isProlongedAbsenceEmailEnabled(),
-                value.isClassRosterChangeEmailEnabled(), value.isHomeworkDeadlineReminderEmailEnabled());
+                value.isClassRosterChangeEmailEnabled(), value.isHomeworkDeadlineReminderEmailEnabled(),
+                java.util.Map.copyOf(value.getInApp()));
     }
 
     private boolean isHomeroomTeacher(AppUser user) {

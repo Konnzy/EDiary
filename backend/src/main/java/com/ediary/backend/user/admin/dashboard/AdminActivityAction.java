@@ -13,6 +13,8 @@ record AdminActivityAction(String title, String target) {
         return switch (action) {
             case "POST /api/admin/users" -> new AdminActivityAction("Створено користувача", "Обліковий запис");
             case "PATCH /api/admin/users/{userId}/status" -> new AdminActivityAction("Змінено статус користувача", target("Користувач", request, "userId"));
+            case "PATCH /api/admin/users/{userId}" -> new AdminActivityAction("Відредаговано користувача", target("Користувач", request, "userId"));
+            case "POST /api/admin/users/{userId}/reset-password" -> new AdminActivityAction("Скинуто пароль користувача", target("Користувач", request, "userId"));
             case "DELETE /api/admin/users/{userId}" -> new AdminActivityAction("Видалено користувача", target("Користувач", request, "userId"));
             case "POST /api/admin/registration-requests/{requestId}/approve" -> new AdminActivityAction("Схвалено заявку", target("Заявка", request, "requestId"));
             case "POST /api/admin/registration-requests/{requestId}/reject" -> new AdminActivityAction("Відхилено заявку", target("Заявка", request, "requestId"));

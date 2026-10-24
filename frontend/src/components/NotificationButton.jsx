@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, CheckCheck, Loader2, RefreshCw, Settings2 } from "lucide-react";
+import { Bell, CheckCheck, Loader2, RefreshCw, Settings2, X } from "lucide-react";
 import { userNotificationApi } from "@/lib/api.js";
 
 function relativeTime(value) {
@@ -19,6 +19,7 @@ export function NotificationButton() {
   const [feed, setFeed] = useState({ unreadCount: 0, items: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [dismissing, setDismissing] = useState([]);
   const role = window.location.hash.slice(1).split("/")[0];
 
   const loadFeed = useCallback(async (quiet = false) => {
@@ -60,6 +61,18 @@ export function NotificationButton() {
     }
   };
 
+  const dismiss = async (id) => {
+    setDismissing((current) => [...current, id]);
+    try {
+      await userNotificationApi.dismiss(id);
+      await loadFeed(true);
+    } catch (requestError) {
+      setError(requestError.message || "Не вдалося прибрати сповіщення.");
+    } finally {
+      setDismissing((current) => current.filter((value) => value !== id));
+    }
+  };
+
   return <div ref={container} className="relative">
     <button type="button" onClick={() => { setOpen((value) => !value); if (!open) void loadFeed(); }}
       className="relative flex h-9 w-9 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:h-10 sm:w-10"
@@ -80,10 +93,10 @@ export function NotificationButton() {
         {loading ? <div className="flex min-h-40 items-center justify-center text-slate-400"><Loader2 className="h-5 w-5 animate-spin" aria-label="Завантаження" /></div> : null}
         {!loading && error ? <div className="px-5 py-8 text-center text-sm text-rose-700">{error}</div> : null}
         {!loading && !error && !feed.items.length ? <div className="px-5 py-8 text-center"><Bell className="mx-auto h-6 w-6 text-slate-300" /><p className="mt-3 text-[0.8rem] font-semibold text-slate-700">Сповіщень поки немає</p></div> : null}
-        {!loading && !error ? feed.items.map((item) => <a key={item.id} href={`#${item.target}`} onClick={() => { if (!item.read) void userNotificationApi.markRead(item.id).catch(() => {}); setOpen(false); }} className={`block border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50 ${item.read ? "" : "bg-sky-50/50"}`}>
+        {!loading && !error ? feed.items.map((item) => <div key={item.id} className={`flex items-start border-b border-slate-100 last:border-b-0 hover:bg-slate-50 ${item.read ? "" : "bg-sky-50/50"}`}><a href={`#${item.target}`} onClick={() => { if (!item.read) void userNotificationApi.markRead(item.id).catch(() => {}); setOpen(false); }} className="block min-w-0 flex-1 py-3 pl-4 pr-1">
           <span className="flex items-start justify-between gap-3"><span className="text-[0.76rem] font-bold text-slate-900">{item.title}</span><time dateTime={item.createdAt} className="shrink-0 text-[0.65rem] text-slate-400">{relativeTime(item.createdAt)}</time></span>
           <span className="mt-1 block text-[0.74rem] leading-5 text-slate-600">{item.body}</span>
-        </a>) : null}
+        </a><button type="button" onClick={() => void dismiss(item.id)} disabled={dismissing.includes(item.id)} aria-label={`Прибрати сповіщення: ${item.title}`} title="Прибрати сповіщення" className="mr-2 mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"><X className="h-4 w-4" aria-hidden="true" /></button></div>) : null}
       </div>
       <a href={`#${role}/profile?notifications=1`} onClick={() => setOpen(false)} className="flex h-11 items-center justify-center gap-2 border-t border-slate-200 text-[0.76rem] font-bold text-slate-700 hover:bg-slate-50"><Settings2 className="h-4 w-4" />Налаштувати</a>
     </section> : null}

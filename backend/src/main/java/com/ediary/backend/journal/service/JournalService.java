@@ -1,6 +1,8 @@
 package com.ediary.backend.journal.service;
 
 import com.ediary.backend.common.error.ApplicationException;
+import com.ediary.backend.common.audit.AuditService;
+import static com.ediary.backend.common.audit.AuditValues.of;
 import com.ediary.backend.journal.dto.JournalOptionsResponse;
 import com.ediary.backend.journal.dto.JournalResponse;
 import com.ediary.backend.journal.dto.SaveJournalCellRequest;
@@ -68,6 +70,7 @@ public class JournalService {
     private final LessonService lessonService;
     private final UserNotificationService notificationService;
     private final Clock clock;
+    private final AuditService audit;
 
     @Transactional(readOnly = true)
     public JournalOptionsResponse options(String teacherLogin, String academicYear) {
@@ -246,6 +249,8 @@ public class JournalService {
         }
         String topic = normalize(request.topic());
         Homework homework = homeworkRepository.findFirstByLessonId(lessonId).orElse(null);
+        var beforeLesson = of("topic", lesson.getTopic(), "workType", lesson.getWorkType(),
+            "homework", homework == null ? null : homework.getDescription(), "deadline", homework == null ? null : homework.getDeadline());
         if (request.workType() == null) {
             boolean hasLessonData = topic != null || homeworkText != null || request.homeworkDeadline() != null
                 || lesson.getTopic() != null && !lesson.getTopic().isBlank()
@@ -258,6 +263,8 @@ public class JournalService {
             lesson.setTopic(null);
             lesson.setUpdatedAt(LocalDateTime.now(clock));
             lessonRepository.save(lesson);
+            audit.record("LESSON_UPDATED", "LESSON", lessonId, beforeLesson,
+                of("topic", null, "workType", null, "homework", null, "deadline", null));
             return;
         }
         validateFinalWorkType(lesson, request.workType());
@@ -301,6 +308,9 @@ public class JournalService {
                 }
             }
         }
+        audit.record("LESSON_UPDATED", "LESSON", lessonId, beforeLesson,
+            of("topic", topic, "workType", request.workType(), "homework", homeworkText,
+                "deadline", homeworkText == null ? null : request.homeworkDeadline()));
     }
 
     @Transactional
@@ -329,8 +339,9 @@ public class JournalService {
         if (request.score() != null || request.attendanceStatus() != null || request.homeworkStatus() != null) {
             LessonTopicPolicy.requireTopic(lesson.getTopic());
         }
-        Integer previousScore = gradeRepository.findAllByStudentIdAndLessonId(studentId, lessonId).stream()
-            .map(Grade::getScore).findFirst().orElse(null);
+        Grade previousGrade = gradeRepository.findAllByStudentIdAndLessonId(studentId, lessonId).stream().findFirst().orElse(null);
+        Integer previousScore = previousGrade == null ? null : previousGrade.getScore();
+        String previousComment = previousGrade == null ? null : previousGrade.getComment();
         AttendanceStatus previousAttendance = attendanceRepository.findByStudentIdAndLessonId(studentId, lessonId)
             .map(Attendance::getStatus).orElse(null);
         gradeService.save(student, lesson, request.score(), gradeType(lesson.getWorkType()), request.comment());
@@ -341,9 +352,11 @@ public class JournalService {
             throw new ApplicationException(HttpStatus.BAD_REQUEST, "HOMEWORK_NOT_ASSIGNED",
                 "Для уроку не призначено домашнього завдання");
         }
+        HomeworkStatus previousHomeworkStatus = null;
         if (homework != null) {
             StudentHomework studentHomework = studentHomeworkRepository
                 .findByStudentIdAndHomeworkId(studentId, homework.getId()).orElse(null);
+            previousHomeworkStatus = studentHomework == null ? null : studentHomework.getStatus();
             if (request.homeworkStatus() == null) {
                 if (studentHomework != null) studentHomeworkRepository.delete(studentHomework);
             } else {
@@ -358,15 +371,18 @@ public class JournalService {
             }
         }
         lesson.setUpdatedAt(LocalDateTime.now(clock));
+        audit.record("JOURNAL_CELL_UPDATED", "JOURNAL_CELL", lessonId + ":" + studentId,
+            of("score", previousScore, "attendance", previousAttendance, "homeworkStatus", previousHomeworkStatus, "commentChanged", false),
+            of("score", request.score(), "attendance", request.attendanceStatus(), "homeworkStatus", request.homeworkStatus(),
+                "commentChanged", !Objects.equals(previousComment, normalize(request.comment()))));
         String subject = lesson.getScheduleEntry().getSubject().getTitle();
         if (request.score() != null && !Objects.equals(previousScore, request.score())) {
             notificationService.forStudent(student, "GRADE", "Нова оцінка",
                 subject + " · " + request.score() + " балів", null);
         }
+        notificationService.attendanceChanged(student, lesson, previousAttendance, request.attendanceStatus());
         if (request.attendanceStatus() == AttendanceStatus.ABSENT
             && previousAttendance != AttendanceStatus.ABSENT) {
-            notificationService.forStudent(student, "ABSENCE", "Відсутність на уроці",
-                subject + " · " + lesson.getDate(), null);
             List<Attendance> recent = attendanceRepository.findRecentByStudentId(studentId, PageRequest.of(0, 3));
             if (recent.size() == 3 && recent.getFirst().getLesson().getId().equals(lessonId)
                 && recent.stream().allMatch(item -> item.getStatus() == AttendanceStatus.ABSENT)) {
@@ -396,7 +412,12 @@ public class JournalService {
         for (StudentProfile student : studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(
             lesson.getScheduleEntry().getSchoolClass().getId()
         )) {
+            var previous = attendanceRepository.findByStudentIdAndLessonId(student.getId(), lessonId)
+                .map(Attendance::getStatus).orElse(null);
             attendanceService.save(student, lesson, AttendanceStatus.PRESENT);
+            audit.record("ATTENDANCE_BULK_UPDATED", "JOURNAL_CELL", lessonId + ":" + student.getId(),
+                of("attendance", previous), of("attendance", AttendanceStatus.PRESENT));
+            notificationService.attendanceChanged(student, lesson, previous, AttendanceStatus.PRESENT);
         }
         lesson.setUpdatedAt(LocalDateTime.now(clock));
     }
@@ -407,7 +428,11 @@ public class JournalService {
         if (lesson.getStatus() == LessonStatus.CANCELLED) {
             throw new ApplicationException(HttpStatus.CONFLICT, "LESSON_CANCELLED", "Скасований урок не можна редагувати");
         }
-        attendanceRepository.deleteAll(attendanceRepository.findAllByLessonIdIn(List.of(lessonId)));
+        var previous = attendanceRepository.findAllByLessonIdIn(List.of(lessonId));
+        attendanceRepository.deleteAll(previous);
+        previous.forEach(item -> notificationService.attendanceChanged(item.getStudent(), lesson, item.getStatus(), null));
+        previous.forEach(item -> audit.record("ATTENDANCE_CLEARED", "JOURNAL_CELL", lessonId + ":" + item.getStudent().getId(),
+            of("attendance", item.getStatus()), of("attendance", null)));
         lesson.setUpdatedAt(LocalDateTime.now(clock));
     }
 
