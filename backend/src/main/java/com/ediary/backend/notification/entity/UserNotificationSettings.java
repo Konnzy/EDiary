@@ -26,6 +26,7 @@ import lombok.Setter;
 @NoArgsConstructor
 public class UserNotificationSettings {
 
+    // Retained for historical data only; in-app delivery no longer reads these preferences.
     @ElementCollection
     @CollectionTable(name = "notification_in_app_preference", joinColumns = @JoinColumn(name = "settings_id"))
     @MapKeyColumn(name = "preference_key", length = 60)
@@ -42,32 +43,32 @@ public class UserNotificationSettings {
     private AppUser user;
 
     @Column(name = "grade_email_enabled", nullable = false)
-    private boolean gradeEmailEnabled = true;
+    private boolean gradeEmailEnabled = false;
 
     @Column(name = "homework_email_enabled", nullable = false)
-    private boolean homeworkEmailEnabled = true;
+    private boolean homeworkEmailEnabled = false;
 
     @Column(name = "homework_deadline_reminder_email_enabled", nullable = false)
-    private boolean homeworkDeadlineReminderEmailEnabled = true;
+    private boolean homeworkDeadlineReminderEmailEnabled = false;
 
     @Column(name = "attendance_email_enabled", nullable = false)
-    private boolean attendanceEmailEnabled = true;
+    private boolean attendanceEmailEnabled = false;
 
     @Column(name = "homework_status_email_enabled", nullable = false)
-    private boolean homeworkStatusEmailEnabled = true;
+    private boolean homeworkStatusEmailEnabled = false;
 
     @Column(name = "message_email_enabled", nullable = false)
-    private boolean messageEmailEnabled = true;
+    private boolean messageEmailEnabled = false;
 
     @Column(name = "schedule_change_email_enabled", nullable = false)
-    private boolean scheduleChangeEmailEnabled = true;
+    private boolean scheduleChangeEmailEnabled = false;
 
     @Column(name = "class_schedule_change_email_enabled", nullable = false)
-    private boolean classScheduleChangeEmailEnabled = true;
+    private boolean classScheduleChangeEmailEnabled = false;
 
     @Column(name = "prolonged_absence_email_enabled", nullable = false)
-    private boolean prolongedAbsenceEmailEnabled = true;
+    private boolean prolongedAbsenceEmailEnabled = false;
 
     @Column(name = "class_roster_change_email_enabled", nullable = false)
-    private boolean classRosterChangeEmailEnabled = true;
+    private boolean classRosterChangeEmailEnabled = false;
 }

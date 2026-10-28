@@ -59,6 +59,9 @@ class AttendanceNotificationTest {
     void setup() {
         when(clock.instant()).thenAnswer(call -> time.get());
         when(clock.getZone()).thenReturn(ZoneOffset.UTC);
+        var optedIn = new UserNotificationSettings();
+        optedIn.setAttendanceEmailEnabled(true);
+        when(settings.findByUser_Id(anyLong())).thenReturn(Optional.of(optedIn));
         service = new UserNotificationService(notifications, settings, parents, users, clock);
         sender = new NotificationEmailSender(notifications, settings, attendance, students, lessons, service, email, clock);
         var user = new AppUser();
@@ -211,7 +214,7 @@ class AttendanceNotificationTest {
     }
 
     @Test
-    void mailAndInAppChannelsAreIndependent() {
+    void legacyInAppOptOutCannotHideNoticeAndEmailRemainsOptional() {
         var preference = new UserNotificationSettings();
         preference.setAttendanceEmailEnabled(false);
         when(settings.findByUser_Id(1L)).thenReturn(Optional.of(preference));
@@ -222,7 +225,7 @@ class AttendanceNotificationTest {
         preference.getInApp().put("absence", false);
         service.attendanceChanged(student, lesson, AttendanceStatus.ABSENT, AttendanceStatus.PRESENT);
         service.attendanceChanged(student, lesson, AttendanceStatus.PRESENT, AttendanceStatus.ABSENT);
-        assertThat(stored.get().isVisibleInApp()).isFalse();
+        assertThat(stored.get().isVisibleInApp()).isTrue();
         assertThat(stored.get().getEmailKind()).isEqualTo("ABSENCE");
     }
 

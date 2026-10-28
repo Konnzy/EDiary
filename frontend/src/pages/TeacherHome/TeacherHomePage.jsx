@@ -7,6 +7,7 @@ import {
   Mail,
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
+import { RecentMessagesCard } from "@/components/RecentMessagesCard.jsx";
 import { NotificationButton } from "@/components/NotificationButton.jsx";
 import { CurrentUserBadge } from "@/lib/currentUser.jsx";
 import { Button } from "@/components/ui/button.jsx";
@@ -226,18 +227,7 @@ function RecentChangesCard({ dashboard }) {
 }
 
 function MessagesCard() {
-  return (
-    <Card className="rounded-lg px-4 py-4 shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)] sm:px-5">
-      <CardHeader className="mb-4 space-y-0">
-        <SectionTitle>Останні повідомлення</SectionTitle>
-      </CardHeader>
-
-      <CardContent className="flex min-h-28 flex-col justify-between gap-4">
-        <p className="text-[0.8rem] text-slate-500">Повідомлень поки немає.</p>
-        <a href="#teacher/messages" className="inline-flex w-fit items-center gap-2 text-[0.8rem] font-semibold text-slate-800 hover:underline"><Mail className="h-4 w-4" aria-hidden="true" />Перейти до повідомлень</a>
-      </CardContent>
-    </Card>
-  );
+  return <RecentMessagesCard role="TEACHER" />;
 }
 
 function LessonsToCompleteCard({ dashboard }) {

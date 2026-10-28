@@ -21,12 +21,13 @@ public final class NotificationChannels {
     }
 
     public static boolean inApp(UserNotificationSettings settings, String category) {
-        return !key(category).isEmpty() && (settings == null || settings.getInApp().getOrDefault(key(category), true));
+        // In-app delivery is mandatory; legacy channel preferences no longer apply.
+        return !key(category).isEmpty();
     }
 
     public static boolean email(UserNotificationSettings settings, String category) {
         if (key(category).isEmpty()) return false;
-        if (settings == null) return true;
+        if (settings == null) return false;
         return switch (category) {
             case "GRADE" -> settings.isGradeEmailEnabled();
             case "HOMEWORK" -> settings.isHomeworkEmailEnabled();

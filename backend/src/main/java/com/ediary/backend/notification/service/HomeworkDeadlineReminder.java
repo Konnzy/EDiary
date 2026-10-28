@@ -58,7 +58,7 @@ public class HomeworkDeadlineReminder {
                     .map(value -> value.getStatus()).orElse(null);
                 if (status == HomeworkStatus.COMPLETED || status == HomeworkStatus.SUBMITTED_LATE) continue;
                 notifications.forStudent(student, "HOMEWORK_DEADLINE", "Дедлайн домашнього завдання",
-                    lesson.getScheduleEntry().getSubject().getTitle() + " · виконати до " + deadline,
+                    "Нагадування: завтра спливає термін виконання.\n\n"+NotificationText.homework(homework),
                     "homework-deadline:" + homework.getId() + ":" + deadline);
                 count++;
             }

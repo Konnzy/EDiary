@@ -80,10 +80,13 @@ public class UserNotificationService {
     @Transactional
     public void forStudent(StudentProfile student, String category, String title, String body, String eventKey) {
         String page = "SCHEDULE".equals(category) ? "schedule" : "subjects";
-        send(student.getUser(), category, title, body, "student/" + page, eventKey);
+        String context="Учень: "+student.getSurname()+" "+student.getName()
+            +(student.getPatronymic()==null?"":" "+student.getPatronymic())
+            +(student.getSchoolClass()==null?"":"\nКлас: "+student.getSchoolClass().getDisplayName())+"\n\n";
+        send(student.getUser(), category, title, context+body, "student/" + page, eventKey);
         parentLinks.findAllByStudent_IdOrderByPrimaryContactDesc(student.getId()).forEach(link ->
             send(link.getParent().getUser(), category, title,
-                student.getSurname() + " " + student.getName() + " · " + body,
+                context + body,
                 "parent/" + page + "?childId=" + student.getId(), eventKey));
     }
 
@@ -107,11 +110,28 @@ public class UserNotificationService {
         item.setCategory(category);
         item.setTitle(title);
         item.setBody(shortBody(body));
+        item.setEmailBody(body);
         item.setTarget(target);
         item.setEventKey(eventKey);
         item.setCreatedAt(LocalDateTime.now(clock));
+        if (NotificationChannels.email(preference, category)) {
+            item.setEmailKind("NOTICE");
+            item.setEmailDueAt(LocalDateTime.now(clock));
+        }
         notifications.save(item);
         com.ediary.backend.common.logging.DiagnosticContext.afterCommit(() -> log.info("event=notification.created recipientId={} category={}", recipient.getId(), category));
+    }
+
+    @Transactional
+    public void messageReceived(AppUser recipient, Long messageId, String senderName, String subject) {
+        send(recipient, "MESSAGE", "Нове повідомлення", "Відправник: " + senderName + "\nТема: " + subject + "\n\nВам надійшло особисте повідомлення. Повний текст доступний у застосунку.",
+            recipient.getRole().name().toLowerCase(java.util.Locale.ROOT) + "/messages?messageId=" + messageId,
+            "message:" + messageId);
+    }
+
+    @Transactional
+    public void messageRead(Long recipientId, Long messageId) {
+        notifications.markEventRead(recipientId,"message:" + messageId);
     }
 
     @Transactional
@@ -155,6 +175,10 @@ public class UserNotificationService {
         item.setTitle(absent ? "Відсутність на уроці" : "Відвідування уточнено");
         item.setBody(shortBody(context + (absent ? " · Учень відсутній." : " · " + attendanceDescription(current)
             + " Попередня позначка відсутності більше не актуальна.")));
+        item.setEmailBody("Учень: "+student.getSurname()+" "+student.getName()
+            +(student.getSchoolClass()==null?"":"\nКлас: "+student.getSchoolClass().getDisplayName())
+            +"\n"+NotificationText.lesson(lesson)+"\n\n"
+            +(absent?"Учня позначено відсутнім на цьому уроці.":"Попередню позначку відсутності скасовано. "+attendanceDescription(current)));
         item.setCreatedAt(now);
         item.setReadAt(null);
         item.setDismissedAt(null);

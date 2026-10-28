@@ -284,6 +284,7 @@ public class JournalService {
                 homeworkRepository.delete(homework);
             }
         } else {
+            boolean newHomework = homework == null;
             boolean homeworkChanged = homework == null || !Objects.equals(homework.getDescription(), homeworkText)
                 || !Objects.equals(homework.getDeadline(), request.homeworkDeadline());
             if (homework == null) {
@@ -295,14 +296,13 @@ public class JournalService {
             homework.setDeadline(request.homeworkDeadline());
             homework = homeworkRepository.save(homework);
             if (homeworkChanged) {
-                String description = lesson.getScheduleEntry().getSubject().getTitle()
-                    + (homework.getDeadline() == null ? "" : " · до " + homework.getDeadline());
+                String description = com.ediary.backend.notification.service.NotificationText.homework(homework);
                 for (StudentProfile student : studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(
                     lesson.getScheduleEntry().getSchoolClass().getId())) {
-                    notificationService.forStudent(student, "HOMEWORK", "Нове домашнє завдання", description, null);
+                    notificationService.forStudent(student, "HOMEWORK", newHomework ? "Нове домашнє завдання" : "Домашнє завдання оновлено", description, null);
                     if (LocalDate.now(clock).plusDays(1).equals(homework.getDeadline())) {
                         notificationService.forStudent(student, "HOMEWORK_DEADLINE", "Дедлайн домашнього завдання",
-                            lesson.getScheduleEntry().getSubject().getTitle() + " · виконати до " + homework.getDeadline(),
+                            "Нагадування: завтра спливає термін виконання.\n\n"+description,
                             "homework-deadline:" + homework.getId() + ":" + homework.getDeadline());
                     }
                 }
@@ -377,8 +377,11 @@ public class JournalService {
                 "commentChanged", !Objects.equals(previousComment, normalize(request.comment()))));
         String subject = lesson.getScheduleEntry().getSubject().getTitle();
         if (request.score() != null && !Objects.equals(previousScore, request.score())) {
-            notificationService.forStudent(student, "GRADE", "Нова оцінка",
-                subject + " · " + request.score() + " балів", null);
+            notificationService.forStudent(student, "GRADE", previousScore == null ? "Нова оцінка" : "Оцінку змінено",
+                com.ediary.backend.notification.service.NotificationText.lesson(lesson)
+                +"\nТип роботи: "+com.ediary.backend.notification.service.NotificationText.workType(lesson.getWorkType())
+                +"\n"+(previousScore==null?"Оцінка: "+request.score():"Оцінку змінено: "+previousScore+" → "+request.score())
+                +(normalize(request.comment())==null?"":"\nКоментар учителя: "+normalize(request.comment())), null);
         }
         notificationService.attendanceChanged(student, lesson, previousAttendance, request.attendanceStatus());
         if (request.attendanceStatus() == AttendanceStatus.ABSENT
@@ -389,7 +392,10 @@ public class JournalService {
                 var schoolClass = lesson.getScheduleEntry().getSchoolClass();
                 notificationService.forTeacher(schoolClass.getClassTeacher(), "PROLONGED_ABSENCE",
                     "Тривалі пропуски", student.getSurname() + " " + student.getName()
-                        + " пропустив(-ла) щонайменше 3 уроки поспіль",
+                        + "\nКлас: "+schoolClass.getDisplayName()+"\nПропущено уроків поспіль: 3\nПеріод: "
+                        +com.ediary.backend.notification.service.NotificationText.date(recent.getLast().getLesson().getDate())+" – "
+                        +com.ediary.backend.notification.service.NotificationText.date(recent.getFirst().getLesson().getDate())
+                        +"\nОстанній зафіксований пропуск:\n"+com.ediary.backend.notification.service.NotificationText.lesson(lesson),
                     "teacher/my-class?classId=" + schoolClass.getId(),
                     "absence:" + studentId + ":" + lessonId);
             }

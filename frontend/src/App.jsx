@@ -222,7 +222,7 @@ function AppContent() {
 
   if (route === "student/messages" || route.startsWith("student/messages?")) {
     const params = new URLSearchParams(route.split("?")[1] || "");
-    return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserMessagesPage role="STUDENT" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} /></ProtectedRoute>;
+    return <ProtectedRoute key={route} allowedRole="STUDENT" loginRoute="login"><UserMessagesPage role="STUDENT" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} initialMessageId={params.get("messageId") || ""} /></ProtectedRoute>;
   }
 
   if (route === "student/profile" || route.startsWith("student/profile?")) {
@@ -272,7 +272,7 @@ function AppContent() {
 
   if (route === "teacher/messages" || route.startsWith("teacher/messages?")) {
     const params = new URLSearchParams(route.split("?")[1] || "");
-    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><UserMessagesPage role="TEACHER" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} /></ProtectedRoute>;
+    return <ProtectedRoute key={route} allowedRole="TEACHER" loginRoute="login"><UserMessagesPage role="TEACHER" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} initialMessageId={params.get("messageId") || ""} /></ProtectedRoute>;
   }
 
   if (route === "teacher/profile" || route.startsWith("teacher/profile?")) {
@@ -300,7 +300,7 @@ function AppContent() {
 
   if (route === "parent/messages" || route.startsWith("parent/messages?")) {
     const params = new URLSearchParams(route.split("?")[1] || "");
-    return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserMessagesPage role="PARENT" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} /></ProtectedRoute>;
+    return <ProtectedRoute key={route} allowedRole="PARENT" loginRoute="login"><UserMessagesPage role="PARENT" initialRecipient={params.get("recipient") || ""} initialRecipientId={params.get("recipientId") || ""} initialMessageId={params.get("messageId") || ""} /></ProtectedRoute>;
   }
 
   if (route === "parent/profile" || route.startsWith("parent/profile?")) {

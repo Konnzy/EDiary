@@ -186,12 +186,6 @@ public class ProfileService {
             preferences.setMessageEmailEnabled(request.newMessage());
             preferences.setHomeworkDeadlineReminderEmailEnabled(request.homeworkDeadlineReminder());
         }
-        if (request.inApp() != null) {
-            var allowed = java.util.Set.of("newGrade", "newHomework", "absence", "newMessage", "scheduleChange",
-                "classScheduleChange", "prolongedAbsence", "classRosterChange", "homeworkDeadlineReminder");
-            if (!allowed.containsAll(request.inApp().keySet()) || request.inApp().values().stream().anyMatch(java.util.Objects::isNull)) throw invalidPreferences();
-            preferences.getInApp().putAll(request.inApp());
-        }
         settings.save(preferences);
         audit.record("NOTIFICATION_PREFERENCES_UPDATED", "USER", user.getId(), of(), of("notificationPreferencesChanged", true));
         return find(login);
@@ -253,13 +247,12 @@ public class ProfileService {
 
     private static ProfileDetailsResponse.NotificationPreferences toPreferences(UserNotificationSettings value) {
         return value == null
-            ? new ProfileDetailsResponse.NotificationPreferences(true, true, true, true, true, true, true, true, true)
+            ? new ProfileDetailsResponse.NotificationPreferences(false, false, false, false, false, false, false, false, false)
             : new ProfileDetailsResponse.NotificationPreferences(value.isGradeEmailEnabled(),
                 value.isHomeworkEmailEnabled(), value.isAttendanceEmailEnabled(),
                 value.isMessageEmailEnabled(), value.isScheduleChangeEmailEnabled(),
                 value.isClassScheduleChangeEmailEnabled(), value.isProlongedAbsenceEmailEnabled(),
-                value.isClassRosterChangeEmailEnabled(), value.isHomeworkDeadlineReminderEmailEnabled(),
-                java.util.Map.copyOf(value.getInApp()));
+                value.isClassRosterChangeEmailEnabled(), value.isHomeworkDeadlineReminderEmailEnabled());
     }
 
     private boolean isHomeroomTeacher(AppUser user) {

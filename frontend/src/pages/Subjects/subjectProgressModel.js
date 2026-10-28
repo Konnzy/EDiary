@@ -3,6 +3,39 @@ const monthNames = [
   "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень",
 ];
 
+export const PROGRESS_PAGE_SIZE = 20;
+
+export function paginateProgressRows(rows, page, pageSize = PROGRESS_PAGE_SIZE) {
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const offset = (currentPage - 1) * pageSize;
+  return {
+    rows: rows.slice(offset, offset + pageSize),
+    page: currentPage,
+    totalPages,
+    total: rows.length,
+    start: rows.length ? offset + 1 : 0,
+    end: Math.min(offset + pageSize, rows.length),
+  };
+}
+
+export function sortProgressRows(rows, sort, labels = {}) {
+  return [...rows].sort((left, right) => {
+    let first = left[sort.column];
+    let second = right[sort.column];
+    if (sort.column === "status") {
+      first = labels[first]?.label || first;
+      second = labels[second]?.label || second;
+    }
+    if (first == null) return second == null ? 0 : 1;
+    if (second == null) return -1;
+    const comparison = typeof first === "number" && typeof second === "number"
+      ? first - second
+      : String(first).localeCompare(String(second), "uk", { numeric: true });
+    return sort.direction === "desc" ? -comparison : comparison;
+  });
+}
+
 export function getPeriodOptions(academicYear) {
   if (!academicYear) return [{ value: "YEAR", label: "Увесь навчальний рік" }];
   const startYear = Number(academicYear.split("/")[0]);

@@ -22,7 +22,7 @@ public final class RequestDiagnostics {
         var allowed = java.util.Set.of("api", "auth", "admin", "login", "logout", "session", "users", "me", "notifications",
             "registration-requests", "password", "forgot", "reset", "security", "csrf", "teacher", "student", "parent",
             "children", "classes", "subjects", "schedules", "lessons", "journal", "options", "academic-years", "read-all",
-            "read", "attendance", "status", "reset-password", "students", "teachers", "avatar");
+            "read", "attendance", "status", "reset-password", "students", "teachers", "avatar", "messages", "recipients", "open", "important");
         return java.util.Arrays.stream(request.getRequestURI().split("/")).filter(value -> !value.isEmpty()).limit(12)
             .map(value -> allowed.contains(value) ? value : value.matches("[0-9]+") ? "{id}" : "{value}")
             .collect(java.util.stream.Collectors.joining("/", "/", ""));

@@ -40,6 +40,8 @@ import {
   getPeriodOptions,
   getSubjectPeriodView,
   getSubjectStats,
+  paginateProgressRows,
+  sortProgressRows,
 } from "./subjectProgressModel.js";
 
 const workTypeLabels = {
@@ -276,7 +278,7 @@ export function SubjectProgressView({ role, adminStudentId, classId, initialAcad
                         <SubjectTabs activeTab={activeTab} onChange={setActiveTab} allSubjects={allSubjects} />
                         <AnimatePresence mode="wait" initial={false}>
                           <motion.div
-                            key={`${subject.id}-${academicYear}-${period}-${activeTab}`}
+                            key={`${studentId}-${subject.id}-${academicYear}-${period}-${activeTab}`}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -3 }}
@@ -488,8 +490,8 @@ function SummaryCards({ tab, stats, yearStats, period, forecast, allSubjects = f
         { label: "Виконано завдань", value: stats.completedHomework, detail: `з них ${stats.completedLateHomework} із запізненням`, icon: ClipboardCheck, tone: "emerald" },
       ]
       : [
-        allSubjects
-          ? { label: "Середній бал з усіх предметів", value: stats.average ?? "—", suffix: stats.average === null ? "" : "з 12", icon: BarChart3, tone: "slate" }
+        allSubjects || period === "YEAR"
+          ? { label: allSubjects ? "Середній бал з усіх предметів" : "Середній бал", value: stats.average ?? "—", suffix: stats.average === null ? "" : "з 12", icon: BarChart3, tone: "slate" }
           : { label: "Орієнтовна тематична", value: forecast.thematic ?? "—", suffix: forecast.thematic === null ? "" : "з 12", detail: "За оцінками після останньої тематичної", icon: BarChart3, tone: "slate" },
         { label: "Динаміка успішності", value: formatDelta(stats.delta), detail: deltaDescription(stats.delta), icon: deltaIcon(stats.delta), tone: stats.delta > 0 ? "emerald" : stats.delta < 0 ? "red" : "slate" },
       ];
@@ -582,34 +584,34 @@ function SubjectTabs({ activeTab, onChange, allSubjects = false }) {
   );
 }
 
-function useSortableRows(rows) {
-  const [sort, setSort] = useState({ column: null, direction: null });
-  const sortedRows = useMemo(() => {
-    if (!sort.column || !sort.direction) return rows;
-    const labels = { ...attendanceLabels, ...homeworkLabels };
-    return [...rows].sort((left, right) => {
-      let first = left[sort.column];
-      let second = right[sort.column];
-      if (sort.column === "status") {
-        first = labels[first]?.label || first;
-        second = labels[second]?.label || second;
-      }
-      if (first == null) return second == null ? 0 : 1;
-      if (second == null) return -1;
-      const comparison = typeof first === "number" && typeof second === "number"
-        ? first - second
-        : String(first).localeCompare(String(second), "uk", { numeric: true });
-      return sort.direction === "desc" ? -comparison : comparison;
+function useSortableRows(rows, dateColumn = "date") {
+  const [sort, setSort] = useState({ column: dateColumn, direction: "desc" });
+  const [page, setPage] = useState(1);
+  const sortedRows = useMemo(() => sortProgressRows(rows, sort, { ...attendanceLabels, ...homeworkLabels }), [rows, sort]);
+  const pagination = paginateProgressRows(sortedRows, page);
+  const onSort = (column) => {
+    setPage(1);
+    setSort((current) => {
+      if (current.column !== column) return { column, direction: "desc" };
+      if (current.direction === "desc") return { column, direction: "asc" };
+      return { column: dateColumn, direction: "desc" };
     });
-  }, [rows, sort]);
+  };
+  return { visibleRows: pagination.rows, pagination, onPageChange: setPage, sort, onSort };
+}
 
-  const onSort = (column) => setSort((current) => {
-    if (current.column !== column) return { column, direction: "desc" };
-    if (current.direction === "desc") return { column, direction: "asc" };
-    return { column: null, direction: null };
-  });
-
-  return { sortedRows, sort, onSort };
+function ProgressPagination({ pagination, onPageChange }) {
+  const { page, totalPages, total, start, end } = pagination;
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 text-[0.75rem] text-slate-500">
+      <p role="status">Показано {start}–{end} із {total}</p>
+      {totalPages > 1 ? <nav aria-label="Сторінки навчальних даних" className="flex items-center gap-2">
+        <button type="button" aria-label="Попередня сторінка" title="Попередня сторінка" disabled={page === 1} onClick={() => onPageChange(page - 1)} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-default disabled:opacity-40"><ChevronLeft className="h-4 w-4" aria-hidden="true" /></button>
+        <span className="min-w-12 text-center font-semibold tabular-nums">{page} / {totalPages}</span>
+        <button type="button" aria-label="Наступна сторінка" title="Наступна сторінка" disabled={page === totalPages} onClick={() => onPageChange(page + 1)} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-default disabled:opacity-40"><ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
+      </nav> : null}
+    </div>
+  );
 }
 
 function SortableHeader({ label, column, sort, onSort, className = "" }) {
@@ -627,7 +629,7 @@ function SortableHeader({ label, column, sort, onSort, className = "" }) {
 }
 
 function GradesPanel({ subject, stats, showSubject = false }) {
-  const { sortedRows, sort, onSort } = useSortableRows(subject.grades);
+  const { visibleRows, pagination, onPageChange, sort, onSort } = useSortableRows(subject.grades);
   if (!subject.grades.length) return <EmptyPeriodData message="За вибраний період оцінок немає" />;
   return (
     <>
@@ -642,18 +644,19 @@ function GradesPanel({ subject, stats, showSubject = false }) {
             <SortableHeader label="Оцінка" column="grade" sort={sort} onSort={onSort} className="border-r border-slate-200 px-4 py-3 text-center [&_button]:justify-center" />
             <th scope="col" className="px-4 py-3">Коментар учителя</th>
           </tr></thead>
-          <tbody>{sortedRows.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.date)}</td>{showSubject ? <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.subjectName}</td> : null}<td className="border-r border-slate-100 px-4 py-3.5"><WorkTypeBadge type={item.workType} /></td><td className="border-r border-slate-100 px-4 py-3.5 text-center"><GradeBadge value={item.grade} /></td><td className="px-4 py-3.5 text-slate-500">{item.comment || "—"}</td></tr>)}</tbody>
+          <tbody>{visibleRows.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.date)}</td>{showSubject ? <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.subjectName}</td> : null}<td className="border-r border-slate-100 px-4 py-3.5"><WorkTypeBadge type={item.workType} /></td><td className="border-r border-slate-100 px-4 py-3.5 text-center"><GradeBadge value={item.grade} /></td><td className="px-4 py-3.5 text-slate-500">{item.comment || "—"}</td></tr>)}</tbody>
         </table>
       </div>
       <div className="mt-4 space-y-3 md:hidden">
-        {sortedRows.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.date)}</p>{showSubject ? <p className="mt-1 text-[0.82rem] font-bold text-slate-800">{item.subjectName}</p> : null}<div className="mt-1"><WorkTypeBadge type={item.workType} /></div></div><GradeBadge value={item.grade} /></div><p className="mt-3 text-[0.74rem] leading-5 text-slate-500">{item.comment || "Без коментаря"}</p></article>)}
+        {visibleRows.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.date)}</p>{showSubject ? <p className="mt-1 text-[0.82rem] font-bold text-slate-800">{item.subjectName}</p> : null}<div className="mt-1"><WorkTypeBadge type={item.workType} /></div></div><GradeBadge value={item.grade} /></div><p className="mt-3 text-[0.74rem] leading-5 text-slate-500">{item.comment || "Без коментаря"}</p></article>)}
       </div>
+      <ProgressPagination pagination={pagination} onPageChange={onPageChange} />
     </>
   );
 }
 
 function AttendancePanel({ subject, showSubject = false }) {
-  const { sortedRows, sort, onSort } = useSortableRows(subject.attendance);
+  const { visibleRows, pagination, onPageChange, sort, onSort } = useSortableRows(subject.attendance);
   if (!subject.attendance.length) return <EmptyPeriodData message="За вибраний період записів відвідування немає" />;
   return (
     <>
@@ -667,18 +670,19 @@ function AttendancePanel({ subject, showSubject = false }) {
             <th scope="col" className="border-r border-slate-200 px-4 py-3">Тема уроку</th>
             <SortableHeader label="Статус відвідування" column="status" sort={sort} onSort={onSort} className="px-4 py-3 text-center [&_button]:justify-center" />
           </tr></thead>
-          <tbody>{sortedRows.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.date)}</td>{showSubject ? <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.subjectName}</td> : null}<td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.topic}</td><td className="px-4 py-3.5 text-center"><StatusBadge status={attendanceLabels[item.status]} /></td></tr>)}</tbody>
+          <tbody>{visibleRows.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.date)}</td>{showSubject ? <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.subjectName}</td> : null}<td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.topic}</td><td className="px-4 py-3.5 text-center"><StatusBadge status={attendanceLabels[item.status]} /></td></tr>)}</tbody>
         </table>
       </div>
       <div className="mt-4 space-y-3 md:hidden">
-        {sortedRows.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><time className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.date)}</time>{showSubject ? <p className="mt-1 text-[0.82rem] font-bold text-slate-800">{item.subjectName}</p> : null}<h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.topic}</h3></div><StatusBadge status={attendanceLabels[item.status]} /></div></article>)}
+        {visibleRows.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><time className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.date)}</time>{showSubject ? <p className="mt-1 text-[0.82rem] font-bold text-slate-800">{item.subjectName}</p> : null}<h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.topic}</h3></div><StatusBadge status={attendanceLabels[item.status]} /></div></article>)}
       </div>
+      <ProgressPagination pagination={pagination} onPageChange={onPageChange} />
     </>
   );
 }
 
 function HomeworkPanel({ subject, showSubject = false }) {
-  const { sortedRows, sort, onSort } = useSortableRows(subject.homework);
+  const { visibleRows, pagination, onPageChange, sort, onSort } = useSortableRows(subject.homework, "assignedDate");
   if (!subject.homework.length) return <EmptyPeriodData message="За вибраний період домашніх завдань немає" />;
   return (
     <>
@@ -693,12 +697,13 @@ function HomeworkPanel({ subject, showSubject = false }) {
             <th scope="col" className="border-r border-slate-200 px-4 py-3">Опис домашнього завдання</th>
             <SortableHeader label="Статус домашнього завдання" column="status" sort={sort} onSort={onSort} className="px-4 py-3 text-center [&_button]:justify-center" />
           </tr></thead>
-          <tbody>{sortedRows.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.assignedDate)}</td><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.dueDate) || "—"}</td>{showSubject ? <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.subjectName}</td> : null}<td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.title}</td><td className="px-4 py-3.5 text-center"><StatusBadge status={homeworkLabels[item.status]} /></td></tr>)}</tbody>
+          <tbody>{visibleRows.map((item) => <tr key={item.id} className="border-b border-slate-100 bg-white text-[0.8rem] transition-colors even:bg-slate-50/40 hover:bg-slate-50 last:border-0"><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.assignedDate)}</td><td className="border-r border-slate-100 px-4 py-3.5 font-medium text-slate-500">{formatDate(item.dueDate) || "—"}</td>{showSubject ? <td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.subjectName}</td> : null}<td className="border-r border-slate-100 px-4 py-3.5 font-semibold text-slate-800">{item.title}</td><td className="px-4 py-3.5 text-center"><StatusBadge status={homeworkLabels[item.status]} /></td></tr>)}</tbody>
         </table>
       </div>
       <div className="mt-4 space-y-3 md:hidden">
-        {sortedRows.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.assignedDate)} · до {formatDate(item.dueDate) || "без терміну"}</p>{showSubject ? <p className="mt-1 text-[0.82rem] font-bold text-slate-800">{item.subjectName}</p> : null}<h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.title}</h3></div><StatusBadge status={homeworkLabels[item.status]} /></div></article>)}
+        {visibleRows.map((item) => <article key={item.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[0.7rem] font-medium text-slate-400">{formatDate(item.assignedDate)} · до {formatDate(item.dueDate) || "без терміну"}</p>{showSubject ? <p className="mt-1 text-[0.82rem] font-bold text-slate-800">{item.subjectName}</p> : null}<h3 className="mt-1 text-[0.82rem] font-bold leading-5 text-slate-800">{item.title}</h3></div><StatusBadge status={homeworkLabels[item.status]} /></div></article>)}
       </div>
+      <ProgressPagination pagination={pagination} onPageChange={onPageChange} />
     </>
   );
 }

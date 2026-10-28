@@ -276,7 +276,7 @@ public class AdminSchoolClassService {
         student.setSchoolClass(targetClass);
         AdminClassStudentResponse response = toStudentResponse(studentProfileRepository.saveAndFlush(student));
         notificationService.forTeacher(targetClass.getClassTeacher(), "CLASS_ROSTER", "Зміна складу класу",
-            student.getSurname() + " " + student.getName() + " додано до " + targetClass.getDisplayName() + " класу",
+            "Учень: "+student.getSurname()+" "+student.getName()+"\nДія: додано до класу\nКлас: "+targetClass.getDisplayName(),
             "teacher/my-class?classId=" + targetClass.getId(), null);
         audit.record("STUDENT_ASSIGNED", "STUDENT", studentId, of("classId", null), of("classId", classId));
         return response;
@@ -312,10 +312,10 @@ public class AdminSchoolClassService {
         AdminClassStudentResponse response = toStudentResponse(studentProfileRepository.saveAndFlush(student));
         String studentName = student.getSurname() + " " + student.getName();
         notificationService.forTeacher(sourceClass.getClassTeacher(), "CLASS_ROSTER", "Зміна складу класу",
-            studentName + " переведено до " + targetClass.getDisplayName() + " класу",
+            "Учень: "+studentName+"\nДія: переведення\nБуло: "+sourceClass.getDisplayName()+"\nСтало: "+targetClass.getDisplayName(),
             "teacher/my-class?classId=" + sourceClassId, null);
         notificationService.forTeacher(targetClass.getClassTeacher(), "CLASS_ROSTER", "Зміна складу класу",
-            studentName + " переведено з " + sourceClass.getDisplayName() + " класу",
+            "Учень: "+studentName+"\nДія: переведення\nБуло: "+sourceClass.getDisplayName()+"\nСтало: "+targetClass.getDisplayName(),
             "teacher/my-class?classId=" + targetClassId, null);
         audit.record("STUDENT_TRANSFERRED", "STUDENT", studentId, of("classId", sourceClassId), of("classId", targetClassId));
         return response;
@@ -332,7 +332,7 @@ public class AdminSchoolClassService {
         studentProfileRepository.saveAndFlush(student);
         audit.record("STUDENT_REMOVED_FROM_CLASS", "STUDENT", studentId, of("classId", classId), of("classId", null));
         notificationService.forTeacher(schoolClass.getClassTeacher(), "CLASS_ROSTER", "Зміна складу класу",
-            student.getSurname() + " " + student.getName() + " вилучено з " + schoolClass.getDisplayName() + " класу",
+            "Учень: "+student.getSurname()+" "+student.getName()+"\nДія: вилучено зі складу класу\nКлас: "+schoolClass.getDisplayName(),
             "teacher/my-class?classId=" + classId, null);
     }
 

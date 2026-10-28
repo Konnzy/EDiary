@@ -146,6 +146,7 @@ public class AdminScheduleService {
 
         List<ScheduleEntry> currentEntries = scheduleRepository.findActiveForUpdate(classId, academicYear, week);
         var beforeSchedule = auditSchedule(currentEntries);
+        var emailBefore = com.ediary.backend.notification.service.ScheduleChangeText.capture(currentEntries);
         Map<Slot, ScheduleDefinition> previousDefinitions = currentEntries.stream().collect(Collectors.toMap(
             this::slot, entry -> new ScheduleDefinition(entry.getSubject().getId(),
                 entry.getTeacher().getId(), entry.getRoom())
@@ -215,11 +216,16 @@ public class AdminScheduleService {
         savedEntries = scheduleRepository.saveAllAndFlush(savedEntries);
         savedEntries.sort(Comparator.comparing(ScheduleEntry::getWeekday).thenComparingInt(ScheduleEntry::getLessonNumber));
         if (changed) {
-            String body = schoolClass.getDisplayName() + " клас · " + academicYear + " · " + week + "-й тиждень";
+            var emailAfter = com.ediary.backend.notification.service.ScheduleChangeText.capture(savedEntries);
+            String context = "Клас: "+schoolClass.getDisplayName()+"\nНавчальний рік: "+academicYear+"\nНавчальний тиждень: "+week+"\n\n";
+            String body = context+com.ediary.backend.notification.service.ScheduleChangeText.describe(emailBefore,emailAfter,null,LocalDate.now(clock));
             Map<Long, TeacherProfile> affectedTeachers = new HashMap<>(previousTeachers);
             savedEntries.stream().map(ScheduleEntry::getTeacher).forEach(teacher -> affectedTeachers.put(teacher.getId(), teacher));
-            affectedTeachers.values().forEach(teacher -> notificationService.forTeacher(teacher,
-                "SCHEDULE", "Зміна розкладу", body, "teacher/schedule", null));
+            affectedTeachers.values().forEach(teacher -> {
+                String changes=com.ediary.backend.notification.service.ScheduleChangeText.describe(emailBefore,emailAfter,teacher.getId(),LocalDate.now(clock));
+                if(!changes.isBlank())notificationService.forTeacher(teacher,
+                    "SCHEDULE", "Зміна розкладу", context+changes, "teacher/schedule", null);
+            });
             notificationService.forTeacher(schoolClass.getClassTeacher(), "CLASS_SCHEDULE",
                 "Зміна розкладу класу", body, "teacher/schedule?classId=" + classId, null);
             studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(classId).forEach(student ->

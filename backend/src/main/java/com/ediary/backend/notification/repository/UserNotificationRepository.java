@@ -32,4 +32,8 @@ public interface UserNotificationRepository extends JpaRepository<UserNotificati
     @Modifying
     @Query("update UserNotification notification set notification.readAt = CURRENT_TIMESTAMP where notification.recipient.id = :recipientId and notification.readAt is null and notification.dismissedAt is null and notification.withdrawn = false and notification.visibleInApp = true")
     int markAllRead(@Param("recipientId") Long recipientId);
+
+    @Modifying
+    @Query("update UserNotification n set n.readAt=CURRENT_TIMESTAMP where n.recipient.id=:recipientId and n.eventKey=:eventKey and n.readAt is null")
+    int markEventRead(@Param("recipientId") Long recipientId,@Param("eventKey") String eventKey);
 }

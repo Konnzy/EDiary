@@ -141,6 +141,7 @@ class NotificationPersistenceIntegrationTest {
         when(email.isEnabled()).thenReturn(true);
         when(email.sendText(anyString(), anyString(), anyString())).thenReturn(true);
         Long user = id("insert into app_user(user_login,user_email,user_password_hash,user_role) values ('notification.student','student@example.invalid','test','STUDENT') returning user_id");
+        jdbc.update("insert into user_notification_settings(user_id,attendance_email_enabled) values (?,true)", user);
         Long teacherUser = id("insert into app_user(user_login,user_email,user_password_hash,user_role) values ('notification.teacher','teacher@example.invalid','test','TEACHER') returning user_id");
         Long teacher = id("insert into teacher(user_id,teacher_name,teacher_surname,teacher_birthdate,teacher_email,teacher_phone) values (?, 'Test','Teacher','1980-01-01','teacher@example.invalid','000') returning teacher_id", teacherUser);
         Long schoolClass = id("insert into school_class(class_number,class_letter,class_academic_year) values (9,'А','2026/2027') returning class_id");
@@ -174,8 +175,7 @@ class NotificationPersistenceIntegrationTest {
         verify(email, times(2)).sendText(anyString(), anyString(), anyString());
         assertThat(jdbc.queryForObject("select count(*) from user_notification", Integer.class)).isEqualTo(1);
         tx.executeWithoutResult(status -> {
-            var setting = new UserNotificationSettings();
-            setting.setUser(users.findById(user).orElseThrow());
+            var setting = preferences.findByUser_Id(user).orElseThrow();
             setting.setAttendanceEmailEnabled(false);
             setting.getInApp().put("absence", true);
             preferences.saveAndFlush(setting);

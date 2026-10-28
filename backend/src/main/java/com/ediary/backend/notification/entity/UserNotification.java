@@ -39,6 +39,9 @@ public class UserNotification {
     @Column(name = "body", nullable = false, length = 500)
     private String body;
 
+    @Column(name = "email_body", columnDefinition = "text")
+    private String emailBody;
+
     @Column(name = "target", nullable = false, length = 500)
     private String target;
 

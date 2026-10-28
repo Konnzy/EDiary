@@ -94,6 +94,9 @@ class ProfileServiceTest {
         assertThat(response.education().className()).isEqualTo("9-А");
         assertThat(response.education().teacherName()).isEqualTo("Коваленко Олександр");
         assertThat(response.education().parentEmail()).isEqualTo("parent@example.com");
+        assertThat(response.notifications().newGrade()).isFalse();
+        assertThat(response.notifications().absence()).isFalse();
+        assertThat(response.notifications().newMessage()).isFalse();
     }
 
     @Test

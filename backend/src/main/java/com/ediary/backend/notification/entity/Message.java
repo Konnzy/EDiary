@@ -49,4 +49,7 @@ public class Message {
 
     @Column(name = "message_is_important", nullable = false)
     private boolean important;
+
+    @Column(name = "client_request_id")
+    private java.util.UUID clientRequestId;
 }

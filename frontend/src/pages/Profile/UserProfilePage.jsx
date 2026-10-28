@@ -230,8 +230,7 @@ export function UserProfilePage({ role, openAddChild = false, focusNotifications
     try {
       const response = await userProfileApi.updateNotifications(notificationDraft);
       const visibleOptions = notificationOptions[role].filter((option) => !option.homeroomOnly || Boolean(data.professional?.homeroomClass));
-      if (!visibleOptions.every((option) => response.notifications?.[option.key] === notificationDraft[option.key]
-        && (response.notifications?.inApp?.[option.key] ?? true) === (notificationDraft.inApp?.[option.key] ?? true))) {
+      if (!visibleOptions.every((option) => response.notifications?.[option.key] === notificationDraft[option.key])) {
         throw new Error("Не вдалося підтвердити збереження налаштувань. Спробуйте ще раз.");
       }
       const profile = mapProfileResponse(response);
@@ -346,10 +345,8 @@ export function UserProfilePage({ role, openAddChild = false, focusNotifications
                   notice={notificationNotice}
                   error={notificationError}
                   busy={pending === "notifications"}
-                  onChange={(key, channel) => {
-                    setNotificationDraft((current) => channel === "inApp"
-                      ? { ...current, inApp: { ...current.inApp, [key]: !(current.inApp?.[key] ?? true) } }
-                      : { ...current, [key]: !current[key] });
+                  onChange={(key) => {
+                    setNotificationDraft((current) => ({ ...current, [key]: !current[key] }));
                     setNotificationNotice("");
                   }}
                   onSave={saveNotifications}
@@ -576,7 +573,7 @@ function LinkChildModal({ code, error, isSubmitting, onChange, onClose, onSubmit
 
 function NotificationSettings({ className, options, settings, notice, error, busy, onChange, onSave }) {
   return (
-    <Section id="profile-notifications" className={className} title="Налаштування сповіщень" icon={Bell}>
+    <Section id="profile-notifications" className={className} title="Сповіщення на пошту" icon={Bell}>
       <div className="divide-y divide-slate-100">
         {options.map((option) => {
           const Icon = option.icon;
@@ -587,10 +584,7 @@ function NotificationSettings({ className, options, settings, notice, error, bus
                 <p className="text-[0.8rem] font-bold text-slate-800">{option.title}</p>
                 <p className="mt-0.5 text-[0.7rem] leading-4 text-slate-500">{option.description}</p>
               </div>
-              <div className="ml-auto flex shrink-0 items-center gap-4">
-                <div className="flex flex-col items-center gap-1.5"><span className="text-[0.65rem] text-slate-500">У застосунку</span><Toggle checked={settings.inApp?.[option.key] ?? true} onChange={() => !busy && onChange(option.key, "inApp")} label={`${option.title}: у застосунку`} /></div>
-                <div className="flex flex-col items-center gap-1.5"><span className="text-[0.65rem] text-slate-500">Пошта</span><Toggle checked={settings[option.key]} onChange={() => !busy && onChange(option.key, "email")} label={`${option.title}: пошта`} /></div>
-              </div>
+              <Toggle checked={settings[option.key] ?? false} onChange={() => !busy && onChange(option.key)} label={`${option.title}: пошта`} />
             </div>
           );
         })}
@@ -722,7 +716,7 @@ function Avatar({ avatar, initials, size = "small" }) {
   const sizeClass = size === "large" ? "h-20 w-20 text-xl sm:h-24 sm:w-24" : "h-9 w-9 text-xs";
   return avatar
     ? <img src={avatar} alt="Фото профілю" className={cn("shrink-0 rounded-full border border-slate-200 object-cover", sizeClass)} />
-    : <span className={cn("flex shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 font-bold text-slate-700", sizeClass)} aria-label="Фото профілю не встановлено">{initials}</span>;
+    : <span className={cn("flex shrink-0 items-center justify-center rounded-full border border-slate-200 font-bold text-slate-700", size === "large" ? "bg-slate-100" : "bg-white", sizeClass)} aria-label="Фото профілю не встановлено">{initials}</span>;
 }
 
 function TopBar({ config, data, avatar }) {
@@ -735,7 +729,7 @@ function TopBar({ config, data, avatar }) {
       <a href={`#${config.homeRoute}`} className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна"><GraduationCap className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" strokeWidth={2.4} aria-hidden="true" /><span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">Електронний щоденник</span></a>
       <div className="flex items-center gap-1.5 sm:gap-4">
         <NotificationButton />
-        <div className="hidden items-center gap-3 bg-slate-50 px-3 py-1.5 sm:flex"><div className="text-right leading-tight"><div className="max-w-[190px] truncate text-[0.78rem] font-bold">{formatShortName({ firstName: data.personal.firstName, lastName: data.personal.lastName })}</div><div className="text-[0.7rem] text-slate-500">{data.roleLabel}</div></div><Avatar avatar={avatar} initials={data.initials} /></div>
+        <div className="hidden min-w-0 items-center gap-3 rounded-md bg-slate-50 px-3 py-1.5 sm:flex"><div className="min-w-0 text-right leading-tight"><div className="max-w-[190px] truncate text-[0.78rem] font-bold text-slate-800">{formatShortName({ firstName: data.personal.firstName, lastName: data.personal.lastName })}</div><div className="text-[0.7rem] text-slate-500">{data.roleLabel}</div></div><Avatar avatar={avatar} initials={data.initials} /></div>
         <button type="button" onClick={logout} className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[0.82rem] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900"><LogOut className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Вийти</span></button>
       </div>
     </header>

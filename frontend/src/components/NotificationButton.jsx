@@ -37,7 +37,9 @@ export function NotificationButton() {
   useEffect(() => {
     void loadFeed();
     const interval = window.setInterval(() => void loadFeed(true), 60_000);
-    return () => window.clearInterval(interval);
+    const refresh = () => void loadFeed(true);
+    window.addEventListener("messages-updated", refresh);
+    return () => { window.clearInterval(interval); window.removeEventListener("messages-updated", refresh); };
   }, [loadFeed]);
 
   useEffect(() => {

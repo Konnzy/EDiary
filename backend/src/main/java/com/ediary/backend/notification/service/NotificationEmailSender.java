@@ -26,41 +26,55 @@ public class NotificationEmailSender {
     private final UserNotificationService notificationService;
     private final EmailService email;
     private final Clock clock;
+    @org.springframework.beans.factory.annotation.Value("${app.password-reset.frontend-url:http://127.0.0.1:5173}")
+    private String frontendUrl = "http://127.0.0.1:5173";
 
     @Transactional
     public void deliver(Long id) {
         var item = notifications.findForDelivery(id).orElse(null);
         LocalDateTime now = LocalDateTime.now(clock);
         if (item == null || item.getEmailDueAt() == null || item.getEmailDueAt().isAfter(now)) return;
-        // This queue only delivers absence notices and their corrections.
-        if (!"ABSENCE".equals(item.getCategory()) || item.getAttendanceLessonId() == null) return;
-        var lesson = lessons.findById(item.getAttendanceLessonId()).orElse(null);
-        var student = students.findById(item.getAttendanceStudentId()).orElse(null);
-        if (lesson == null || student == null) {
-            item.setEmailKind(null);
-            item.setEmailDueAt(null);
-            return;
+        boolean absenceNotice = "ABSENCE".equals(item.getCategory());
+        if (absenceNotice) {
+            if (item.getAttendanceLessonId() == null) { item.setEmailDueAt(null); return; }
+            var lesson = lessons.findById(item.getAttendanceLessonId()).orElse(null);
+            var student = students.findById(item.getAttendanceStudentId()).orElse(null);
+            if (lesson == null || student == null) {
+                item.setEmailKind(null);
+                item.setEmailDueAt(null);
+                return;
+            }
+            var current = lesson.getStatus() == LessonStatus.CANCELLED ? null : attendance
+                .findByStudentIdAndLessonId(student.getId(), lesson.getId()).map(value -> value.getStatus()).orElse(null);
+            notificationService.reconcileAttendance(item, student, lesson, current);
         }
-        var current = lesson.getStatus() == LessonStatus.CANCELLED ? null : attendance
-            .findByStudentIdAndLessonId(student.getId(), lesson.getId()).map(value -> value.getStatus()).orElse(null);
-        notificationService.reconcileAttendance(item, student, lesson, current);
         if (item.getEmailKind() == null || item.getEmailDueAt() == null || item.getEmailDueAt().isAfter(now)) return;
         var preference = settings.findByUser_Id(item.getRecipient().getId()).orElse(null);
-        if (item.getRecipient().getStatus() != UserStatus.ACTIVE || !NotificationChannels.email(preference, "ABSENCE")) {
+        if (item.isWithdrawn() || item.getRecipient().getStatus() != UserStatus.ACTIVE || !NotificationChannels.email(preference, item.getCategory())) {
             item.setEmailKind(null);
             item.setEmailDueAt(null);
-            log.info("Attendance email cancelled notificationId={} recipientId={} reason=preferences_or_account", id, item.getRecipient().getId());
+            log.info("Notification email cancelled notificationId={} recipientId={} reason=preferences_or_account", id, item.getRecipient().getId());
             return;
         }
         if (!email.isEnabled()) {
             item.setEmailDueAt(now.plusMinutes(1));
-            log.debug("Attendance email deferred notificationId={} reason=mail_disabled", id);
+            log.debug("Notification email deferred notificationId={} reason=mail_disabled", id);
             return;
         }
         String kind = item.getEmailKind();
-        if (!"ABSENCE".equals(kind) && !"CORRECTION".equals(kind)) return;
-        if (email.sendText(item.getRecipient().getEmail(), item.getTitle(), item.getBody())) {
-            item.setLastEmailedAbsent("ABSENCE".equals(kind));
+        if (absenceNotice ? !"ABSENCE".equals(kind) && !"CORRECTION".equals(kind) : !"NOTICE".equals(kind)) return;
+        String content=item.getEmailBody()==null?item.getBody():item.getEmailBody();
+        String action=switch(item.getCategory()) {
+            case "SCHEDULE", "CLASS_SCHEDULE" -> "Переглянути розклад";
+            case "MESSAGE" -> "Прочитати повідомлення";
+            case "HOMEWORK", "HOMEWORK_DEADLINE" -> "Переглянути домашнє завдання";
+            case "CLASS_ROSTER", "PROLONGED_ABSENCE" -> "Переглянути дані класу";
+            default -> "Переглянути навчальні дані";
+        };
+        String letter=item.getTitle()+"\n\n"+content+"\n\nДата події: "+item.getCreatedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+            +"\n\n"+action+":\n"+frontendUrl.replaceAll("/+$", "")+"/#"+item.getTarget();
+        if (email.sendText(item.getRecipient().getEmail(), item.getTitle(), letter)) {
+            if (absenceNotice) item.setLastEmailedAbsent("ABSENCE".equals(kind));
             item.setEmailKind(null);
             item.setEmailDueAt(null);
             item.setEmailSentAt(now);
@@ -72,7 +86,7 @@ public class NotificationEmailSender {
             int attempts = item.getEmailAttempts() + 1;
             item.setEmailAttempts(attempts);
             item.setEmailDueAt(attempts >= 5 ? null : now.plusSeconds(30L << attempts));
-            log.warn("Attendance email failed notificationId={} kind={} attempt={} exhausted={}", id, kind, attempts, attempts >= 5);
+            log.warn("Notification email failed notificationId={} kind={} attempt={} exhausted={}", id, kind, attempts, attempts >= 5);
         }
     }
 }

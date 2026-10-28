@@ -112,6 +112,14 @@ export const userNotificationApi = {
   dismiss: (id) => request(`/notifications/${id}`, { method: "DELETE", csrf: true }),
 };
 
+export const messagesApi = {
+  list: (folder = "inbox", page = 0) => request(`/messages?${new URLSearchParams({ folder, page: String(page) })}`),
+  recipients: (query = "", id = "") => request(`/messages/recipients?${new URLSearchParams({ query, ...(id ? { id: String(id) } : {}) })}`),
+  send: (body) => request("/messages", { method: "POST", body, csrf: true }),
+  open: (id) => request(`/messages/${id}/open`, { method: "POST", csrf: true }),
+  important: (id, important) => request(`/messages/${id}/important`, { method: "PUT", body: { important }, csrf: true }),
+};
+
 export const parentApi = {
   findChildren: () => request("/parent/children"),
   findChild: (studentId) => request(`/parent/children/${studentId}`),

@@ -3,7 +3,6 @@ package com.ediary.backend.user.profile.dto;
 import com.ediary.backend.user.entity.UserRole;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 public record ProfileDetailsResponse(
     Long id,
@@ -56,14 +55,6 @@ public record ProfileDetailsResponse(
         boolean classScheduleChange,
         boolean prolongedAbsence,
         boolean classRosterChange,
-        boolean homeworkDeadlineReminder,
-        Map<String, Boolean> inApp
-    ) {
-        public NotificationPreferences(boolean newGrade, boolean newHomework, boolean absence,
-            boolean newMessage, boolean scheduleChange, boolean classScheduleChange, boolean prolongedAbsence,
-            boolean classRosterChange, boolean homeworkDeadlineReminder) {
-            this(newGrade, newHomework, absence, newMessage, scheduleChange, classScheduleChange,
-                prolongedAbsence, classRosterChange, homeworkDeadlineReminder, Map.of());
-        }
-    }
+        boolean homeworkDeadlineReminder
+    ) { }
 }
