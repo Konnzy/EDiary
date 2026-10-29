@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, CheckCircle2, Loader2, MailPlus, RefreshCw, XCircle } from "lucide-react";
+import { Bell, CheckCircle2, Loader2, MailPlus, RefreshCw, XCircle, X, Trash2 } from "lucide-react";
 import { adminRegistrationApi } from "@/lib/api.js";
 import { cn } from "@/lib/utils.js";
+import { NotificationClearDialog } from "@/components/NotificationClearDialog.jsx";
 
 const statusContent = {
   PENDING: {
@@ -35,6 +36,18 @@ export function AdminRequestNotifications() {
   const [feed, setFeed] = useState({ pendingCount: 0, items: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const hide = async (id) => {
+    setBusy(true);setError("");
+    try {
+      if(id==null)await adminRegistrationApi.clearNotifications();else await adminRegistrationApi.hideNotification(id);
+      setFeed(current=>({...current,items:current.items.filter(item=>id==null?item.status==="PENDING":item.id!==id)}));
+      await loadFeed({quiet:true});
+    }
+    catch(e) { if(id==null)throw e;setError(e.message || "Не вдалося приховати події."); }
+    finally { setBusy(false); }
+  };
 
   const loadFeed = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setLoading(true);
@@ -60,7 +73,7 @@ export function AdminRequestNotifications() {
   }, [loadFeed]);
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open || confirmClear) return undefined;
     const handlePointerDown = (event) => {
       if (!containerRef.current?.contains(event.target)) setOpen(false);
     };
@@ -73,7 +86,7 @@ export function AdminRequestNotifications() {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open]);
+  }, [open, confirmClear]);
 
   const toggle = () => {
     const nextOpen = !open;
@@ -125,7 +138,7 @@ export function AdminRequestNotifications() {
             </button>
           </header>
 
-          <div className="max-h-[min(410px,calc(100dvh-10rem))] overflow-y-auto">
+          <div className="max-h-[min(410px,calc(100dvh-15rem))] overflow-y-auto">
             {loading ? (
               <div className="flex min-h-44 items-center justify-center text-slate-400">
                 <Loader2 className="h-5 w-5 animate-spin" aria-label="Завантаження подій" />
@@ -145,13 +158,14 @@ export function AdminRequestNotifications() {
               </div>
             ) : null}
             {!loading && !error ? feed.items.map((item) => (
-              <NotificationItem key={item.id} item={item} onNavigate={() => {
+              <NotificationItem key={item.id} item={item} busy={busy} onHide={() => hide(item.id)} onNavigate={() => {
                 navigateToRequests(item.status);
                 setOpen(false);
               }} />
             )) : null}
           </div>
 
+          <button type="button" disabled={busy||loading||!feed.items.some(item=>item.status!=="PENDING")} onClick={() => setConfirmClear(true)} className="flex h-10 w-full items-center justify-center gap-2 border-t border-slate-200 text-[0.75rem] font-semibold text-slate-500 hover:bg-slate-50 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" aria-hidden="true" />Очистити сповіщення</button>
           <a
             href="#admin/requests"
             onClick={() => {
@@ -164,18 +178,19 @@ export function AdminRequestNotifications() {
           </a>
         </section>
       ) : null}
+      {confirmClear ? <NotificationClearDialog admin onConfirm={() => hide(null)} onClose={() => setConfirmClear(false)} /> : null}
     </div>
   );
 }
 
-function NotificationItem({ item, onNavigate }) {
+function NotificationItem({ item, onNavigate, onHide, busy }) {
   const content = statusContent[item.status] || statusContent.PENDING;
   const Icon = content.Icon;
   const eventTime = item.status === "PENDING" ? item.submittedAt : item.reviewedAt;
   const fullName = [item.lastName, item.firstName, item.patronymic].filter(Boolean).join(" ");
 
   return (
-    <a href="#admin/requests" onClick={onNavigate} className="flex gap-3 border-b border-slate-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-slate-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400">
+    <div className="relative border-b border-slate-100 last:border-b-0"><a href="#admin/requests" onClick={onNavigate} className={cn("flex gap-3 px-4 py-3 transition-colors hover:bg-slate-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400",item.status!=="PENDING"&&"pr-12")}>
       <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ring-1 ring-inset", content.iconClass)}>
         <Icon className="h-4 w-4" aria-hidden="true" />
       </span>
@@ -187,7 +202,7 @@ function NotificationItem({ item, onNavigate }) {
         <span className="mt-1 block truncate text-[0.75rem] font-semibold text-slate-700">{fullName}</span>
         <span className="mt-0.5 block text-[0.68rem] text-slate-400">{roleLabels[item.role] || item.role}</span>
       </span>
-    </a>
+    </a>{item.status!=="PENDING"?<button type="button" onClick={onHide} disabled={busy} title="Приховати подію" aria-label={`Приховати подію: ${fullName}`} className="absolute right-2 top-3 flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"><X className="h-3.5 w-3.5" aria-hidden="true" /></button>:null}</div>
   );
 }
 

@@ -71,6 +71,7 @@ public class JournalService {
     private final UserNotificationService notificationService;
     private final Clock clock;
     private final AuditService audit;
+    private final AssessmentPolicyService assessmentPolicyService;
 
     @Transactional(readOnly = true)
     public JournalOptionsResponse options(String teacherLogin, String academicYear) {
@@ -176,7 +177,8 @@ public class JournalService {
                                 grade == null ? null : grade.getScore(),
                                 attendance == null ? null : attendance.getStatus(),
                                 studentHomework == null ? null : studentHomework.getStatus(),
-                                grade == null ? null : grade.getComment()
+                                grade == null ? null : grade.getComment(),
+                                grade == null ? null : grade.getResult()
                             ));
                         }
                     }
@@ -199,7 +201,7 @@ public class JournalService {
             students.stream().map(student -> new JournalResponse.Student(
                 student.getId(), student.getSurname() + " " + student.getName(),
                 thematicEstimates.get(student.getId())
-            )).toList(), lessons);
+            )).toList(), lessons, assessmentPolicyService.find(subjectId));
     }
 
     private Map<Long, Double> thematicEstimates(Long classId, Long subjectId, YearMonth period) {
@@ -217,6 +219,7 @@ public class JournalService {
         Map<Long, Integer> counts = new LinkedHashMap<>();
         for (Lesson lesson : lessons) {
             for (Grade grade : gradesByLesson.getOrDefault(lesson.getId(), List.of())) {
+                if (grade.getScore() == null) continue;
                 Long studentId = grade.getStudent().getId();
                 if (grade.getType() == GradeType.TOPIC || lesson.getWorkType() == LessonWorkType.THEMATIC) {
                     sums.remove(studentId);
@@ -271,6 +274,10 @@ public class JournalService {
         if (topic == null) {
             LessonTopicPolicy.validate(lesson, topic, LocalDate.now(clock),
                 homeworkText != null || lessonRepository.hasJournalRecords(lessonId));
+        }
+        var assessmentPolicy = assessmentPolicyService.lockAndFind(lesson.getScheduleEntry().getSubject().getId());
+        for (Grade existingGrade : gradeRepository.findAllByLessonIdIn(List.of(lessonId))) {
+            AssessmentPolicyService.validate(assessmentPolicy,request.workType(),existingGrade.getScore(),existingGrade.getResult());
         }
         gradeService.retagLessonGrades(lesson, gradeType(request.workType()));
         lesson.setWorkType(request.workType());
@@ -328,7 +335,7 @@ public class JournalService {
                 "Учень не належить до класу цього уроку");
         }
         if (lesson.getWorkType() == null) {
-            boolean hasData = request.score() != null || request.attendanceStatus() != null
+            boolean hasData = request.score() != null || request.result() != null || request.attendanceStatus() != null
                 || request.homeworkStatus() != null || request.comment() != null && !request.comment().isBlank();
             if (hasData) {
                 throw new ApplicationException(HttpStatus.CONFLICT, "LESSON_WORK_TYPE_REQUIRED",
@@ -336,15 +343,21 @@ public class JournalService {
             }
             return;
         }
-        if (request.score() != null || request.attendanceStatus() != null || request.homeworkStatus() != null) {
+        if (request.score() != null || request.result() != null || request.attendanceStatus() != null || request.homeworkStatus() != null) {
             LessonTopicPolicy.requireTopic(lesson.getTopic());
         }
+        var policy = assessmentPolicyService.lockAndFind(lesson.getScheduleEntry().getSubject().getId());
+        AssessmentPolicyService.validate(policy,lesson.getWorkType(),request.score(),request.result());
         Grade previousGrade = gradeRepository.findAllByStudentIdAndLessonId(studentId, lessonId).stream().findFirst().orElse(null);
         Integer previousScore = previousGrade == null ? null : previousGrade.getScore();
+        var previousResult = previousGrade == null ? null : previousGrade.getResult();
         String previousComment = previousGrade == null ? null : previousGrade.getComment();
         AttendanceStatus previousAttendance = attendanceRepository.findByStudentIdAndLessonId(studentId, lessonId)
             .map(Attendance::getStatus).orElse(null);
-        gradeService.save(student, lesson, request.score(), gradeType(lesson.getWorkType()), request.comment());
+        if (request.attendanceStatus() == AttendanceStatus.EXEMPTED && previousAttendance != AttendanceStatus.EXEMPTED)
+            throw new ApplicationException(HttpStatus.BAD_REQUEST,"ATTENDANCE_STATUS_RETIRED","Звільнення більше не є статусом відвідування");
+        if (request.result() == null) gradeService.save(student, lesson, request.score(), gradeType(lesson.getWorkType()), request.comment());
+        else gradeService.save(student, lesson, request.score(), gradeType(lesson.getWorkType()), request.comment(),request.result());
         attendanceService.save(student, lesson, request.attendanceStatus());
 
         Homework homework = homeworkRepository.findFirstByLessonId(lessonId).orElse(null);
@@ -372,15 +385,22 @@ public class JournalService {
         }
         lesson.setUpdatedAt(LocalDateTime.now(clock));
         audit.record("JOURNAL_CELL_UPDATED", "JOURNAL_CELL", lessonId + ":" + studentId,
-            of("score", previousScore, "attendance", previousAttendance, "homeworkStatus", previousHomeworkStatus, "commentChanged", false),
-            of("score", request.score(), "attendance", request.attendanceStatus(), "homeworkStatus", request.homeworkStatus(),
+            of("score", previousScore, "result",previousResult,"attendance", previousAttendance, "homeworkStatus", previousHomeworkStatus, "commentChanged", false),
+            of("score", request.score(), "result",request.result(),"attendance", request.attendanceStatus(), "homeworkStatus", request.homeworkStatus(),
                 "commentChanged", !Objects.equals(previousComment, normalize(request.comment()))));
         String subject = lesson.getScheduleEntry().getSubject().getTitle();
-        if (request.score() != null && !Objects.equals(previousScore, request.score())) {
-            notificationService.forStudent(student, "GRADE", previousScore == null ? "Нова оцінка" : "Оцінку змінено",
+        if (!Objects.equals(previousScore, request.score()) || previousResult != request.result()) {
+            boolean removed = request.score() == null && request.result() == null;
+            String scoreNotice = previousResult != null || request.result() != null
+                ? removed ? "Результат видалено: " + previousResult.label()
+                    : "Результат: " + (request.result() == null ? request.score()+" із 12" : request.result().label())
+                : removed ? "Оцінку видалено: " + previousScore + " із 12"
+                : previousScore == null ? "Нова оцінка: " + request.score() + " із 12"
+                : "Оцінку змінено: з " + previousScore + " на " + request.score() + " із 12";
+            notificationService.forStudent(student, "GRADE", scoreNotice,
                 com.ediary.backend.notification.service.NotificationText.lesson(lesson)
                 +"\nТип роботи: "+com.ediary.backend.notification.service.NotificationText.workType(lesson.getWorkType())
-                +"\n"+(previousScore==null?"Оцінка: "+request.score():"Оцінку змінено: "+previousScore+" → "+request.score())
+                +"\n"+scoreNotice
                 +(normalize(request.comment())==null?"":"\nКоментар учителя: "+normalize(request.comment())), null);
         }
         notificationService.attendanceChanged(student, lesson, previousAttendance, request.attendanceStatus());

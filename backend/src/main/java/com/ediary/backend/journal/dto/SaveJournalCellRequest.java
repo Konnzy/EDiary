@@ -10,5 +10,10 @@ public record SaveJournalCellRequest(
     @Min(1) @Max(12) Integer score,
     AttendanceStatus attendanceStatus,
     HomeworkStatus homeworkStatus,
-    @Size(max = 200) String comment
-) { }
+    @Size(max = 200) String comment,
+    com.ediary.backend.journal.entity.GradeResult result
+) {
+    public SaveJournalCellRequest(Integer score,AttendanceStatus attendanceStatus,HomeworkStatus homeworkStatus,String comment) {
+        this(score,attendanceStatus,homeworkStatus,comment,null);
+    }
+}

@@ -46,7 +46,7 @@ public class UserNotificationService {
             notifications.countByRecipient_IdAndReadAtIsNullAndDismissedAtIsNullAndWithdrawnFalseAndVisibleInAppTrue(user.getId()),
             notifications.findTop20ByRecipient_IdAndDismissedAtIsNullAndWithdrawnFalseAndVisibleInAppTrueOrderByCreatedAtDescIdDesc(user.getId()).stream()
                 .map(item -> new UserNotificationFeedResponse.Item(item.getId(), item.getCategory(),
-                    item.getTitle(), item.getBody(), item.getTarget(), item.getCreatedAt(),
+                    NotificationText.previewTitle(item.getCategory(),item.getEmailBody()==null?item.getBody():item.getEmailBody(),item.getTitle()), NotificationText.preview(item.getCategory(),item.getEmailBody()==null?item.getBody():item.getEmailBody(),user.getRole()==com.ediary.backend.user.entity.UserRole.PARENT), item.getTarget(), item.getCreatedAt(),
                     item.getReadAt() != null)).toList()
         );
     }
@@ -75,6 +75,13 @@ public class UserNotificationService {
             item.setDismissedAt(LocalDateTime.now(clock));
             com.ediary.backend.common.logging.DiagnosticContext.afterCommit(() -> log.info("event=notification.dismissed notificationId={} recipientId={}", id, user.getId()));
         }
+    }
+
+    @Transactional
+    public void dismissAll(String login) {
+        var user=requireUser(login);
+        int count=notifications.dismissAll(user.getId(),LocalDateTime.now(clock));
+        com.ediary.backend.common.logging.DiagnosticContext.afterCommit(()->log.info("event=notification.cleared recipientId={} count={}",user.getId(),count));
     }
 
     @Transactional
@@ -109,7 +116,7 @@ public class UserNotificationService {
         item.setRecipient(recipient);
         item.setCategory(category);
         item.setTitle(title);
-        item.setBody(shortBody(body));
+        item.setBody(NotificationText.preview(category,body));
         item.setEmailBody(body);
         item.setTarget(target);
         item.setEventKey(eventKey);
@@ -179,6 +186,7 @@ public class UserNotificationService {
             +(student.getSchoolClass()==null?"":"\nКлас: "+student.getSchoolClass().getDisplayName())
             +"\n"+NotificationText.lesson(lesson)+"\n\n"
             +(absent?"Учня позначено відсутнім на цьому уроці.":"Попередню позначку відсутності скасовано. "+attendanceDescription(current)));
+        item.setBody(NotificationText.preview("ABSENCE",item.getEmailBody()));
         item.setCreatedAt(now);
         item.setReadAt(null);
         item.setDismissedAt(null);

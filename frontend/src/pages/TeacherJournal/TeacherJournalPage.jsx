@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   CalendarDays,
@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button.jsx";
 import { authApi, teacherJournalApi } from "@/lib/api.js";
 import { TeacherNavigation as SharedTeacherNavigation } from "@/components/TeacherNavigation.jsx";
 import { cn } from "@/lib/utils.js";
+import { defaultAssessmentPolicy, gradeDisplay, resultLabels, resultOptions } from "@/lib/assessment.js";
 import {
   dateParts,
   homeworkStatuses,
@@ -33,12 +34,66 @@ import {
 
 const gradeValues = Array.from({ length: 12 }, (_, index) => String(index + 1));
 const attendanceOptions = [
-  { value: "", label: "—" },
-  { value: "PRESENT", label: "П" },
-  { value: "ABSENT", label: "Н" },
-  { value: "EXCUSED_ABSENCE", label: "ПП" },
-  { value: "EXEMPTED", label: "З" },
+  { value: "", label: "—", description: "Відвідування не вказано" },
+  { value: "PRESENT", label: "П", description: "Присутній" },
+  { value: "ABSENT", label: "Н", description: "Відсутній" },
+  { value: "EXCUSED_ABSENCE", label: "ПП", description: "Відсутній із поважної причини" },
 ];
+const resultDescriptions = { PASSED: "Зараховано", NOT_PASSED: "Не зараховано", EXEMPTED: "Звільнено від оцінювання" };
+
+function JournalHintButton({ hint, onClick, children, ...props }) {
+  const button = useRef(null);
+  const tooltip = useRef(null);
+  const timer = useRef(null);
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState(null);
+  const cancelTimer = () => window.clearTimeout(timer.current);
+  const show = () => { cancelTimer(); setOpen(true); };
+  const dismiss = () => { cancelTimer(); setOpen(false); setPosition(null); };
+  const schedule = () => {
+    cancelTimer();
+    timer.current = window.setTimeout(() => setOpen(true), 300);
+  };
+  useLayoutEffect(() => {
+    if (!open || !button.current || !tooltip.current) return;
+    const anchor = button.current.getBoundingClientRect();
+    const { width, height } = tooltip.current.getBoundingClientRect();
+    const margin = 12, gap = 10;
+    const aboveSpace = anchor.top - margin - gap;
+    const belowSpace = window.innerHeight - anchor.bottom - margin - gap;
+    const above = height <= aboveSpace || aboveSpace >= belowSpace;
+    const left = Math.max(margin, Math.min(anchor.left + anchor.width / 2 - width / 2, window.innerWidth - width - margin));
+    const top = Math.max(margin, Math.min(above ? anchor.top - height - gap : anchor.bottom + gap, window.innerHeight - height - margin));
+    setPosition({ left, top, above, arrowLeft: Math.max(10, Math.min(anchor.left + anchor.width / 2 - left, width - 10)) });
+  }, [open, hint]);
+  useEffect(() => {
+    const outside = event => { if (!button.current?.contains(event.target)) dismiss(); };
+    const escape = event => { if (event.key === "Escape") dismiss(); };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("scroll", dismiss, true);
+    document.addEventListener("keydown", escape);
+    window.addEventListener("resize", dismiss);
+    return () => {
+      cancelTimer();
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("scroll", dismiss, true);
+      document.removeEventListener("keydown", escape);
+      window.removeEventListener("resize", dismiss);
+    };
+  }, []);
+  return <>
+    <button {...props} ref={button} aria-label={hint} aria-describedby={open ? id : undefined}
+      onMouseEnter={schedule} onMouseLeave={dismiss} onFocus={show} onBlur={dismiss}
+      onClick={event => { show(); onClick?.(event); }}>{children}</button>
+    {open ? createPortal(<span ref={tooltip} id={id} role="tooltip"
+      style={{ left: position?.left ?? 0, top: position?.top ?? 0, width: "max-content", maxWidth: "min(280px, calc(100vw - 24px))", visibility: position ? "visible" : "hidden", borderRadius: 6, backgroundColor: "#17212b", color: "#fff" }}
+      className="pointer-events-none fixed z-[110] rounded-md px-3 py-2.5 text-center text-xs leading-4 shadow-lg">
+      <span className="block wrap-anywhere">{hint}</span>
+      <span aria-hidden="true" className="absolute h-2 w-2 rotate-45" style={{ left: (position?.arrowLeft ?? 10) - 4, ...(position?.above ? { bottom: -4 } : { top: -4 }), backgroundColor: "inherit" }} />
+    </span>, document.body) : null}
+  </>;
+}
 
 const workTypeClasses = {
   CLASSWORK: "border-sky-200 bg-sky-50 text-sky-700",
@@ -161,6 +216,7 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
     try {
       await teacherJournalApi.saveCell(lesson.id, studentId, {
         score: value.grade ? Number(value.grade) : null,
+        result: value.result || null,
         attendanceStatus: value.attendanceStatus || null,
         homeworkStatus: lesson.homework ? value.homeworkStatus || null : null,
         comment: value.comment,
@@ -256,15 +312,10 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
                     <h2 className="truncate text-[0.95rem] font-bold text-slate-900">{journal.subjectName} · {journal.className}</h2>
                     <p className="mt-1 text-[0.72rem] text-slate-500">{journal.students.length} учнів · {journal.lessons.length} уроків</p>
                   </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2 text-[0.72rem] text-slate-500">
-                    <span className="inline-flex h-7 items-center rounded border border-emerald-200 bg-emerald-50 px-2.5 text-emerald-700">П — присутній</span>
-                    <span className="inline-flex h-7 items-center rounded border border-red-200 bg-red-50 px-2.5 text-red-600">Н — відсутній</span>
-                    <span className="inline-flex h-7 items-center rounded border border-sky-200 bg-sky-50 px-2.5 text-sky-700">ПП — поважна причина</span>
-                    <span className="inline-flex h-7 items-center rounded border border-violet-200 bg-violet-50 px-2.5 text-violet-700">З — звільнений</span>
-                  </div>
                 </div>
 
                 <JournalTable
+                  passFail={journal.assessmentPolicy?.mode === "PASS_FAIL"}
                   key={`${classId}:${subjectId}:${period}`}
                   lessons={journal.lessons}
                   students={journal.students}
@@ -319,6 +370,7 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
         <GradePopover
           key={`${gradeEditor.student.id}:${gradeEditor.lesson.scheduleId}:${gradeEditor.date}`}
           editor={gradeEditor}
+          policy={journal.assessmentPolicy || defaultAssessmentPolicy}
           initialValue={gradeEditor.lesson.cells.find((cell) => cell.studentId === gradeEditor.student.id)}
           lesson={gradeEditor.lesson}
           requestError={error}
@@ -463,7 +515,7 @@ function SelectField({ label, value, onChange, children }) {
   );
 }
 
-function JournalTable({ lessons, students, initialTarget, onLessonClick, onGradeClick, onMarkAllPresent, onClearAttendance, onPageChange, saving }) {
+function JournalTable({ lessons, students, initialTarget, onLessonClick, onGradeClick, onMarkAllPresent, onClearAttendance, onPageChange, saving, passFail = false }) {
   const tableContainer = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(0);
   const [page, setPage] = useState(null);
@@ -527,7 +579,7 @@ function JournalTable({ lessons, students, initialTarget, onLessonClick, onGrade
                 saving={saving}
               />
             ))}
-            <th className="sticky right-0 z-40 border-b border-l border-slate-200 bg-slate-50 px-1 py-3 text-center text-[0.7rem] font-semibold text-slate-500" title="Середнє поточних оцінок після останньої виставленої тематичної до кінця вибраного місяця">Орієнтовна тематична</th>
+            <th className="sticky right-0 z-40 border-b border-l border-slate-200 bg-slate-50 px-1 py-3 text-center text-[0.7rem] font-semibold text-slate-500" title={passFail ? "Залікова система" : "Середнє поточних оцінок після останньої виставленої тематичної до кінця вибраного місяця"}>{passFail ? "Система оцінювання" : "Орієнтовна тематична"}</th>
           </tr>
         </thead>
         <tbody>
@@ -544,7 +596,7 @@ function JournalTable({ lessons, students, initialTarget, onLessonClick, onGrade
                 return <GradeCell key={`${lesson.scheduleId}:${lesson.date}`} grade={cell} onClick={(event) => onGradeClick(event, student, lesson)} />;
               })}
               <td className="sticky right-0 z-10 border-b border-l border-slate-200 bg-slate-50 px-1 text-center text-[0.8rem] font-bold text-slate-700">
-                {formatThematicEstimate(student.thematicEstimate)}
+                {passFail ? "Залікова" : formatThematicEstimate(student.thematicEstimate)}
               </td>
             </tr>
           ))}
@@ -677,7 +729,7 @@ function DateHeader({ date, lesson, onClick, onMarkAllPresent, onClearAttendance
 }
 
 function GradeCell({ grade, onClick }) {
-  const gradeValue = grade?.score ? String(grade.score) : "";
+  const gradeValue = String(gradeDisplay(grade));
   const attendanceStatus = grade?.attendanceStatus || "";
   const attendanceLabel = attendanceStatus === "ABSENT"
     ? "Н"
@@ -692,6 +744,7 @@ function GradeCell({ grade, onClick }) {
             : "";
   const numeric = /^\d+$/.test(gradeValue);
   const title = [
+    resultDescriptions[grade?.result],
     grade?.comment,
     attendanceStatus === "PRESENT" && "Присутній",
     attendanceStatus === "ABSENT" && "Відсутній",
@@ -701,7 +754,7 @@ function GradeCell({ grade, onClick }) {
   ].filter(Boolean).join(" · ") || "Виставити оцінку";
   return (
     <td className="h-[58px] border-b border-r border-slate-200 p-1.5 text-center">
-      <button
+      <JournalHintButton
         type="button"
         onClick={onClick}
         className={cn(
@@ -711,13 +764,14 @@ function GradeCell({ grade, onClick }) {
           numeric && Number(gradeValue) >= 7 && Number(gradeValue) < 10 && "border-emerald-200 bg-emerald-50 text-emerald-700",
           numeric && Number(gradeValue) >= 4 && Number(gradeValue) < 7 && "border-amber-200 bg-amber-50 text-amber-700",
           numeric && Number(gradeValue) < 4 && "border-red-200 bg-red-50 text-red-600",
+          !numeric && gradeValue && "border-slate-300 bg-slate-100 text-slate-700",
           !gradeValue && attendanceStatus === "ABSENT" && "border-red-200 bg-red-50 text-red-600",
           !gradeValue && attendanceStatus === "EXCUSED_ABSENCE" && "border-sky-200 bg-sky-50 text-sky-700",
           !gradeValue && attendanceStatus === "LATE" && "border-amber-200 bg-amber-50 text-amber-700",
           !gradeValue && attendanceStatus === "PRESENT" && "border-emerald-200 bg-emerald-50 text-emerald-700",
           !gradeValue && attendanceStatus === "EXEMPTED" && "border-violet-200 bg-violet-50 text-violet-700",
         )}
-        title={title}
+        hint={title}
       >
         {gradeValue || attendanceLabel || <Plus className="h-4 w-4 opacity-0 transition-opacity group-hover/cell:opacity-100" aria-hidden="true" />}
         {gradeValue && attendanceLabel ? (
@@ -730,7 +784,7 @@ function GradeCell({ grade, onClick }) {
             attendanceStatus === "EXEMPTED" && "bg-violet-100 text-violet-700",
           )}>{attendanceLabel}</span>
         ) : null}
-      </button>
+      </JournalHintButton>
     </td>
   );
 }
@@ -746,7 +800,7 @@ function LessonDetailsDialog({ date, className, subject, initialValue, requestEr
   const hasPersistedJournalData = Boolean(
     initialValue?.topic?.trim()
     || initialValue?.homework?.trim()
-    || initialValue?.cells?.some((cell) => cell.score != null || cell.attendanceStatus || cell.homeworkStatus || cell.comment?.trim()),
+    || initialValue?.cells?.some((cell) => cell.score != null || cell.result || cell.attendanceStatus || cell.homeworkStatus || cell.comment?.trim()),
   );
   const hasLessonData = hasPersistedJournalData || Boolean(form.topic.trim() || form.homework.trim());
   const formattedDate = new Intl.DateTimeFormat("uk-UA", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
@@ -867,8 +921,9 @@ function TextAreaField({ label, value, onChange, ...props }) {
   );
 }
 
-function GradePopover({ editor, initialValue, lesson, requestError, saving, onClose, onSave, onDelete }) {
+export function GradePopover({ editor, initialValue, lesson, policy = defaultAssessmentPolicy, requestError, saving, onClose, onSave, onDelete }) {
   const [grade, setGrade] = useState(initialValue?.score ? String(initialValue.score) : "");
+  const [result, setResult] = useState(initialValue?.result || "");
   const [attendanceStatus, setAttendanceStatus] = useState(initialValue?.attendanceStatus || "");
   const hasHomework = Boolean(lesson?.homework?.trim());
   const [homeworkStatus, setHomeworkStatus] = useState(initialValue?.homeworkStatus || "");
@@ -919,12 +974,13 @@ function GradePopover({ editor, initialValue, lesson, requestError, saving, onCl
 
   const submit = (event) => {
     event.preventDefault();
-    if (!grade && !attendanceStatus && !homeworkStatus) {
+    if (!grade && !result && !attendanceStatus && !homeworkStatus) {
       setError("Оберіть оцінку, відвідування або статус домашнього завдання.");
       return;
     }
     onSave({
       grade,
+      result,
       attendanceStatus,
       homeworkStatus: hasHomework ? homeworkStatus : "",
       comment: comment.trim().replace(/\s+/g, " "),
@@ -942,13 +998,14 @@ function GradePopover({ editor, initialValue, lesson, requestError, saving, onCl
       </div>
       <form onSubmit={submit} className="flex min-h-0 flex-col">
         <div className="min-h-0 overflow-y-auto px-4 pt-3">
-        <p className="mb-2 text-[0.7rem] font-semibold text-slate-600">Оцінка</p>
+        {policy.mode !== "PASS_FAIL" || resultOptions(policy,lesson.workType).length ? <p className="mb-2 text-[0.7rem] font-semibold text-slate-600">Результат</p> : null}
+        {policy.mode !== "PASS_FAIL" ? <>
         <div className="grid grid-cols-6 gap-1.5" aria-label="Оцінка">
           {gradeValues.map((gradeOption) => (
             <button
               key={gradeOption}
               type="button"
-              onClick={() => { setGrade((current) => current === gradeOption ? "" : gradeOption); setError(""); }}
+              onClick={() => { setGrade((current) => current === gradeOption ? "" : gradeOption); setResult(""); setError(""); }}
               className={cn(
                 "h-8 rounded border text-[0.74rem] font-semibold transition-colors",
                 grade === gradeOption ? "border-slate-800 bg-slate-800 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
@@ -958,14 +1015,20 @@ function GradePopover({ editor, initialValue, lesson, requestError, saving, onCl
             </button>
           ))}
         </div>
+        </> : null}
+        {resultOptions(policy,lesson.workType).length ? <div className="mt-2 flex justify-center gap-1.5" aria-label="Нечисловий результат">
+          {resultOptions(policy,lesson.workType).map(option => <JournalHintButton key={option} type="button" hint={resultDescriptions[option]} aria-pressed={result===option} onClick={() => {setResult(current=>current===option?"":option);setGrade("");setError("");}} className={cn("h-9 w-[calc((100%-0.75rem)/3)] shrink-0 rounded border text-xs font-semibold",result===option?"border-slate-800 bg-slate-800 text-white":"border-slate-200 text-slate-700 hover:bg-slate-50")}>{resultLabels[option]}</JournalHintButton>)}
+        </div> : null}
         <p className="mt-3 text-[0.7rem] text-slate-500">Тип роботи: <span className="font-semibold text-slate-700">{workTypes.find((item) => item.value === lesson.workType)?.label || "Не вказано"}</span></p>
         <textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={2} maxLength={200} placeholder="Коментар до оцінки" className="mt-3 w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.76rem] leading-5 text-slate-800 outline-hidden placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200" />
         <p className="mb-2 mt-3 text-[0.7rem] font-semibold text-slate-600">Відвідування</p>
-        <div className="grid grid-cols-5 gap-1.5" aria-label="Статус відвідування">
-          {attendanceOptions.map((option) => (
-            <button
+        <div className="grid grid-cols-4 gap-1.5" aria-label="Статус відвідування">
+          {(initialValue?.attendanceStatus === "EXEMPTED" ? [...attendanceOptions,{value:"EXEMPTED",label:"З (архів)",description:"Звільнений від заняття (архівна позначка)"}] : attendanceOptions).map((option) => (
+            <JournalHintButton
               key={option.value}
               type="button"
+              hint={option.description}
+              aria-pressed={attendanceStatus === option.value}
               onClick={() => { setAttendanceStatus(option.value); setError(""); }}
               className={cn(
                 "h-9 rounded border px-1 text-[0.68rem] font-semibold transition-colors",
@@ -973,7 +1036,7 @@ function GradePopover({ editor, initialValue, lesson, requestError, saving, onCl
               )}
             >
               {option.label}
-            </button>
+            </JournalHintButton>
           ))}
         </div>
         <p className="mt-2 text-[0.64rem] leading-4 text-slate-400">Оцінка та відвідування зберігаються незалежно.</p>

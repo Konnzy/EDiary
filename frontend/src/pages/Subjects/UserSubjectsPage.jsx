@@ -1,4 +1,5 @@
 import { WorkTypeBadge } from "@/components/WorkTypeBadge.jsx";
+import { gradeDisplay } from "@/lib/assessment.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -197,7 +198,7 @@ export function SubjectProgressView({ role, adminStudentId, classId, initialAcad
         ...item,
         grades: item.grades.map((grade) => ({
           ...grade,
-          grade: grade.score,
+          grade: gradeDisplay(grade),
           workTypeCode: grade.workType,
           workType: workTypeLabels[grade.workType] || grade.workType,
         })),
@@ -273,7 +274,7 @@ export function SubjectProgressView({ role, adminStudentId, classId, initialAcad
                   {canShowContent && !subject ? <EmptyPeriodData message="Для вибраного навчального року предметів поки немає" /> : null}
                   {canShowContent && subject ? (
                     <>
-                      <SummaryCards tab={activeTab} stats={stats} yearStats={yearStats} period={period} forecast={forecast} allSubjects={allSubjects} gradeCount={periodSubject.grades.length} />
+                      <SummaryCards tab={activeTab} stats={stats} yearStats={yearStats} period={period} forecast={forecast} allSubjects={allSubjects} gradeCount={periodSubject.grades.length} passFail={periodSubject.assessmentPolicy?.mode === "PASS_FAIL"} />
                       <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)]">
                         <SubjectTabs activeTab={activeTab} onChange={setActiveTab} allSubjects={allSubjects} />
                         <AnimatePresence mode="wait" initial={false}>
@@ -471,7 +472,7 @@ function PeriodField({ value, options, onChange, className }) {
   );
 }
 
-function SummaryCards({ tab, stats, yearStats, period, forecast, allSubjects = false, gradeCount = 0 }) {
+function SummaryCards({ tab, stats, yearStats, period, forecast, allSubjects = false, gradeCount = 0, passFail = false }) {
   const selectedAttendanceLabel = /^\d{4}-\d{2}$/.test(period)
     ? "Пропущено уроків за місяць"
     : period.startsWith("SEMESTER_")
@@ -491,17 +492,18 @@ function SummaryCards({ tab, stats, yearStats, period, forecast, allSubjects = f
       ]
       : [
         allSubjects || period === "YEAR"
-          ? { label: allSubjects ? "Середній бал з усіх предметів" : "Середній бал", value: stats.average ?? "—", suffix: stats.average === null ? "" : "з 12", icon: BarChart3, tone: "slate" }
-          : { label: "Орієнтовна тематична", value: forecast.thematic ?? "—", suffix: forecast.thematic === null ? "" : "з 12", detail: "За оцінками після останньої тематичної", icon: BarChart3, tone: "slate" },
-        { label: "Динаміка успішності", value: formatDelta(stats.delta), detail: deltaDescription(stats.delta), icon: deltaIcon(stats.delta), tone: stats.delta > 0 ? "emerald" : stats.delta < 0 ? "red" : "slate" },
+          ? { label: passFail ? "Система оцінювання" : allSubjects ? "Середній бал з усіх предметів" : "Середній бал", value: passFail ? "Залікова" : stats.average ?? "—", suffix: passFail || stats.average === null ? "" : "з 12", icon: BarChart3, tone: "slate" }
+          : { label: passFail ? "Система оцінювання" : "Орієнтовна тематична", value: passFail ? "Залікова" : forecast.thematic ?? "—", suffix: passFail || forecast.thematic === null ? "" : "з 12", detail: passFail ? undefined : "За оцінками після останньої тематичної", icon: BarChart3, tone: "slate" },
+        passFail ? { label: "Зараховано", value: stats.passed, icon: CheckCircle2, tone: "emerald" }
+          : { label: "Динаміка успішності", value: formatDelta(stats.delta), detail: deltaDescription(stats.delta), icon: deltaIcon(stats.delta), tone: stats.delta > 0 ? "emerald" : stats.delta < 0 ? "red" : "slate" },
       ];
 
   return (
     <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {cards.map((card) => <MetricCard key={card.label} {...card} />)}
-      {tab === "grades" ? allSubjects
+      {tab === "grades" ? passFail ? <MetricCard label="Не зараховано" value={stats.notPassed} icon={CircleAlert} tone={stats.notPassed ? "red" : "slate"} /> : allSubjects
         ? <MetricCard label="Оцінок за період" value={gradeCount} icon={BookOpen} tone="slate" />
-        : <GradeForecastCard forecast={forecast} /> : null}
+        : !passFail ? <GradeForecastCard forecast={forecast} /> : null : null}
     </div>
   );
 }
@@ -633,7 +635,7 @@ function GradesPanel({ subject, stats, showSubject = false }) {
   if (!subject.grades.length) return <EmptyPeriodData message="За вибраний період оцінок немає" />;
   return (
     <>
-      <PanelHeading title="Оцінки за період" meta={`${countLabel(subject.grades.length, "оцінка", "оцінки", "оцінок")} · середній бал ${stats.average ?? "—"}`} />
+      <PanelHeading title="Оцінки за період" meta={`${countLabel(subject.grades.length, "результат", "результати", "результатів")}${subject.assessmentPolicy?.mode === "PASS_FAIL" ? "" : ` · середній бал ${stats.average ?? "—"}`}`} />
       <div className="mt-4 hidden overflow-x-auto rounded-md border border-slate-200 md:block">
         <table className="w-full min-w-[680px] table-fixed border-collapse text-left">
           <colgroup><col className="w-[14%]" />{showSubject ? <col className="w-[20%]" /> : null}<col className={showSubject ? "w-[24%]" : "w-[30%]"} /><col className="w-[12%]" /><col className={showSubject ? "w-[30%]" : "w-[44%]"} /></colgroup>
@@ -721,7 +723,7 @@ function EmptyPeriodData({ message }) {
 }
 
 function GradeBadge({ value }) {
-  const tone = value >= 10
+  const tone = typeof value !== "number" ? "bg-slate-100 text-slate-700 ring-slate-200" : value >= 10
     ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
     : value >= 7
       ? "bg-sky-50 text-sky-700 ring-sky-200"

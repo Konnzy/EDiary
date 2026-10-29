@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminRegistrationRequestController {
 
     private final RegistrationRequestService registrationRequestService;
+    private final com.ediary.backend.registration.service.AdminNotificationService notifications;
 
     @GetMapping
     public PageResponse<RegistrationRequestResponse> findAll(
@@ -40,9 +41,15 @@ public class AdminRegistrationRequestController {
     }
 
     @GetMapping("/notifications")
-    public RegistrationNotificationFeedResponse notifications() {
-        return registrationRequestService.findNotificationFeed();
+    public RegistrationNotificationFeedResponse notifications(Authentication authentication) {
+        return notifications.feed(authentication.getName());
     }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/notifications/{id}")
+    public void dismissNotification(@PathVariable Long id,Authentication authentication) { notifications.dismiss(authentication.getName(),id); }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/notifications")
+    public void clearNotifications(Authentication authentication) { notifications.clear(authentication.getName()); }
 
     @PostMapping("/{requestId}/approve")
     public RegistrationDecisionResponse approve(

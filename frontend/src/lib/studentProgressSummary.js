@@ -23,7 +23,7 @@ export function summarizeStudentProgress(subjects = []) {
   }))).sort((left, right) => right.date.localeCompare(left.date) || right.id - left.id)
     .slice(0, 7).map((item) => ({
       id: item.id, subject: item.subject, type: workTypeLabels[item.workType] || item.workType || "—",
-      grade: item.score, date: formatProgressDate(item.date), comment: item.comment || "—",
+      grade: item.score ?? ({PASSED:"зар.",NOT_PASSED:"не зар.",EXEMPTED:"зв."}[item.result] || "—"), date: formatProgressDate(item.date), comment: item.comment || "—",
     }));
 
   const homework = subjects.flatMap((subject) => (subject.homework || []).map((item) => ({

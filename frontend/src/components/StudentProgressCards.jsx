@@ -79,7 +79,7 @@ export function RecentGradesCard({ data }) {
 }
 
 function GradeBadge({ value }) {
-  const color = value >= 10
+  const color = typeof value !== "number" ? "bg-slate-100 text-slate-700 ring-slate-200" : value >= 10
     ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
     : value >= 7
       ? "bg-sky-50 text-sky-700 ring-sky-200"

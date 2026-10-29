@@ -53,6 +53,7 @@ public class SubjectProgressService {
     private final HomeworkRepository homeworkRepository;
     private final StudentHomeworkRepository studentHomeworkRepository;
     private final Clock clock;
+    private final AssessmentPolicyService assessmentPolicyService;
 
     @Transactional(readOnly = true)
     public SubjectProgressResponse forStudent(String login, String academicYear) {
@@ -109,7 +110,8 @@ public class SubjectProgressService {
         for (Long classId : classIds) {
             for (ScheduleEntry entry : scheduleRepository.findAllBySchoolClassIdAndAcademicYearAndActiveTrue(classId, year)) {
                 subjects.computeIfAbsent(entry.getSubject().getId(), ignored -> new SubjectAccumulator(
-                    entry.getSubject().getId(), entry.getSubject().getTitle(), teacherName(entry)
+                    entry.getSubject().getId(), entry.getSubject().getTitle(), teacherName(entry),
+                    assessmentPolicyService.find(entry.getSubject().getId())
                 ));
             }
             lessons.addAll(lessonRepository.findClassLessons(classId, start, end));
@@ -117,7 +119,8 @@ public class SubjectProgressService {
         for (Lesson lesson : lessons) {
             ScheduleEntry entry = lesson.getScheduleEntry();
             subjects.computeIfAbsent(entry.getSubject().getId(), ignored -> new SubjectAccumulator(
-                entry.getSubject().getId(), entry.getSubject().getTitle(), teacherName(entry)
+                entry.getSubject().getId(), entry.getSubject().getTitle(), teacherName(entry),
+                assessmentPolicyService.find(entry.getSubject().getId())
             ));
         }
 
@@ -130,7 +133,7 @@ public class SubjectProgressService {
                 subjects.get(lesson.getScheduleEntry().getSubject().getId()).grades.add(
                     new SubjectProgressResponse.Grade(
                         grade.getId(), lesson.getDate(), lesson.getScheduleEntry().getLessonNumber(),
-                        lesson.getWorkType(), grade.getScore(), grade.getComment()
+                        lesson.getWorkType(), grade.getScore(), grade.getComment(), grade.getResult()
                     )
                 );
             });
@@ -169,7 +172,8 @@ public class SubjectProgressService {
                 subject.id, subject.name, subject.teacher,
                 subject.grades.stream().sorted(Comparator.comparing(SubjectProgressResponse.Grade::date).reversed()).toList(),
                 subject.attendance.stream().sorted(Comparator.comparing(SubjectProgressResponse.Attendance::date).reversed()).toList(),
-                subject.homework.stream().sorted(Comparator.comparing(SubjectProgressResponse.Homework::assignedDate).reversed()).toList()
+                subject.homework.stream().sorted(Comparator.comparing(SubjectProgressResponse.Homework::assignedDate).reversed()).toList(),
+                subject.policy
             ))
             .toList();
         return new SubjectProgressResponse(
@@ -189,14 +193,16 @@ public class SubjectProgressService {
         private final Long id;
         private final String name;
         private final String teacher;
+        private final AssessmentPolicyService.Policy policy;
         private final List<SubjectProgressResponse.Grade> grades = new ArrayList<>();
         private final List<SubjectProgressResponse.Attendance> attendance = new ArrayList<>();
         private final List<SubjectProgressResponse.Homework> homework = new ArrayList<>();
 
-        private SubjectAccumulator(Long id, String name, String teacher) {
+        private SubjectAccumulator(Long id, String name, String teacher, AssessmentPolicyService.Policy policy) {
             this.id = id;
             this.name = name;
             this.teacher = teacher;
+            this.policy = policy;
         }
     }
 }

@@ -38,4 +38,7 @@ public class UserNotificationController {
     public void dismiss(@PathVariable Long id, Authentication authentication) {
         service.dismiss(authentication.getName(), id);
     }
+
+    @DeleteMapping
+    public void dismissAll(Authentication authentication) { service.dismissAll(authentication.getName()); }
 }

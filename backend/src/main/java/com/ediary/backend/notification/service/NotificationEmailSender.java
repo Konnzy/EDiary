@@ -63,17 +63,20 @@ public class NotificationEmailSender {
         }
         String kind = item.getEmailKind();
         if (absenceNotice ? !"ABSENCE".equals(kind) && !"CORRECTION".equals(kind) : !"NOTICE".equals(kind)) return;
-        String content=item.getEmailBody()==null?item.getBody():item.getEmailBody();
+        String source=item.getEmailBody()==null?item.getBody():item.getEmailBody();
+        String title=NotificationText.title(item.getCategory(),source,item.getTitle());
+        String content=NotificationText.concise(item.getCategory(),source);
+        if(item.getCategory().equals("GRADE"))content=content.lines().filter(line->!line.equals(title)).collect(java.util.stream.Collectors.joining("\n"));
         String action=switch(item.getCategory()) {
             case "SCHEDULE", "CLASS_SCHEDULE" -> "Переглянути розклад";
             case "MESSAGE" -> "Прочитати повідомлення";
             case "HOMEWORK", "HOMEWORK_DEADLINE" -> "Переглянути домашнє завдання";
             case "CLASS_ROSTER", "PROLONGED_ABSENCE" -> "Переглянути дані класу";
-            default -> "Переглянути навчальні дані";
+            default -> "Переглянути деталі";
         };
-        String letter=item.getTitle()+"\n\n"+content+"\n\nДата події: "+item.getCreatedAt().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+        String letter=title+"\n\n"+content
             +"\n\n"+action+":\n"+frontendUrl.replaceAll("/+$", "")+"/#"+item.getTarget();
-        if (email.sendText(item.getRecipient().getEmail(), item.getTitle(), letter)) {
+        if (email.sendText(item.getRecipient().getEmail(), title, letter)) {
             if (absenceNotice) item.setLastEmailedAbsent("ABSENCE".equals(kind));
             item.setEmailKind(null);
             item.setEmailDueAt(null);

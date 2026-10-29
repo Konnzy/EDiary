@@ -110,6 +110,7 @@ export const userNotificationApi = {
   markRead: (id) => request(`/notifications/${id}/read`, { method: "POST", csrf: true }),
   markAllRead: () => request("/notifications/read-all", { method: "POST", csrf: true }),
   dismiss: (id) => request(`/notifications/${id}`, { method: "DELETE", csrf: true }),
+  clear: () => request("/notifications", { method: "DELETE", csrf: true }),
 };
 
 export const messagesApi = {
@@ -192,6 +193,8 @@ export const adminAuthApi = {
 
 export const adminRegistrationApi = {
   findNotifications: () => request("/admin/registration-requests/notifications"),
+  hideNotification: (id) => request(`/admin/registration-requests/notifications/${id}`, { method: "DELETE", csrf: true }),
+  clearNotifications: () => request("/admin/registration-requests/notifications", { method: "DELETE", csrf: true }),
   findAll: ({ status, role, page = 0, size = 20 } = {}) => {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
     if (status) params.set("status", status);

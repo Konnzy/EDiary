@@ -34,6 +34,7 @@ public class AdminSubjectService {
     private final TeacherProfileRepository teacherProfileRepository;
     private final ScheduleRepository scheduleRepository;
     private final AuditService audit;
+    private final com.ediary.backend.journal.service.AssessmentPolicyService assessmentPolicyService;
 
     @Transactional(readOnly = true)
     public List<AdminSubjectResponse> findAll(String query) {
@@ -85,6 +86,9 @@ public class AdminSubjectService {
         Subject subject = new Subject();
         subject.setTitle(title);
         subject = subjectRepository.saveAndFlush(subject);
+        assessmentPolicyService.save(subject.getId(),input.assessmentPolicy()==null
+            ? new com.ediary.backend.journal.service.AssessmentPolicyService.Policy(com.ediary.backend.journal.service.AssessmentPolicyService.Mode.NUMERIC,false,false)
+            : input.assessmentPolicy());
         List<TeacherProfile> assignedTeachers = synchronizeTeachers(subject, input.teacherIds());
         audit.record("SUBJECT_CREATED", "SUBJECT", subject.getId(), of(),
             of("title", subject.getTitle(), "teacherIds", input.teacherIds()));
@@ -94,6 +98,7 @@ public class AdminSubjectService {
     @Transactional
     public AdminSubjectResponse update(Long subjectId, SaveSubjectRequest input) {
         Subject subject = requireSubjectForUpdate(subjectId);
+        if(input.assessmentPolicy()!=null)assessmentPolicyService.save(subjectId,input.assessmentPolicy());
         var beforeSubject = of("title", subject.getTitle(), "teacherIds",
             teacherProfileRepository.findAllAssignedToSubject(subjectId).stream().map(TeacherProfile::getId).sorted().toList());
         String title = normalizeTitle(input.title());
@@ -238,7 +243,8 @@ public class AdminSubjectService {
         return new AdminSubjectResponse(
             subject.getId(),
             subject.getTitle(),
-            teachers.stream().map(this::toTeacherResponse).toList()
+            teachers.stream().map(this::toTeacherResponse).toList(),
+            assessmentPolicyService.find(subject.getId()), assessmentPolicyService.hasResults(subject.getId())
         );
     }
 

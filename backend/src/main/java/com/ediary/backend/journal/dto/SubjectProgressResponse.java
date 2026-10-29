@@ -17,10 +17,11 @@ public record SubjectProgressResponse(
         String teacher,
         List<Grade> grades,
         List<Attendance> attendance,
-        List<Homework> homework
+        List<Homework> homework,
+        com.ediary.backend.journal.service.AssessmentPolicyService.Policy assessmentPolicy
     ) { }
     public record Grade(Long id, LocalDate date, Integer lessonNumber, LessonWorkType workType,
-                        Integer score, String comment) { }
+                        Integer score, String comment, com.ediary.backend.journal.entity.GradeResult result) { }
     public record Attendance(Long id, LocalDate date, String topic, AttendanceStatus status) { }
     public record Homework(Long id, LocalDate assignedDate, LocalDate dueDate, String title, HomeworkStatus status) { }
 }

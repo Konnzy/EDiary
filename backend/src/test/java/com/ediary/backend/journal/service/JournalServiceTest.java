@@ -64,11 +64,14 @@ class JournalServiceTest {
     @Mock private Clock clock;
     @Mock private com.ediary.backend.common.audit.AuditService audit;
     @InjectMocks private JournalService service;
+    @Mock private AssessmentPolicyService assessmentPolicyService;
 
     private static final SaveJournalCellRequest CELL = new SaveJournalCellRequest(10, null, null, null);
 
     @BeforeEach
     void defaultClock() {
+        org.mockito.Mockito.lenient().when(assessmentPolicyService.lockAndFind(org.mockito.ArgumentMatchers.any()))
+            .thenReturn(new AssessmentPolicyService.Policy(AssessmentPolicyService.Mode.NUMERIC,false,false));
         org.mockito.Mockito.lenient().when(clock.instant()).thenReturn(Instant.parse("2026-09-24T10:00:00Z"));
         org.mockito.Mockito.lenient().when(clock.getZone()).thenReturn(ZoneOffset.UTC);
     }
@@ -258,6 +261,35 @@ class JournalServiceTest {
         assertThat(journal.lessons().getFirst().id()).isEqualTo(21L);
         assertThat(journal.lessons().getLast().scheduleId()).isEqualTo(10L);
         assertThat(journal.lessons().getLast().date()).isEqualTo(LocalDate.of(2026, 9, 28));
+    }
+
+    @Test
+    void notifiesAboutNewChangedAndDeletedScoresWithoutBeforeAfterComparison() {
+        Lesson lesson = lesson(LocalDate.of(2026, 9, 24), LessonWorkType.CLASSWORK);
+        lesson.getScheduleEntry().getSubject().setTitle("Інформатика");
+        StudentProfile student = new StudentProfile();
+        student.setId(7L);
+        student.setSchoolClass(lesson.getScheduleEntry().getSchoolClass());
+        when(lessonRepository.findForTeacher(21L, "teacher.one")).thenReturn(Optional.of(lesson));
+        when(studentProfileRepository.findById(7L)).thenReturn(Optional.of(student));
+        Integer[][] changes = {{null,11},{7,11},{11,null},{11,11},{null,null}};
+        for(Integer[] change:changes) {
+            org.mockito.Mockito.clearInvocations(notificationService);
+            var previous = new com.ediary.backend.journal.entity.Grade();
+            previous.setScore(change[0]);
+            when(gradeRepository.findAllByStudentIdAndLessonId(7L,21L))
+                .thenReturn(change[0]==null?List.of():List.of(previous));
+            service.saveCell("teacher.one",21L,7L,new SaveJournalCellRequest(change[1],null,null,null));
+            if(java.util.Objects.equals(change[0],change[1])) {
+                verify(notificationService,never()).forStudent(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),
+                    org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any());
+            } else {
+                String expected = change[1]==null?"Оцінку видалено: 11 із 12":change[0]==null?"Нова оцінка: 11 із 12":"Оцінку змінено: з 7 на 11 із 12";
+                verify(notificationService).forStudent(org.mockito.ArgumentMatchers.eq(student),org.mockito.ArgumentMatchers.eq("GRADE"),
+                    org.mockito.ArgumentMatchers.eq(expected),org.mockito.ArgumentMatchers.argThat(body->body.contains(expected)
+                        &&body.contains("Предмет: Інформатика")&&!body.contains("→")),org.mockito.ArgumentMatchers.isNull());
+            }
+        }
     }
 
     private Lesson lesson(LocalDate date, LessonWorkType workType) {

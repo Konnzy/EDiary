@@ -114,9 +114,10 @@ function EmptyState({ query, onCreate }) {
   return <Card className="mt-5 flex min-h-[300px] flex-col items-center justify-center rounded-lg px-5 text-center"><span className="flex h-12 w-12 items-center justify-center rounded-md bg-slate-100 text-slate-500"><BookOpen className="h-5 w-5" /></span><h2 className="mt-4 text-base font-bold text-slate-900">{query ? "Предметів не знайдено" : "Предметів ще немає"}</h2><p className="mt-1 text-sm text-slate-500">{query ? "Змініть пошуковий запит." : "Створіть перший навчальний предмет."}</p>{!query ? <Button onClick={onCreate} className="mt-5 h-9 rounded-md"><Plus className="h-4 w-4" />Створити предмет</Button> : null}</Card>;
 }
 
-function SubjectDialog({ subject, onClose, onCompleted }) {
+export function SubjectDialog({ subject, onClose, onCompleted }) {
   const editing = Boolean(subject);
   const [title, setTitle] = useState(subject?.title || "");
+  const [assessmentPolicy, setAssessmentPolicy] = useState(subject?.assessmentPolicy || { mode: "NUMERIC", allowPassed: false, allowExempted: false });
   const [teacherIds, setTeacherIds] = useState(() => subject?.teachers.map((teacher) => teacher.id) || []);
   const [teacherQuery, setTeacherQuery] = useState("");
   const [teachers, setTeachers] = useState([]);
@@ -152,7 +153,7 @@ function SubjectDialog({ subject, onClose, onCompleted }) {
     setError("");
     setFieldError("");
     try {
-      const payload = { title: normalizedTitle, teacherIds };
+      const payload = { title: normalizedTitle, teacherIds, assessmentPolicy };
       if (editing) await adminSubjectsApi.update(subject.id, payload);
       else await adminSubjectsApi.create(payload);
       await onCompleted(editing ? `Предмет «${normalizedTitle}» оновлено.` : `Предмет «${normalizedTitle}» створено.`);
@@ -184,6 +185,15 @@ function SubjectDialog({ subject, onClose, onCompleted }) {
           {fieldError ? <span className="mt-1.5 block text-xs font-normal text-red-500">{fieldError}</span> : null}
         </label>
 
+        <fieldset disabled={submitting} className="space-y-3 border-y border-slate-200 py-4">
+          <label className="block text-sm font-semibold text-slate-700">Система оцінювання
+            <select value={assessmentPolicy.mode} onChange={event => setAssessmentPolicy(current => ({ ...current, mode: event.target.value }))} disabled={Boolean(subject?.hasResults)} title={subject?.hasResults ? "Є внесені результати цього предмета" : undefined} className="mt-2 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-normal text-slate-700 disabled:bg-slate-50">
+              <option value="NUMERIC">Бальна: 1–12</option><option value="PASS_FAIL">Зараховано / Не зараховано</option>
+            </select>
+          </label>
+          <label className="flex items-start gap-2 text-sm text-slate-700"><input className="mt-1 shrink-0" type="checkbox" checked={assessmentPolicy.mode === "PASS_FAIL" || assessmentPolicy.allowPassed} disabled={assessmentPolicy.mode === "PASS_FAIL"} onChange={event => setAssessmentPolicy(current => ({ ...current, allowPassed: event.target.checked }))} /><span>Дозволити «Зараховано» замість підсумкової оцінки окремим учням</span></label>
+          <label className="flex items-start gap-2 text-sm text-slate-700"><input className="mt-1 shrink-0" type="checkbox" checked={assessmentPolicy.allowExempted} onChange={event => setAssessmentPolicy(current => ({ ...current, allowExempted: event.target.checked }))} /><span>Дозволити «Звільнено» у підсумкових результатах окремих учнів</span></label>
+        </fieldset>
         <div>
           <div className="mb-2 flex items-end justify-between gap-3">
             <div>

@@ -48,8 +48,12 @@ public class Grade {
     @Column(name = "mark_type", nullable = false, columnDefinition = "enum_mark_type")
     private GradeType type;
 
-    @Column(name = "mark_score", nullable = false)
+    @Column(name = "mark_score")
     private Integer score;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mark_result", length = 16)
+    private GradeResult result;
 
     @Column(name = "mark_comment", length = 200)
     private String comment;

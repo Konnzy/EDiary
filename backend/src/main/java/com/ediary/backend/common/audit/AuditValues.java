@@ -7,7 +7,8 @@ public final class AuditValues {
         "deadline", "status", "role", "studentId", "lessonId", "classId", "subjectId", "teacherId", "academicYear", "week",
         "lessons", "day", "number", "room", "start", "end", "created", "deleted", "passwordChanged", "loginChanged",
         "emailChanged", "profileChanged", "notificationPreferencesChanged", "phoneChanged", "avatarChanged", "linked", "commentChanged",
-        "teacherIds", "classNumber", "classLetter", "processedUserId", "count", "reasonCode", "active", "mustChangePassword", "title");
+        "teacherIds", "classNumber", "classLetter", "processedUserId", "count", "reasonCode", "active", "mustChangePassword", "title",
+        "result", "mode", "allowPassed", "allowExempted");
     private AuditValues() {}
 
     public static Map<String, Object> of(Object... pairs) {

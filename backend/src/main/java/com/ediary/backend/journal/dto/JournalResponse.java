@@ -13,7 +13,8 @@ public record JournalResponse(
     String subjectName,
     String month,
     List<Student> students,
-    List<Lesson> lessons
+    List<Lesson> lessons,
+    com.ediary.backend.journal.service.AssessmentPolicyService.Policy assessmentPolicy
 ) {
     public record Student(Long id, String name, Double thematicEstimate) { }
     public record Lesson(
@@ -32,6 +33,7 @@ public record JournalResponse(
         Integer score,
         AttendanceStatus attendanceStatus,
         HomeworkStatus homeworkStatus,
-        String comment
+        String comment,
+        com.ediary.backend.journal.entity.GradeResult result
     ) { }
 }

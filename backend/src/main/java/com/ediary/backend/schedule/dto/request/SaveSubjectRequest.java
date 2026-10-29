@@ -11,6 +11,8 @@ public record SaveSubjectRequest(
     String title,
 
     @NotNull(message = "Передайте список учителів")
-    Set<@NotNull(message = "Некоректний ідентифікатор учителя") Long> teacherIds
+    Set<@NotNull(message = "Некоректний ідентифікатор учителя") Long> teacherIds,
+    @jakarta.validation.Valid com.ediary.backend.journal.service.AssessmentPolicyService.Policy assessmentPolicy
 ) {
+    public SaveSubjectRequest(String title,Set<Long> teacherIds) { this(title,teacherIds,null); }
 }

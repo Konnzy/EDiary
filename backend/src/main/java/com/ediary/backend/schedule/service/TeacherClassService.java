@@ -118,7 +118,7 @@ public class TeacherClassService {
         double gradeSum = 0;
         long gradeCount = 0;
         for (var grade : gradeRepository.findAllByLessonIdIn(lessonIds)) {
-            if (!includedStudents.contains(grade.getStudent().getId())) continue;
+            if (!includedStudents.contains(grade.getStudent().getId()) || grade.getScore() == null) continue;
             gradeSum += grade.getScore();
             gradeCount++;
         }

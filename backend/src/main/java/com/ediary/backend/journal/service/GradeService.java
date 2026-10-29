@@ -29,9 +29,14 @@ public class GradeService {
     }
 
     public Grade save(StudentProfile student, Lesson lesson, Integer score, GradeType type, String comment) {
+        return save(student,lesson,score,type,comment,null);
+    }
+
+    public Grade save(StudentProfile student, Lesson lesson, Integer score, GradeType type, String comment,
+                      com.ediary.backend.journal.entity.GradeResult result) {
         List<Grade> existing = gradeRepository.findAllByStudentIdAndLessonId(student.getId(), lesson.getId());
         Grade grade = existing.stream().filter(item -> item.getType() == type).findFirst().orElse(null);
-        if (score == null) {
+        if (score == null && result == null) {
             if (grade == null && existing.size() == 1) grade = existing.getFirst();
             if (grade != null) gradeRepository.delete(grade);
             return null;
@@ -46,6 +51,7 @@ public class GradeService {
         grade.setType(type);
         grade.setDate(lesson.getDate());
         grade.setScore(score);
+        grade.setResult(result);
         grade.setComment(comment == null || comment.isBlank() ? null : comment.strip());
         return gradeRepository.save(grade);
     }

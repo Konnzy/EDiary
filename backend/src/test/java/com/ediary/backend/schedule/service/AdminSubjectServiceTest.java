@@ -31,13 +31,14 @@ class AdminSubjectServiceTest {
     @Mock private SubjectRepository subjectRepository;
     @Mock private TeacherProfileRepository teacherProfileRepository;
     @Mock private ScheduleRepository scheduleRepository;
+    @Mock private com.ediary.backend.journal.service.AssessmentPolicyService assessmentPolicyService;
     @Mock private ScheduleRepository.TeacherClassAssignment classAssignment;
 
     private AdminSubjectService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminSubjectService(subjectRepository, teacherProfileRepository, scheduleRepository, org.mockito.Mockito.mock(com.ediary.backend.common.audit.AuditService.class));
+        service = new AdminSubjectService(subjectRepository, teacherProfileRepository, scheduleRepository, org.mockito.Mockito.mock(com.ediary.backend.common.audit.AuditService.class),assessmentPolicyService);
     }
 
     @Test

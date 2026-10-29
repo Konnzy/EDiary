@@ -175,6 +175,14 @@
   html.dark [class~="text-indigo-700"] { color: #bdc8ff; }
   html.dark [class~="border-indigo-200"] { border-color: #596b9d; }
 
+  html.dark [class~="bg-lime-50"] { background-color: #2c361d; }
+  html.dark [class~="text-lime-800"] { color: #c4df91; }
+  html.dark [class~="border-lime-200"] { border-color: #708647; }
+
+  html.dark [class~="bg-fuchsia-50"] { background-color: #402440; }
+  html.dark [class~="text-fuchsia-800"] { color: #e9b3e9; }
+  html.dark [class~="border-fuchsia-200"] { border-color: #996399; }
+
   html.dark :is([class~="bg-red-50"], [class~="bg-red-50/30"], [class~="hover:bg-red-50"]:hover) { background-color: #41262c; }
   html.dark :is([class~="text-red-500"], [class~="text-red-600"], [class~="text-red-700"]) { color: #f7aaaa; }
   html.dark :is([class~="border-red-200"], [class~="border-red-300"], [class~="border-red-400"]) { border-color: #a05a65; }

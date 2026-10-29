@@ -81,10 +81,10 @@ export function getSubjectPeriodView(subject, academicYear, period) {
 }
 
 export function getGradeForecast(subject, academicYear, period, fractionDigits = 2) {
-  if (!subject) return { thematic: null, semester: null, annual: null };
+  if (!subject || subject.assessmentPolicy?.mode === "PASS_FAIL") return { thematic: null, semester: null, annual: null };
   const yearView = getSubjectPeriodView(subject, academicYear, "YEAR");
   const cutoff = forecastCutoff(academicYear, period);
-  const grades = yearView.grades.filter((grade) => grade.date <= cutoff);
+  const grades = yearView.grades.filter((grade) => grade.date <= cutoff && typeof grade.grade === "number" && Number.isFinite(grade.grade));
   const latestGrade = [...grades].sort(compareGrades).at(-1);
   const referenceMonth = /^\d{4}-\d{2}$/.test(period)
     ? period : latestGrade ? monthPeriod(latestGrade.date) : null;
@@ -157,11 +157,13 @@ function gradeType(grade) {
 }
 
 function meanScore(values) {
+  values = values.filter(value => typeof (typeof value === "number" ? value : value.grade) === "number" && Number.isFinite(typeof value === "number" ? value : value.grade));
   if (!values.length) return null;
   return values.reduce((sum, value) => sum + Number(typeof value === "number" ? value : value.grade), 0) / values.length;
 }
 
 export function calculateAverage(grades) {
+  grades = grades.filter(item => typeof item.grade === "number" && Number.isFinite(item.grade));
   if (!grades.length) return null;
   const value = grades.reduce((sum, item) => sum + Number(item.grade), 0) / grades.length;
   return Math.round(value * 10) / 10;
@@ -169,7 +171,7 @@ export function calculateAverage(grades) {
 
 export function getSubjectStats(subject) {
   if (!subject) return null;
-  const average = calculateAverage(subject.grades);
+  const average = subject.assessmentPolicy?.mode === "PASS_FAIL" ? null : calculateAverage(subject.grades);
   const delta = average === null || subject.previousAverage === null || subject.previousAverage === undefined || subject.previousAverage <= 0
     ? null
     : Math.round(((average - subject.previousAverage) / subject.previousAverage) * 1000) / 10;
@@ -188,6 +190,8 @@ export function getSubjectStats(subject) {
 
   return {
     average,
+    passed: subject.grades.filter(item => item.result === "PASSED").length,
+    notPassed: subject.grades.filter(item => item.result === "NOT_PASSED").length,
     delta,
     missed,
     missedPercent,
