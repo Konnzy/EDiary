@@ -41,7 +41,7 @@ const attendanceOptions = [
 ];
 const resultDescriptions = { PASSED: "Зараховано", NOT_PASSED: "Не зараховано", EXEMPTED: "Звільнено від оцінювання" };
 
-function JournalHintButton({ hint, onClick, children, ...props }) {
+function JournalHintButton({ hint, onClick, children, buttonRef, hintDisabled = false, showOnClick = true, ...props }) {
   const button = useRef(null);
   const tooltip = useRef(null);
   const timer = useRef(null);
@@ -49,12 +49,14 @@ function JournalHintButton({ hint, onClick, children, ...props }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const cancelTimer = () => window.clearTimeout(timer.current);
-  const show = () => { cancelTimer(); setOpen(true); };
+  const show = () => { cancelTimer(); if (!hintDisabled) setOpen(true); };
   const dismiss = () => { cancelTimer(); setOpen(false); setPosition(null); };
   const schedule = () => {
     cancelTimer();
+    if (hintDisabled) return;
     timer.current = window.setTimeout(() => setOpen(true), 300);
   };
+  useEffect(() => { if (hintDisabled) dismiss(); }, [hintDisabled]);
   useLayoutEffect(() => {
     if (!open || !button.current || !tooltip.current) return;
     const anchor = button.current.getBoundingClientRect();
@@ -83,9 +85,9 @@ function JournalHintButton({ hint, onClick, children, ...props }) {
     };
   }, []);
   return <>
-    <button {...props} ref={button} aria-label={hint} aria-describedby={open ? id : undefined}
+    <button {...props} ref={node => { button.current = node; if (buttonRef) buttonRef.current = node; }} aria-label={props["aria-label"] || hint} aria-describedby={open ? id : undefined}
       onMouseEnter={schedule} onMouseLeave={dismiss} onFocus={show} onBlur={dismiss}
-      onClick={event => { show(); onClick?.(event); }}>{children}</button>
+      onClick={event => { if (showOnClick) show(); else dismiss(); onClick?.(event); }}>{children}</button>
     {open ? createPortal(<span ref={tooltip} id={id} role="tooltip"
       style={{ left: position?.left ?? 0, top: position?.top ?? 0, width: "max-content", maxWidth: "min(280px, calc(100vw - 24px))", visibility: position ? "visible" : "hidden", borderRadius: 6, backgroundColor: "#17212b", color: "#fff" }}
       className="pointer-events-none fixed z-[110] rounded-md px-3 py-2.5 text-center text-xs leading-4 shadow-lg">
@@ -707,16 +709,18 @@ function DateHeader({ date, lesson, onClick, onMarkAllPresent, onClearAttendance
             {homeworkDeadline ? <span className="mt-0.5 block truncate text-slate-400"><span className="font-semibold">До:</span> {homeworkDeadline}</span> : null}
           </span>
         </button>
-        <button
-          ref={menuButton}
+        <JournalHintButton
+          buttonRef={menuButton}
+          hint="Дії з відвідуванням"
+          hintDisabled={menuOpen}
+          showOnClick={false}
           type="button"
           onClick={toggleMenu}
           aria-label={`Дії з відвідуванням ${parts.day}.${parts.month}`}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          title="Дії з відвідуванням"
           className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 shadow-xs hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-400"
-        ><Ellipsis className="h-4 w-4" aria-hidden="true" /></button>
+        ><Ellipsis className="h-4 w-4" aria-hidden="true" /></JournalHintButton>
       </div>
       {menuOpen && menuPosition ? createPortal(
         <div ref={menu} role="menu" aria-label={`Відвідування ${parts.day}.${parts.month}`} className="fixed z-[100] rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl" style={menuPosition}>

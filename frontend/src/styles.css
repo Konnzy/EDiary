@@ -67,6 +67,23 @@
     font: inherit;
   }
 
+  :where(button, a[href], select, summary, [role="button"], [role="tab"], [role="switch"], [role="checkbox"], [role="radio"], [role="menuitem"], [role="option"], input[type="button"], input[type="submit"], input[type="reset"], input[type="checkbox"], input[type="radio"]):not(:disabled):not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  :where(button, select, input, textarea):disabled,
+  :where(button, a[href], [role="button"], [role="tab"], [role="switch"], [role="checkbox"], [role="radio"], [role="menuitem"], [role="option"])[aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
+  label:has(input:is([type="checkbox"], [type="radio"]):not(:disabled)) {
+    cursor: pointer;
+  }
+
+  label:has(input:is([type="checkbox"], [type="radio"]):disabled) {
+    cursor: not-allowed;
+  }
+
   ::selection {
     @apply bg-primary/15 text-primary;
   }
@@ -153,6 +170,15 @@
   html.dark :is([class~="bg-sky-50"], [class~="bg-sky-100"], [class~="bg-sky-50/40"]) { background-color: #15354d; }
   html.dark :is([class~="text-sky-700"], [class~="text-sky-900"]) { color: #a6d9fb; }
   html.dark :is([class~="border-sky-200"], [class~="border-sky-300"]) { border-color: #4681aa; }
+
+  html.dark .notification-item[data-unread="true"] {
+    background-color: #203344;
+    box-shadow: inset 2px 0 #73b9e6;
+  }
+  html.dark .notification-item[data-unread="true"]:is(:hover, :focus-within) { background-color: #294154; }
+  html.dark .notification-item[data-unread="true"] .notification-title { color: #f1f5f9; }
+  html.dark .notification-item[data-unread="true"] .notification-body { color: #d0dce7; }
+  html.dark .notification-item[data-unread="true"] .notification-time { color: #adc0d2; }
 
   html.dark :is([class~="bg-emerald-50"], [class~="bg-emerald-100"], [class~="hover:bg-emerald-100"]:hover) { background-color: #173b32; }
   html.dark :is([class~="text-emerald-600"], [class~="text-emerald-700"], [class~="text-emerald-800"]) { color: #9be2bc; }
