@@ -34,8 +34,9 @@ public class GlobalExceptionHandler {
         MaxUploadSizeExceededException exception,
         HttpServletRequest request
     ) {
-        return response(HttpStatus.CONTENT_TOO_LARGE, "AVATAR_TOO_LARGE",
-            "Розмір зображення не має перевищувати 5 МБ", Map.of(), request);
+        boolean avatar = request.getRequestURI().contains("/avatar");
+        return response(HttpStatus.CONTENT_TOO_LARGE, avatar ? "AVATAR_TOO_LARGE" : "FILE_TOO_LARGE",
+            avatar ? "Розмір зображення не має перевищувати 5 МБ" : "Розмір файлу не має перевищувати 5 МБ", Map.of(), request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

@@ -214,7 +214,7 @@ class AttendanceNotificationTest {
     }
 
     @Test
-    void legacyInAppOptOutCannotHideNoticeAndEmailRemainsOptional() {
+    void inAppDeliveryIsMandatoryAndEmailRemainsOptional() {
         var preference = new UserNotificationSettings();
         preference.setAttendanceEmailEnabled(false);
         when(settings.findByUser_Id(1L)).thenReturn(Optional.of(preference));
@@ -222,7 +222,6 @@ class AttendanceNotificationTest {
         assertThat(stored.get().isVisibleInApp()).isTrue();
         assertThat(stored.get().getEmailKind()).isNull();
         preference.setAttendanceEmailEnabled(true);
-        preference.getInApp().put("absence", false);
         service.attendanceChanged(student, lesson, AttendanceStatus.ABSENT, AttendanceStatus.PRESENT);
         service.attendanceChanged(student, lesson, AttendanceStatus.PRESENT, AttendanceStatus.ABSENT);
         assertThat(stored.get().isVisibleInApp()).isTrue();

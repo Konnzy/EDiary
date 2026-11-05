@@ -105,9 +105,8 @@ export function AdminRequestsPage() {
         <FilterSelect label="Роль" value={role} options={roleOptions} onChange={(value) => { setRole(value); setPage(0); }} />
         <div className="flex items-center justify-between gap-3 sm:justify-end">
           {data ? <span className="whitespace-nowrap text-[0.75rem] text-slate-500">{data.totalElements} заявок</span> : null}
-          <Button type="button" variant="ghost" onClick={loadRequests} disabled={isLoading} className="h-10 shrink-0 rounded-md border border-slate-200 px-3 text-[0.78rem] text-slate-600">
+          <Button type="button" variant="ghost" onClick={loadRequests} disabled={isLoading} title="Оновити заявки" aria-label="Оновити заявки" className="h-10 w-10 shrink-0 rounded-md border border-slate-200 p-0 text-slate-600">
             <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} aria-hidden="true" />
-            Оновити
           </Button>
         </div>
       </Card>

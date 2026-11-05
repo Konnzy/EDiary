@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input.jsx";
 import { ApiError, adminUsersApi, registrationApi } from "@/lib/api.js";
 import { cn } from "@/lib/utils.js";
 import { AdminLayout } from "@/pages/AdminHome/AdminLayout.jsx";
+import { UserImportDialog } from "./UserImportDialog.jsx";
 
 const roleLabels = {
   ADMIN: "Адміністратор",
@@ -173,6 +174,7 @@ export function AdminUsersPage() {
   const [dialog, setDialog] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editDialog, setEditDialog] = useState(null);
   const [resetDialog, setResetDialog] = useState(null);
   const requestSequence = useRef(0);
@@ -257,12 +259,12 @@ export function AdminUsersPage() {
           <Button
             type="button"
             variant="ghost"
-            disabled
-            title="Імпорт із CSV та XLSX буде доступний пізніше"
-            className="h-10 w-full rounded-md border border-slate-300 bg-white px-4 text-slate-500 sm:w-auto"
+            onClick={() => setImportOpen(true)}
+            title="Імпорт користувачів із CSV або XLSX"
+            className="user-import-trigger h-10 w-full rounded-md border border-sky-700 bg-sky-700 px-4 font-semibold text-white hover:border-sky-800 hover:bg-sky-800 hover:text-white focus-visible:ring-sky-300 sm:w-auto"
           >
             <FileUp className="h-4 w-4" aria-hidden="true" />
-            Завантаження користувачів
+            Імпортувати користувачів
           </Button>
           <Button type="button" onClick={() => setCreateOpen(true)} className="h-10 w-full rounded-md px-4 sm:w-auto">
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -338,6 +340,11 @@ export function AdminUsersPage() {
           onCompleted={handleCreated}
         />
       ) : null}
+
+      {importOpen ? <UserImportDialog onClose={() => setImportOpen(false)} onImported={async (message) => {
+        setNotice(message);
+        if (page === 0) await loadUsers(); else setPage(0);
+      }} /> : null}
 
       {deleteDialog ? (
         <DeleteUserDialog

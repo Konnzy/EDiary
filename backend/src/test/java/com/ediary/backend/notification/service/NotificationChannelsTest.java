@@ -12,7 +12,6 @@ class NotificationChannelsTest {
     void allKnownCategoriesAreInAppAndEmailIsOptIn() {
         var settings = new UserNotificationSettings();
         for (String category : CATEGORIES) {
-            settings.getInApp().put(NotificationChannels.key(category), false);
             assertThat(NotificationChannels.inApp(null, category)).isTrue();
             assertThat(NotificationChannels.inApp(settings, category)).isTrue();
             assertThat(NotificationChannels.email(null, category)).isFalse();

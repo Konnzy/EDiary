@@ -339,8 +339,8 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
       title="Розклад"
       subtitle="Перегляд та редагування розкладу занять для класів"
     >
-      <Card className="rounded-lg p-4 sm:p-5">
-        <div className="grid gap-4 lg:grid-cols-[minmax(200px,1fr)_minmax(200px,1fr)_minmax(300px,1.2fr)] lg:items-end xl:grid-cols-[minmax(150px,1fr)_minmax(150px,1fr)_minmax(260px,1.4fr)_minmax(0,2.8fr)]">
+      <Card className="@container rounded-lg p-4 sm:p-5">
+        <div className="grid gap-4 @min-[640px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(252px,1.3fr)] @min-[640px]:items-end @min-[1040px]:grid-cols-[minmax(120px,1fr)_minmax(156px,1fr)_minmax(252px,1.3fr)_max-content]">
           <SelectField label="Клас">
             <ClassCombobox
               classes={classes}
@@ -375,7 +375,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
                   type="button"
                   onClick={() => item !== week && requestContextChange(() => setWeek(item))}
                   className={cn(
-                    "min-w-[140px] rounded px-4 text-[0.78rem] font-semibold transition-colors",
+                    "min-w-0 whitespace-nowrap rounded px-2 text-[0.75rem] font-semibold transition-colors",
                     week === item ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800",
                   )}
                 >
@@ -385,7 +385,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
             </div>
           </div>
 
-          <div className="flex flex-wrap items-end justify-end gap-2 lg:col-span-3 xl:col-span-1 xl:flex-nowrap">
+          <div className="flex flex-wrap items-end justify-end gap-2 @min-[640px]:col-span-3 @min-[1040px]:col-span-1 @min-[1040px]:flex-nowrap">
             <Button
               type="button"
               variant="ghost"
@@ -421,7 +421,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
               Очистити
             </Button>
 
-            <div className="min-w-[140px] shrink-0">
+            <div className="w-[148px] shrink-0">
               <p className={cn("mb-2 inline-flex items-center gap-2 whitespace-nowrap text-[0.68rem] font-medium", dirty ? "text-amber-700" : "text-emerald-700")}>
                 <span className={cn("h-2 w-2 rounded-full", dirty ? "bg-amber-400" : "bg-emerald-500")} aria-hidden="true" />
                 {dirty ? "Є незбережені зміни" : "Усі зміни збережено"}

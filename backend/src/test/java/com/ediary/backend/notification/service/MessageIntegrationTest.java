@@ -51,6 +51,8 @@ class MessageIntegrationTest {
     @Autowired PlatformTransactionManager transactions;
     @Autowired WebApplicationContext context;
     @Autowired com.ediary.backend.registration.service.AdminNotificationService adminNotifications;
+    @Autowired com.ediary.backend.user.admin.service.UserImportService userImports;
+    @Autowired com.ediary.backend.user.admin.service.UserImportFileService importFiles;
     @MockitoBean EmailService email;
     @MockitoBean Clock clock;
     private String prefix;
@@ -61,7 +63,8 @@ class MessageIntegrationTest {
         prefix=UUID.randomUUID().toString().substring(0,8);
         studentUser=userId("student","STUDENT"); teacherUser=userId("teacher","TEACHER");parentUser=userId("parent","PARENT");outsider=userId("outsider","STUDENT");
         long teacher=id("insert into teacher(user_id,teacher_name,teacher_surname,teacher_birthdate,teacher_email,teacher_phone) values (?,'Олександр','Коваленко','1980-01-01',?,'000') returning teacher_id",teacherUser,prefix+"teacher@example.invalid");
-        long schoolClass=id("insert into school_class(class_number,class_letter,class_academic_year,class_teacher_id) values (?,'А','2026/2027',?) returning class_id",jdbc.queryForObject("select count(*)+1 from school_class",Integer.class),teacher);
+        int classIndex=jdbc.queryForObject("select count(*) from school_class",Integer.class);
+        long schoolClass=id("insert into school_class(class_number,class_letter,class_academic_year,class_teacher_id) values (?,?,'2026/2027',?) returning class_id",classIndex%12+1,String.valueOf("АБВГҐД".charAt(classIndex/12)),teacher);
         studentId=id("insert into student(user_id,class_id,student_name,student_surname,student_birthdate,student_enrollment_date,student_status) values (?,?,'Іван','Петренко','2010-01-01','2026-09-01','STUDYING') returning student_id",studentUser,schoolClass);
         long parent=id("insert into parent(user_id,parent_name,parent_surname,parent_birthdate,parent_email,parent_phone) values (?,'Олена','Петренко','1980-01-01',?,'000') returning parent_id",parentUser,prefix+"parent@example.invalid");
         jdbc.update("insert into student_parents(student_id,parent_id,is_primary_contact) values (?,?,true)",studentId,parent);
@@ -301,6 +304,11 @@ class MessageIntegrationTest {
             migration=new String(stream.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
         }
         new TransactionTemplate(transactions).executeWithoutResult(transaction->{
+            // Recreate the pre-V32 source only inside this rollback-only migration test.
+            try(var stream=new org.springframework.core.io.ClassPathResource("db/migration/V31__assessment_results_and_policy.sql").getInputStream()) {
+                String source=new String(stream.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
+                jdbc.execute(source.substring(source.indexOf("CREATE TABLE assessment_policy")));
+            } catch(java.io.IOException error) { throw new java.io.UncheckedIOException(error); }
             long classId=id("select class_id from student where student_id=?",studentId);
             long teacherId=id("select teacher_id from teacher where user_id=?",teacherUser);
             jdbc.update("insert into assessment_policy(class_id,subject_id,mode,allow_passed,allow_exempted) values (?,?,'PASS_FAIL',false,true)",classId,subjectId);
@@ -324,6 +332,124 @@ class MessageIntegrationTest {
             transaction.setRollbackOnly();
         });
         assertThat(assessment.find(subjectId).mode()).isEqualTo(com.ediary.backend.journal.service.AssessmentPolicyService.Mode.NUMERIC);
+    }
+
+    @Test void userImportPreviewConfirmationSecurityAndDuplicateProtection() throws Exception {
+        when(email.sendText(anyString(),anyString(),anyString())).thenReturn(true);
+        String subject="Імпорт "+prefix;
+        jdbc.update("insert into subject(subject_title) values (?)",subject);
+        var upload=importCsv("Вчитель",login("import"),subject,"","","");
+        long before=id("select count(*) from app_user");
+        var preview=userImports.preview(upload,"csv");
+        assertThat(preview.invalid()).isZero();
+        assertThat(id("select count(*) from app_user")).isEqualTo(before);
+        verify(email,never()).sendText(anyString(),anyString(),anyString());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/admin/users/import/preview").file(upload).param("format","csv").with(user("teacher").roles("TEACHER")).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/admin/users/import/confirm").file(upload).param("format","csv").param("fingerprint",preview.fingerprint()).with(user("admin").roles("ADMIN"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/users/import/template").param("format","xlsx").with(user("teacher").roles("TEACHER"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/users/import/template").param("format","xlsx").with(user("admin").roles("ADMIN"))).andExpect(status().isOk()).andExpect(header().string("Content-Disposition","attachment; filename=users-template.xlsx"));
+        assertThatThrownBy(()->userImports.confirm(upload,"csv","wrong")).hasMessageContaining("змінився");
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/admin/users/import/confirm").file(upload).param("format","csv").param("fingerprint",preview.fingerprint()).with(user("admin").roles("ADMIN")).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.created").value(1));
+        assertThat(id("select count(*) from app_user")).isEqualTo(before+1);
+        assertThat(jdbc.queryForObject("select user_must_change_password from app_user where user_login=?",Boolean.class,login("import"))).isTrue();
+        verify(email,times(1)).sendText(anyString(),anyString(),anyString());
+        assertThatThrownBy(()->userImports.confirm(upload,"csv",preview.fingerprint())).hasMessageContaining("повторну перевірку");
+        assertThat(userImports.preview(upload,"csv").rows().getFirst().errors()).containsKey("Логін");
+        String changedLogin=new String(upload.getBytes(),java.nio.charset.StandardCharsets.UTF_8)
+            .replaceFirst(java.util.regex.Pattern.quote(login("import"))+";",login("other")+";");
+        var duplicateEmail=new org.springframework.mock.web.MockMultipartFile("file","users.csv","text/csv",changedLogin.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(userImports.preview(duplicateEmail,"csv").rows().getFirst().errors()).containsKey("Електронна пошта");
+        assertThat(id("select count(*) from app_user")).isEqualTo(before+1);
+    }
+
+    @Test void userImportHandlesParentLinksStudentsAndFileErrors() throws Exception {
+        long schoolClass=id("select class_id from student where student_id=?",studentId);
+        String className=jdbc.queryForObject("select class_number||'-'||class_letter from school_class where class_id=?",String.class,schoolClass);
+        var student=importCsv("Учень",login("newstudent"),"",className,"2026/2027","");
+        var studentPreview=userImports.preview(student,"csv");
+        assertThat(studentPreview.invalid()).isZero();
+        userImports.confirm(student,"csv",studentPreview.fingerprint());
+        var captured=org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(email).sendText(anyString(),anyString(),captured.capture());
+        var code=java.util.regex.Pattern.compile("[A-Z0-9]{4}-[A-Z0-9]{4}").matcher(captured.getValue());
+        assertThat(code.find()).isTrue();
+        var parent=importCsv("Батьки",login("newparent"),"","","",code.group());
+        var parentPreview=userImports.preview(parent,"csv");
+        assertThat(parentPreview.invalid()).isZero();
+        assertThat(parentPreview.rows().getFirst().values().get(11)).isEqualTo("••••-••••");
+        userImports.confirm(parent,"csv",parentPreview.fingerprint());
+        assertThat(id("select count(*) from student_parents sp join parent p using(parent_id) join app_user u using(user_id) where u.user_login=?",login("newparent"))).isEqualTo(1);
+        assertThat(userImports.preview(importCsv("ADMIN",login("badadmin"),"","","",""),"csv").invalid()).isEqualTo(1);
+        assertThat(userImports.preview(importCsv("Батьки",login("badparent"),"","","","XXXX-XXXX"),"csv").invalid()).isEqualTo(1);
+        assertThat(userImports.preview(importCsv("Учень",login("badclass"),"",className,"2025/2026",""),"csv").invalid()).isEqualTo(1);
+        String text=new String(student.getBytes(),java.nio.charset.StandardCharsets.UTF_8);
+        String[] lines=text.split("\\R");
+        var duplicate=new org.springframework.mock.web.MockMultipartFile("file","users.csv","text/csv",(lines[0]+"\n"+lines[1]+"\n"+lines[1]).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(userImports.preview(duplicate,"csv").invalid()).isEqualTo(2);
+        assertThatThrownBy(()->userImports.confirm(duplicate,"csv",userImports.preview(duplicate,"csv").fingerprint())).hasMessageContaining("Жодного");
+    }
+
+    @Test void userImportRollsBackEarlierRowsAndNeverSendsCredentialsOnDatabaseFailure() throws Exception {
+        String subject="Відкат "+prefix;jdbc.update("insert into subject(subject_title) values (?)",subject);
+        var first=importCsv("Вчитель",login("batchone"),subject,"","","");
+        var second=importCsv("Вчитель",login("batchtwo"),subject,"","","");
+        String content=new String(first.getBytes(),java.nio.charset.StandardCharsets.UTF_8)+new String(second.getBytes(),java.nio.charset.StandardCharsets.UTF_8).split("\\R",2)[1];
+        var file=new org.springframework.mock.web.MockMultipartFile("file","users.csv","text/csv",content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var preview=userImports.preview(file,"csv");assertThat(preview.invalid()).isZero();
+        jdbc.execute("create function fail_import() returns trigger language plpgsql as $$ begin if new.user_login='"+login("batchtwo")+"' then raise exception 'Test import failure' using errcode='23514'; end if; return new; end $$");
+        jdbc.execute("create trigger fail_import before insert on app_user for each row execute function fail_import()");
+        try { assertThatThrownBy(()->userImports.confirm(file,"csv",preview.fingerprint())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+        finally { jdbc.execute("drop trigger fail_import on app_user");jdbc.execute("drop function fail_import()"); }
+        assertThat(id("select count(*) from app_user where user_login in (?,?)",login("batchone"),login("batchtwo"))).isZero();
+        verify(email,never()).sendText(anyString(),anyString(),anyString());
+    }
+
+    @Test void xlsxImportRevalidatesAndCreatesTeacherProfile() throws Exception {
+        String subject="XLSX "+prefix;jdbc.update("insert into subject(subject_title) values (?)",subject);
+        var row=importFiles.parse(importCsv("Вчитель",login("xlsx"),subject,"","","").getBytes(),"csv").getFirst();
+        byte[] bytes;
+        try(var book=new org.apache.poi.xssf.usermodel.XSSFWorkbook();var out=new java.io.ByteArrayOutputStream()) {
+            var sheet=book.createSheet("Користувачі");
+            for(int index=0;index<2;index++) {
+                var cells=sheet.createRow(index);var values=index==0?com.ediary.backend.user.admin.service.UserImportFileService.COLUMNS:row.values();
+                for(int col=0;col<values.size();col++)cells.createCell(col).setCellValue(values.get(col));
+            }
+            book.write(out);bytes=out.toByteArray();
+        }
+        var file=new org.springframework.mock.web.MockMultipartFile("file","users.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",bytes);
+        var preview=userImports.preview(file,"xlsx");assertThat(preview.invalid()).isZero();
+        userImports.confirm(file,"xlsx",preview.fingerprint());
+        assertThat(id("select count(*) from teacher_subject ts join teacher t using(teacher_id) join app_user u using(user_id) where u.user_login=?",login("xlsx"))).isEqualTo(1);
+    }
+
+    @Test void capacityIsRecheckedAfterPreviewAndConcurrentConfirmationCreatesOnlyOneAccount() throws Exception {
+        long schoolClass=id("select class_id from student where student_id=?",studentId);
+        String name=jdbc.queryForObject("select class_number||'-'||class_letter from school_class where class_id=?",String.class,schoolClass);
+        var file=importCsv("Учень",login("overlimit"),"",name,"2026/2027","");
+        var preview=userImports.preview(file,"csv");assertThat(preview.invalid()).isZero();
+        jdbc.update("insert into app_user(user_login,user_email,user_password_hash,user_role) select ?||n,?||n||'@example.invalid','test','STUDENT' from generate_series(1,29) n",prefix+"fill",prefix+"fill");
+        jdbc.update("insert into student(user_id,class_id,student_name,student_surname,student_birthdate,student_enrollment_date,student_status) select user_id,?,'Іван','Петренко','2011-01-01','2026-09-01','STUDYING' from app_user where user_login like ?",schoolClass,prefix+"fill%");
+        assertThatThrownBy(()->userImports.confirm(file,"csv",preview.fingerprint())).hasMessageContaining("Жодного");
+        assertThat(id("select count(*) from app_user where user_login=?",login("overlimit"))).isZero();
+        String subject="Паралельно "+prefix;jdbc.update("insert into subject(subject_title) values (?)",subject);
+        var concurrent=importCsv("Вчитель",login("once"),subject,"","","");
+        var ready=userImports.preview(concurrent,"csv");assertThat(ready.invalid()).isZero();
+        try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Boolean> task=()->{try{userImports.confirm(concurrent,"csv",ready.fingerprint());return true;}catch(com.ediary.backend.common.error.ApplicationException error){return false;}};
+            var first=pool.submit(task);var second=pool.submit(task);
+            assertThat(List.of(first.get(30,java.util.concurrent.TimeUnit.SECONDS),second.get(30,java.util.concurrent.TimeUnit.SECONDS))).containsExactlyInAnyOrder(true,false);
+        }
+        assertThat(id("select count(*) from app_user where user_login=?",login("once"))).isEqualTo(1);
+    }
+
+    private org.springframework.mock.web.MockMultipartFile importCsv(String role,String login,String subject,String schoolClass,String year,String code) throws Exception {
+        var out=new java.io.StringWriter();
+        try(var csv=new org.apache.commons.csv.CSVPrinter(out,org.apache.commons.csv.CSVFormat.RFC4180.builder().setDelimiter(';').get())) {
+            csv.printRecord(com.ediary.backend.user.admin.service.UserImportFileService.COLUMNS);
+            csv.printRecord(role,login,"Петренко","Іван","Олександрович",login+"@example.invalid","+380671112233",role.equals("Учень")?"15.04.2011":"15.04.1980",schoolClass,year,subject,code);
+        }
+        return new org.springframework.mock.web.MockMultipartFile("file","users.csv","text/csv",out.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private String login(String type){return prefix+type;}

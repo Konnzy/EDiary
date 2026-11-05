@@ -177,13 +177,12 @@ class NotificationPersistenceIntegrationTest {
         tx.executeWithoutResult(status -> {
             var setting = preferences.findByUser_Id(user).orElseThrow();
             setting.setAttendanceEmailEnabled(false);
-            setting.getInApp().put("absence", true);
             preferences.saveAndFlush(setting);
         });
         tx.executeWithoutResult(status -> {
             var setting = preferences.findByUser_Id(user).orElseThrow();
             assertThat(setting.isAttendanceEmailEnabled()).isFalse();
-            assertThat(setting.getInApp()).containsEntry("absence", true);
+            assertThat(NotificationChannels.inApp(setting, "ABSENCE")).isTrue();
         });
     }
 

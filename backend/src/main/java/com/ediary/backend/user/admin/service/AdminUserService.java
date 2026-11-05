@@ -101,22 +101,12 @@ public class AdminUserService {
 
     @Transactional
     public AdminUserCreationResponse create(CreateAdminUserRequest input) {
-        if (input.role() == UserRole.ADMIN) {
-            throw new ApplicationException(
-                HttpStatus.BAD_REQUEST,
-                "ADMIN_CREATION_REQUIRES_SEPARATE_FLOW",
-                "Створення адміністратора потребує окремого захищеного процесу"
-            );
-        }
-
+        CreationTargets targets = validateAndResolveCreation(input);
         String login = normalizeLogin(input.login());
         String email = normalizeEmail(input.email());
-        ensureUniqueCredentials(login, email);
-        validateBirthDate(input.birthDate(), input.role());
-
-        SchoolClass schoolClass = resolveClass(input);
-        Subject subject = resolveSubject(input);
-        StudentProfile requestedStudent = resolveStudent(input);
+        SchoolClass schoolClass = targets.schoolClass();
+        Subject subject = targets.subject();
+        StudentProfile requestedStudent = targets.student();
         String temporaryPassword = temporaryPasswordGenerator.generate();
         LocalDateTime now = LocalDateTime.now(clock);
 
@@ -133,19 +123,40 @@ public class AdminUserService {
 
         String parentLinkCode = createRoleProfile(input, user, schoolClass, subject, requestedStudent, now);
         eventPublisher.publishEvent(new AdminUserCreatedEvent(
-            email,
-            normalizeName(input.firstName()),
-            login,
-            temporaryPassword,
-            parentLinkCode
+            email, normalizeName(input.firstName()), login, temporaryPassword, parentLinkCode
         ));
-
         audit.record("USER_CREATED", "USER", user.getId(), of(), of("role", user.getRole(), "status", user.getStatus()));
-        return new AdminUserCreationResponse(
-            toResponse(user),
-            "Користувача створено. Лист із даними для входу передано на надсилання."
-        );
+        return new AdminUserCreationResponse(toResponse(user),
+            "Користувача створено. Лист із даними для входу передано на надсилання.");
     }
+
+    // Called within the import transaction; validation does not create accounts or publish mail.
+    public void validateCreation(CreateAdminUserRequest input) {
+        validateAndResolveCreation(input);
+    }
+
+    private CreationTargets validateAndResolveCreation(CreateAdminUserRequest input) {
+        if (input.role() == UserRole.ADMIN) {
+            throw new ApplicationException(
+                HttpStatus.BAD_REQUEST,
+                "ADMIN_CREATION_REQUIRES_SEPARATE_FLOW",
+                "Створення адміністратора потребує окремого захищеного процесу"
+            );
+        }
+
+        String login = normalizeLogin(input.login());
+        String email = normalizeEmail(input.email());
+        ensureUniqueCredentials(login, email);
+        validateBirthDate(input.birthDate(), input.role());
+        normalizePhone(input.phone());
+
+        SchoolClass schoolClass = resolveClass(input);
+        Subject subject = resolveSubject(input);
+        StudentProfile requestedStudent = resolveStudent(input);
+        return new CreationTargets(schoolClass, subject, requestedStudent);
+    }
+
+    private record CreationTargets(SchoolClass schoolClass, Subject subject, StudentProfile student) {}
 
     @Transactional(readOnly = true)
     public AdminUserResponse findCurrent(String login) {

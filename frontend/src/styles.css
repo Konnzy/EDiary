@@ -171,6 +171,17 @@
   html.dark :is([class~="text-sky-700"], [class~="text-sky-900"]) { color: #a6d9fb; }
   html.dark :is([class~="border-sky-200"], [class~="border-sky-300"]) { border-color: #4681aa; }
 
+  html.dark .user-import-trigger {
+    background-color: #075985;
+    border-color: #4681aa;
+    color: #fff;
+  }
+  html.dark .user-import-trigger:is(:hover, :focus-visible) {
+    background-color: #0369a1;
+    border-color: #73b9e6;
+    color: #fff;
+  }
+
   html.dark .notification-item[data-unread="true"] {
     background-color: #203344;
     box-shadow: inset 2px 0 #73b9e6;

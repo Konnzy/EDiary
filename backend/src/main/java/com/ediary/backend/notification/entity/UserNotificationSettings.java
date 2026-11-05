@@ -10,11 +10,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.CollectionTable;
-import jakarta.persistence.MapKeyColumn;
-import java.util.HashMap;
-import java.util.Map;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -25,13 +20,6 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class UserNotificationSettings {
-
-    // Retained for historical data only; in-app delivery no longer reads these preferences.
-    @ElementCollection
-    @CollectionTable(name = "notification_in_app_preference", joinColumns = @JoinColumn(name = "settings_id"))
-    @MapKeyColumn(name = "preference_key", length = 60)
-    @Column(name = "enabled", nullable = false)
-    private Map<String, Boolean> inApp = new HashMap<>();
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

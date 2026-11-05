@@ -23,7 +23,7 @@ async function loadCsrfToken() {
   csrfHeaderName = body.headerName || csrfHeaderName;
 }
 
-async function request(path, { method = "GET", body, csrf = false } = {}) {
+async function request(path, { method = "GET", body, csrf = false, responseType = "json" } = {}) {
   if (csrf && !csrfToken) {
     await loadCsrfToken();
   }
@@ -53,6 +53,7 @@ async function request(path, { method = "GET", body, csrf = false } = {}) {
   if (response.status === 204) {
     return null;
   }
+  if (response.ok && responseType === "blob") return response.blob();
 
   const payload = await response.json().catch(() => ({}));
   const responseId = validRequestId(response.headers.get("X-Request-ID"), validRequestId(payload.requestId, requestId));
@@ -214,6 +215,15 @@ export const adminRegistrationApi = {
 };
 
   export const adminUsersApi = {
+  importTemplate: (format) => request(`/admin/users/import/template?format=${encodeURIComponent(format)}`, { responseType: "blob" }),
+  previewImport: (file, format) => {
+    const body = new FormData(); body.append("file", file); body.append("format", format);
+    return request("/admin/users/import/preview", { method: "POST", body, csrf: true });
+  },
+  confirmImport: (file, format, fingerprint) => {
+    const body = new FormData(); body.append("file", file); body.append("format", format); body.append("fingerprint", fingerprint);
+    return request("/admin/users/import/confirm", { method: "POST", body, csrf: true });
+  },
   findMe: () => request("/admin/users/me"),
   create: (payload) => request("/admin/users", {
     method: "POST",
