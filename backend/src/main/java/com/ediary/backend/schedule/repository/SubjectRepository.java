@@ -2,6 +2,7 @@ package com.ediary.backend.schedule.repository;
 
 import com.ediary.backend.schedule.entity.Subject;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +13,9 @@ import org.springframework.data.repository.query.Param;
 public interface SubjectRepository extends JpaRepository<Subject, Long> {
 
     List<Subject> findAllByOrderByTitleAsc();
+
+    @Query("select subject from Subject subject where lower(subject.title) in :titles")
+    List<Subject> findAllByNormalizedTitles(@Param("titles") Set<String> titles);
 
     boolean existsByTitleIgnoreCase(String title);
 

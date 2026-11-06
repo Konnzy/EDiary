@@ -115,7 +115,10 @@ public class JournalService {
             .toList();
         if (assignments.isEmpty()) throw journalNotFound();
 
-        List<StudentProfile> students = studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(classId);
+        List<StudentProfile> students = year.compareTo(SchedulePeriod.academicYear(LocalDate.now(clock))) < 0
+            ? membershipRepository.findAllBySchoolClassIdOrderByStudentSurnameAscStudentNameAsc(classId)
+                .stream().map(membership -> membership.getStudent()).toList()
+            : studentProfileRepository.findAllBySchoolClassIdOrderBySurnameAscNameAsc(classId);
         Map<String, JournalSlot> slots = new LinkedHashMap<>();
         for (ScheduleEntry entry : assignments) {
             if (!entry.isActive()) continue;

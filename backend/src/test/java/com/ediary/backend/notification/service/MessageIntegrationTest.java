@@ -2,7 +2,13 @@ package com.ediary.backend.notification.service;
 
 import com.ediary.backend.notification.dto.MessageDtos;
 import com.ediary.backend.notification.repository.MessageRepository;
+import com.ediary.backend.schedule.dto.response.ScheduleImportDtos.Status;
+import com.ediary.backend.schedule.dto.response.ScheduleImportDtos.Column;
+import com.ediary.backend.schedule.service.ScheduleImportService;
 import com.ediary.backend.user.repository.StudentProfileRepository;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.DriverManager;
 import java.time.*;
 import java.util.*;
@@ -17,6 +23,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.mock.web.MockMultipartFile;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -53,6 +61,8 @@ class MessageIntegrationTest {
     @Autowired com.ediary.backend.registration.service.AdminNotificationService adminNotifications;
     @Autowired com.ediary.backend.user.admin.service.UserImportService userImports;
     @Autowired com.ediary.backend.user.admin.service.UserImportFileService importFiles;
+    @Autowired PasswordEncoder passwordEncoder;
+    @Autowired ScheduleImportService scheduleImports;
     @MockitoBean EmailService email;
     @MockitoBean Clock clock;
     private String prefix;
@@ -367,42 +377,341 @@ class MessageIntegrationTest {
         long schoolClass=id("select class_id from student where student_id=?",studentId);
         String className=jdbc.queryForObject("select class_number||'-'||class_letter from school_class where class_id=?",String.class,schoolClass);
         var student=importCsv("Учень",login("newstudent"),"",className,"2026/2027","");
-        var studentPreview=userImports.preview(student,"csv");
-        assertThat(studentPreview.invalid()).isZero();
-        userImports.confirm(student,"csv",studentPreview.fingerprint());
-        var captured=org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(email).sendText(anyString(),anyString(),captured.capture());
-        var code=java.util.regex.Pattern.compile("[A-Z0-9]{4}-[A-Z0-9]{4}").matcher(captured.getValue());
-        assertThat(code.find()).isTrue();
-        var parent=importCsv("Батьки",login("newparent"),"","","",code.group());
-        var parentPreview=userImports.preview(parent,"csv");
-        assertThat(parentPreview.invalid()).isZero();
-        assertThat(parentPreview.rows().getFirst().values().get(11)).isEqualTo("••••-••••");
-        userImports.confirm(parent,"csv",parentPreview.fingerprint());
-        assertThat(id("select count(*) from student_parents sp join parent p using(parent_id) join app_user u using(user_id) where u.user_login=?",login("newparent"))).isEqualTo(1);
+        var parent=importCsv("Батьки",login("newparent"),"","","",login("newstudent").toUpperCase(Locale.ROOT));
+        var existing=importCsv("Батьки",login("existingchild"),"","","",login("student"));
+        var batch=combineCsv(parent,student,existing);
+        var preview=userImports.preview(batch,"csv");
+        assertThat(preview.invalid()).isZero();
+        assertThat(preview.rows().getFirst().values().get(11)).isEqualTo(login("newstudent").toUpperCase(Locale.ROOT));
+        assertThat(preview.rows().getFirst().linkedStudent().fullName()).isEqualTo("Петренко Іван Олександрович");
+        assertThat(preview.rows().getFirst().linkedStudent().className()).isEqualTo(className);
+        assertThat(preview.rows().getLast().linkedStudent().fullName()).isEqualTo("Петренко Іван");
+        verifyNoInteractions(email);
+        assertThat(userImports.confirm(batch,"csv",preview.fingerprint()).created()).isEqualTo(3);
+        var imported=students.findByUser_LoginIgnoreCase(login("newstudent")).orElseThrow();
+        assertThat(imported.getParentLinkCodeHash()).isNotBlank();
+        assertThat(linkedStudentId(login("newparent"))).isEqualTo(imported.getId());
+        assertThat(linkedStudentId(login("existingchild"))).isEqualTo(studentId);
+        verify(email,times(3)).sendText(anyString(),anyString(),anyString());
         assertThat(userImports.preview(importCsv("ADMIN",login("badadmin"),"","","",""),"csv").invalid()).isEqualTo(1);
-        assertThat(userImports.preview(importCsv("Батьки",login("badparent"),"","","","XXXX-XXXX"),"csv").invalid()).isEqualTo(1);
-        assertThat(userImports.preview(importCsv("Учень",login("badclass"),"",className,"2025/2026",""),"csv").invalid()).isEqualTo(1);
-        String text=new String(student.getBytes(),java.nio.charset.StandardCharsets.UTF_8);
-        String[] lines=text.split("\\R");
-        var duplicate=new org.springframework.mock.web.MockMultipartFile("file","users.csv","text/csv",(lines[0]+"\n"+lines[1]+"\n"+lines[1]).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        for (String login : List.of("", "not-found", login("teacher"))) {
+            var invalidParent=importCsv("Батьки",login("badparent"),"","","",login);
+            assertThat(userImports.preview(invalidParent,"csv").rows().getFirst().errors()).containsKey("Логін учня");
+        }
+        var invalidStudent=importCsv("Учень",login("badclass"),"",className,"2025/2026","");
+        var dependsOnInvalid=importCsv("Батьки",login("dependent"),"","","",login("badclass"));
+        var invalidBatch=userImports.preview(combineCsv(dependsOnInvalid,invalidStudent),"csv");
+        assertThat(invalidBatch.invalid()).isEqualTo(2);
+        assertThat(invalidBatch.rows().getFirst().errors()).containsKey("Логін учня");
+        var duplicate=combineCsv(student,student);
         assertThat(userImports.preview(duplicate,"csv").invalid()).isEqualTo(2);
         assertThatThrownBy(()->userImports.confirm(duplicate,"csv",userImports.preview(duplicate,"csv").fingerprint())).hasMessageContaining("Жодного");
     }
 
     @Test void userImportRollsBackEarlierRowsAndNeverSendsCredentialsOnDatabaseFailure() throws Exception {
-        String subject="Відкат "+prefix;jdbc.update("insert into subject(subject_title) values (?)",subject);
-        var first=importCsv("Вчитель",login("batchone"),subject,"","","");
-        var second=importCsv("Вчитель",login("batchtwo"),subject,"","","");
-        String content=new String(first.getBytes(),java.nio.charset.StandardCharsets.UTF_8)+new String(second.getBytes(),java.nio.charset.StandardCharsets.UTF_8).split("\\R",2)[1];
-        var file=new org.springframework.mock.web.MockMultipartFile("file","users.csv","text/csv",content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String className=jdbc.queryForObject("select class_number||'-'||class_letter from school_class join student using(class_id) where student_id=?",String.class,studentId);
+        var student=importCsv("Учень",login("batchone"),"",className,"2026/2027","");
+        var parent=importCsv("Батьки",login("batchtwo"),"","","",login("batchone"));
+        var file=combineCsv(parent,student);
         var preview=userImports.preview(file,"csv");assertThat(preview.invalid()).isZero();
-        jdbc.execute("create function fail_import() returns trigger language plpgsql as $$ begin if new.user_login='"+login("batchtwo")+"' then raise exception 'Test import failure' using errcode='23514'; end if; return new; end $$");
-        jdbc.execute("create trigger fail_import before insert on app_user for each row execute function fail_import()");
+        jdbc.execute("create function fail_import() returns trigger language plpgsql as $$ begin raise exception 'Test import failure' using errcode='23514'; end $$");
+        jdbc.execute("create trigger fail_import before insert on student_parents for each row execute function fail_import()");
         try { assertThatThrownBy(()->userImports.confirm(file,"csv",preview.fingerprint())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
-        finally { jdbc.execute("drop trigger fail_import on app_user");jdbc.execute("drop function fail_import()"); }
+        finally { jdbc.execute("drop trigger fail_import on student_parents");jdbc.execute("drop function fail_import()"); }
         assertThat(id("select count(*) from app_user where user_login in (?,?)",login("batchone"),login("batchtwo"))).isZero();
         verify(email,never()).sendText(anyString(),anyString(),anyString());
+    }
+
+    @Test void adminSearchesLinkableStudentsAndCreatesParentUsingSelectedId() throws Exception {
+        mvc.perform(get("/api/admin/users/students").param("query",login("student")).with(user("teacher").roles("TEACHER")))
+            .andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/users/students").param("query","Петренко Іван").with(user("admin").roles("ADMIN")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[0].fullName").value("Петренко Іван"));
+        mvc.perform(get("/api/admin/users/students").param("query",login("student").toUpperCase(Locale.ROOT)).with(user("admin").roles("ADMIN")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(studentId))
+            .andExpect(jsonPath("$[0].className").isString());
+        mvc.perform(get("/api/admin/users/students").param("query","%%").with(user("admin").roles("ADMIN")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+        String payload="""
+            {"role":"PARENT","login":"%s","firstName":"Іван","lastName":"Петренко",
+             "email":"%s@example.invalid","birthDate":"1980-04-15","phone":"+380671112233","studentId":%d}
+            """;
+        long missingStudentId=Long.MAX_VALUE;
+        mvc.perform(post("/api/admin/users").with(user("admin").roles("ADMIN")).with(csrf()).contentType("application/json")
+            .content(payload.formatted(login("manual"),login("manual"),missingStudentId)))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_LINKED_STUDENT"));
+        mvc.perform(post("/api/admin/users").with(user("admin").roles("ADMIN")).with(csrf()).contentType("application/json")
+            .content(payload.formatted(login("manual"),login("manual"),studentId)))
+            .andExpect(status().isCreated());
+        assertThat(linkedStudentId(login("manual"))).isEqualTo(studentId);
+    }
+
+    @Test void importsBothWeeksWithExplicitDecisionsAndPreservesUnlistedLessons() throws Exception {
+        var target=scheduleImportTarget();
+        long recorded=scheduleSlot(target,target.classId(),1,"MONDAY",1,"101");
+        long kept=scheduleSlot(target,target.classId(),1,"MONDAY",2,"102");
+        long same=scheduleSlot(target,target.classId(),2,"FRIDAY",1,"103");
+        long unlisted=scheduleSlot(target,target.classId(),1,"MONDAY",4,"104");
+        jdbc.update("insert into lesson(schedule_id,lesson_date,lesson_status) values (?,'2026-09-14','COMPLETED')",recorded);
+        var file=scheduleCsv("1;Понеділок;1;"+target.subject()+";"+login("teacher")+";201",
+            "1;Понеділок;2;"+target.subject()+";"+login("teacher")+";202",
+            "2;П’ятниця;1;"+target.subject()+";"+login("teacher")+";103",
+            "1;Вівторок;3;"+target.subject()+";"+login("teacher")+";203",
+            "2;П'ятниця;3;"+target.subject().toUpperCase(Locale.ROOT)+";"+login("teacher").toUpperCase(Locale.ROOT)+";204");
+        var preview=scheduleImports.preview(target.classId(),"2026/2027",file,"csv");
+        assertThat(preview.rows()).extracting(row->row.status())
+            .containsExactly(Status.CONFLICT,Status.CONFLICT,Status.UNCHANGED,Status.ADD,Status.ADD);
+        assertThat(preview.rows().getFirst().current().room()).isEqualTo("101");
+        assertThat(preview.rows().getFirst().proposed().room()).isEqualTo("201");
+        assertThat(preview.rows().getLast().proposed().startTime()).isEqualTo("09:50");
+        assertThat(scheduleSlotCount(target.classId())).isEqualTo(4);
+        assertThatThrownBy(()->scheduleImports.confirm(target.classId(),"2026/2027",file,"csv",preview.fingerprint(),List.of(),List.of(2)))
+            .hasMessageContaining("кожним зайнятим");
+        assertThat(scheduleSlotCount(target.classId())).isEqualTo(4);
+
+        String endpoint="/api/admin/schedules/import";
+        String classId=Long.toString(target.classId());
+        mvc.perform(multipart(endpoint+"/preview").file(file).param("classId",classId).param("academicYear","2026/2027")
+            .param("format","csv").with(user("teacher").roles("TEACHER")).with(csrf())).andExpect(status().isForbidden());
+        mvc.perform(multipart(endpoint+"/confirm").file(file).param("classId",classId).param("academicYear","2026/2027")
+            .param("format","csv").param("fingerprint",preview.fingerprint()).with(user("admin").roles("ADMIN")))
+            .andExpect(status().isForbidden());
+        mvc.perform(multipart(endpoint+"/confirm").file(file).param("classId",classId).param("academicYear","2026/2027")
+            .param("format","csv").param("fingerprint",preview.fingerprint()).param("keepRows","3").param("replaceRows","2")
+            .with(user("admin").roles("ADMIN")).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.added").value(2)).andExpect(jsonPath("$.replaced").value(1))
+            .andExpect(jsonPath("$.kept").value(1)).andExpect(jsonPath("$.unchanged").value(1));
+        assertThat(scheduleSlotCount(target.classId())).isEqualTo(6);
+        assertThat(jdbc.queryForObject("select schedule_active from schedule where schedule_id=?",Boolean.class,recorded)).isFalse();
+        assertThat(id("select count(*) from lesson where schedule_id=?",recorded)).isEqualTo(1);
+        assertThat(jdbc.queryForList("select schedule_room from schedule where schedule_id in (?,?,?) order by schedule_room",
+            String.class,kept,same,unlisted)).containsExactly("102","103","104");
+        assertThat(jdbc.queryForList("select schedule_room from schedule where class_id=? and schedule_active and schedule_room in ('201','203','204') order by schedule_room",
+            String.class,target.classId())).containsExactly("201","203","204");
+        assertThatThrownBy(()->scheduleImports.confirm(target.classId(),"2026/2027",file,"csv",preview.fingerprint(),List.of(3),List.of(2)))
+            .hasMessageContaining("змінився");
+    }
+
+    @Test void scheduleImportValidatesRowsAndRejectsArchivedOrMissingClasses() throws Exception {
+        var target=scheduleImportTarget();
+        long other=id("insert into school_class(class_number,class_letter,class_academic_year) values (1,'Ї','2026/2027') returning class_id");
+        scheduleSlot(target,other,1,"MONDAY",1,"101");
+        String valid=target.subject()+";"+login("teacher")+";101";
+        var file=scheduleCsv("1;Понеділок;1;"+valid,
+            "1;Вівторок;2;"+valid,"1;Вівторок;2;"+valid,
+            "3;Неділя;9;Невідомий;неіснуючий;!", "1;Середа;3;"+target.subject()+";"+login("teacher")+";!");
+        var preview=scheduleImports.preview(target.classId(),"2026/2027",file,"csv");
+        assertThat(preview.rows()).allMatch(row->row.status()==Status.INVALID);
+        assertThat(preview.rows().get(0).errors()).anyMatch(error->error.contains("іншому класі"));
+        assertThat(preview.rows().get(1).errors()).anyMatch(error->error.contains("повторюється"));
+        assertThat(preview.rows().get(3).errors()).hasSizeGreaterThanOrEqualTo(5);
+        assertThat(preview.rows().getLast().errors()).anyMatch(error->error.contains("Кабінет"));
+        assertThat(preview.rows().getFirst().cellErrors()).containsOnlyKeys(Column.TEACHER);
+        assertThat(preview.rows().get(1).cellErrors()).containsOnlyKeys(Column.LESSON);
+        assertThat(preview.rows().get(3).cellErrors()).containsOnlyKeys(Column.values());
+        assertThat(preview.rows().getLast().cellErrors()).containsOnlyKeys(Column.ROOM);
+        mvc.perform(multipart("/api/admin/schedules/import/preview").file(file).param("format","csv")
+            .param("classId",Long.toString(target.classId())).param("academicYear","2026/2027")
+            .with(user("admin").roles("ADMIN")).with(csrf()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.rows[0].cellErrors.TEACHER[0]").isString())
+            .andExpect(jsonPath("$.rows[0].errors[0]").isString());
+        assertThatThrownBy(()->scheduleImports.confirm(target.classId(),"2026/2027",file,"csv",preview.fingerprint(),List.of(),List.of()))
+            .hasMessageContaining("Виправте помилки");
+        assertThatThrownBy(()->scheduleImports.preview(target.classId(),"2025/2026",file,"csv"))
+            .hasMessageContaining("поточного навчального року");
+        assertThatThrownBy(()->scheduleImports.preview(null,"2026/2027",file,"csv"))
+            .hasMessageContaining("Оберіть клас");
+        assertThatThrownBy(()->scheduleImports.preview(other,"2026/2027",file,"csv"))
+            .hasMessageContaining("класного керівника");
+        assertThat(scheduleSlotCount(target.classId())).isZero();
+    }
+
+    @Test void xlsxScheduleImportRollsBackFirstWeekWhenSecondWeekCannotBeSaved() throws Exception {
+        var target=scheduleImportTarget();
+        byte[] bytes;
+        try (var book=new org.apache.poi.xssf.usermodel.XSSFWorkbook(new ByteArrayInputStream(scheduleImports.template("xlsx")));
+             var output=new ByteArrayOutputStream()) {
+            var sheet=book.getSheetAt(0);
+            for (int i=1;i<=2;i++) {
+                sheet.getRow(i).getCell(3).setCellValue(target.subject());
+                sheet.getRow(i).getCell(4).setCellValue(login("teacher"));
+            }
+            book.write(output);
+            bytes=output.toByteArray();
+        }
+        var file=new MockMultipartFile("file","schedule.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",bytes);
+        var preview=scheduleImports.preview(target.classId(),"2026/2027",file,"xlsx");
+        assertThat(preview.rows()).extracting(row->row.status()).containsExactly(Status.ADD,Status.ADD);
+        jdbc.execute("""
+            create function fail_schedule_import() returns trigger language plpgsql as $$
+            begin
+                if new.schedule_week_number=2 then raise exception 'Test second week failure' using errcode='23514'; end if;
+                return new;
+            end $$;
+            """);
+        jdbc.execute("create trigger fail_schedule_import before insert on schedule for each row execute function fail_schedule_import()");
+        try {
+            assertThatThrownBy(()->scheduleImports.confirm(target.classId(),"2026/2027",file,"xlsx",preview.fingerprint(),List.of(),List.of()))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        } finally {
+            jdbc.execute("drop trigger fail_schedule_import on schedule");
+            jdbc.execute("drop function fail_schedule_import()");
+        }
+        assertThat(scheduleSlotCount(target.classId())).isZero();
+        assertThat(notifications.feed(login("student")).items()).isEmpty();
+        assertThat(scheduleImports.confirm(target.classId(),"2026/2027",file,"xlsx",preview.fingerprint(),List.of(),List.of()).added()).isEqualTo(2);
+        assertThat(scheduleSlotCount(target.classId())).isEqualTo(2);
+    }
+
+    private record ScheduleImportTarget(long classId,long teacherId,long subjectId,String subject) {}
+
+    private ScheduleImportTarget scheduleImportTarget() {
+        long classId=id("select class_id from student where student_id=?",studentId);
+        long teacherId=id("select teacher_id from teacher where user_id=?",teacherUser);
+        String title="Розклад "+prefix;
+        long subjectId=id("insert into subject(subject_title) values (?) returning subject_id",title);
+        jdbc.update("insert into teacher_subject(teacher_id,subject_id) values (?,?)",teacherId,subjectId);
+        return new ScheduleImportTarget(classId,teacherId,subjectId,title);
+    }
+
+    private long scheduleSlot(ScheduleImportTarget target,long classId,int week,String day,int number,String room) {
+        var times=List.of("08:00","08:55","09:50","10:45");
+        var ends=List.of("08:45","09:40","10:35","11:30");
+        return id("""
+            insert into schedule(class_id,subject_id,teacher_id,schedule_weekday,schedule_lesson_number,
+                schedule_room,schedule_start_time,schedule_end_time,schedule_academic_year,schedule_week_number,schedule_effective_from)
+            values (?,?,?,?::enum_weekday,?,?,?::time,?::time,'2026/2027',?,'2026-09-01') returning schedule_id
+            """,classId,target.subjectId(),target.teacherId(),day,number,room,times.get(number-1),ends.get(number-1),week);
+    }
+
+    private long scheduleSlotCount(long classId) {
+        return id("select count(*) from schedule where class_id=? and schedule_active",classId);
+    }
+
+    private MockMultipartFile scheduleCsv(String... rows) {
+        String text="Тиждень;День;Номер уроку;Предмет;Логін учителя;Кабінет\n"+String.join("\n",rows);
+        return new MockMultipartFile("file","schedule.csv","text/csv",text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test void historicalRosterAndGradesUsePreviousClassWithoutMovingStudent() throws Exception {
+        long currentClass=id("select class_id from student where student_id=?",studentId);
+        long teacher=id("select teacher_id from teacher where user_id=?",teacherUser);
+        jdbc.update("insert into academic_year(academic_year_value) values ('2025/2026')");
+        long pastClass=id("""
+            insert into school_class(class_number,class_letter,class_academic_year,class_teacher_id)
+            values (8,'А','2025/2026',?) returning class_id
+            """,teacher);
+        jdbc.update("""
+            insert into student_class_membership(student_id,class_id,membership_active,joined_at,left_at)
+            values (?,?,false,'2025-09-01','2026-06-01')
+            """,studentId,pastClass);
+        long subject=id("insert into subject(subject_title) values (?) returning subject_id","Архів "+prefix);
+        jdbc.update("insert into teacher_subject(teacher_id,subject_id) values (?,?)",teacher,subject);
+        long slot=id("""
+            insert into schedule(class_id,teacher_id,subject_id,schedule_weekday,schedule_lesson_number,
+                schedule_start_time,schedule_end_time,schedule_academic_year,schedule_week_number,schedule_effective_from)
+            values (?,?,?,'MONDAY',1,'08:00','08:45','2025/2026',1,'2025-09-01') returning schedule_id
+            """,pastClass,teacher,subject);
+        long lesson=id("""
+            insert into lesson(schedule_id,lesson_date,lesson_work_type,lesson_topic,lesson_status)
+            values (?,'2026-05-18','YEAR','Підсумок за рік','COMPLETED') returning lesson_id
+            """,slot);
+        jdbc.update("insert into mark(student_id,lesson_id,mark_date,mark_type,mark_score) values (?,?,'2026-05-18','YEAR',11)",
+            studentId,lesson);
+
+        mvc.perform(get("/api/admin/classes/{id}/students",pastClass).with(user("admin").roles("ADMIN")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(studentId));
+        mvc.perform(get("/api/admin/schedules").param("classId",String.valueOf(pastClass)).param("academicYear","2025/2026")
+            .param("week","1").with(user("admin").roles("ADMIN"))).andExpect(status().isOk());
+        mvc.perform(put("/api/admin/schedules").param("classId",String.valueOf(pastClass)).param("academicYear","2025/2026")
+            .param("week","1").with(user("admin").roles("ADMIN")).with(csrf()).contentType("application/json")
+            .content("{\"lessons\":[]}")).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("SCHEDULE_YEAR_READ_ONLY"));
+        var archive=journal.find(login("teacher"),pastClass,subject,"2026-05");
+        assertThat(archive.students()).extracting(student->student.id()).containsExactly(studentId);
+        assertThat(archive.lessons()).anySatisfy(item->{
+            assertThat(item.id()).isEqualTo(lesson);
+            assertThat(item.cells()).singleElement().satisfies(cell->assertThat(cell.score()).isEqualTo(11));
+        });
+        assertThat(progress.forStudent(login("student"),"2025/2026").subjects().getFirst().grades())
+            .singleElement().satisfies(grade->assertThat(grade.score()).isEqualTo(11));
+        assertThat(progress.forParent(login("parent"),studentId,"2025/2026").subjects().getFirst().grades())
+            .singleElement().satisfies(grade->assertThat(grade.score()).isEqualTo(11));
+        assertThat(id("select class_id from student where student_id=?",studentId)).isEqualTo(currentClass);
+    }
+
+    @Test void adminCanChangeOwnPasswordButManagementCannotResetOrChangeAdminStatus() throws Exception {
+        long adminId=administrator("admin");
+        long otherId=administrator("otheradmin");
+        var admin=user(login("admin")).roles("ADMIN");
+        String change="{\"currentPassword\":\"OldAdmin!2026\",\"newPassword\":\"NewAdmin!2026\"}";
+        mvc.perform(post("/api/admin/users/me/password").with(user(login("teacher")).roles("TEACHER")).with(csrf())
+            .contentType("application/json").content(change)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/admin/users/me/password").with(admin).contentType("application/json").content(change))
+            .andExpect(status().isForbidden());
+        mvc.perform(post("/api/admin/users/me/password").with(admin).with(csrf()).contentType("application/json")
+            .content(change.replace("OldAdmin!2026","Incorrect!2026")))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_CURRENT_PASSWORD"));
+        mvc.perform(post("/api/admin/users/me/password").with(admin).with(csrf()).contentType("application/json")
+            .content(change.replace("NewAdmin!2026","weak")))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.fieldErrors.newPassword").isString());
+        mvc.perform(post("/api/admin/users/me/password").with(admin).with(csrf()).contentType("application/json")
+            .content(change.replace("NewAdmin!2026","OldAdmin!2026")))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_NEW_PASSWORD"));
+        mvc.perform(post("/api/admin/users/me/password").with(admin).with(csrf()).contentType("application/json").content(change))
+            .andExpect(status().isNoContent());
+        assertThat(passwordEncoder.matches("NewAdmin!2026",
+            jdbc.queryForObject("select user_password_hash from app_user where user_id=?",String.class,adminId))).isTrue();
+        assertThat(passwordEncoder.matches("OldAdmin!2026",
+            jdbc.queryForObject("select user_password_hash from app_user where user_id=?",String.class,otherId))).isTrue();
+        for (long target : new long[]{adminId,otherId}) {
+            mvc.perform(post("/api/admin/users/{id}/reset-password",target).with(admin).with(csrf()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ADMIN_PASSWORD_RESET_FORBIDDEN"));
+            mvc.perform(patch("/api/admin/users/{id}/status",target).with(admin).with(csrf())
+                .contentType("application/json").content("{\"status\":\"BLOCKED\"}"))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ADMIN_STATUS_IS_PROTECTED"));
+        }
+        jdbc.update("update app_user set user_status='BLOCKED' where user_id=?",otherId);
+        mvc.perform(patch("/api/admin/users/{id}/status",otherId).with(admin).with(csrf())
+            .contentType("application/json").content("{\"status\":\"ACTIVE\"}"))
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ADMIN_STATUS_IS_PROTECTED"));
+        mvc.perform(patch("/api/admin/users/{id}",otherId).with(admin).with(csrf()).contentType("application/json")
+            .content("""
+                {"login":"%s","email":"different@example.invalid","firstName":"Олена","lastName":"Ткаченко","role":"ADMIN"}
+                """.formatted(login("otheradmin"))))
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ADMIN_CREDENTIALS_ARE_PROTECTED"));
+        verifyNoInteractions(email);
+    }
+
+    @Test void adminCanRecoverPasswordByEmailAndStillNeedsAccessCodeToSignIn() throws Exception {
+        administrator("recovery");
+        String address=login("recovery")+"@example.invalid";
+        when(email.sendText(eq(address),anyString(),anyString())).thenReturn(true);
+        mvc.perform(post("/api/auth/password/forgot").with(csrf()).contentType("application/json")
+            .content("{\"email\":\""+address+"\"}")).andExpect(status().isOk());
+        var body=org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(email,timeout(5000)).sendText(eq(address),anyString(),body.capture());
+        var link=java.util.regex.Pattern.compile("/#admin/reset-password\\?token=([A-Za-z0-9_-]{43})").matcher(body.getValue());
+        assertThat(link.find()).isTrue();
+        String reset="{\"token\":\""+link.group(1)+"\",\"newPassword\":\"Recovered!2026\"}";
+        mvc.perform(post("/api/auth/password/reset").with(csrf()).contentType("application/json").content(reset))
+            .andExpect(status().isOk());
+        mvc.perform(post("/api/auth/password/reset").with(csrf()).contentType("application/json").content(reset))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_RESET_TOKEN"));
+        String loginPayload="{\"login\":\""+login("recovery")+"\",\"password\":\"Recovered!2026\",\"accessCode\":\"ABC-123\"}";
+        mvc.perform(post("/api/auth/admin/login").with(csrf()).contentType("application/json")
+            .content(loginPayload.replace("ABC-123","ABC-999"))).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/admin/login").with(csrf()).contentType("application/json")
+            .content(loginPayload.replace("Recovered!2026","OldAdmin!2026"))).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/admin/login").with(csrf()).contentType("application/json").content(loginPayload))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.role").value("ADMIN"));
+    }
+
+    private long administrator(String suffix) {
+        long accountId=userId(suffix,"ADMIN");
+        jdbc.update("update app_user set user_password_hash=? where user_id=?",passwordEncoder.encode("OldAdmin!2026"),accountId);
+        jdbc.update("insert into administrator(user_id,admin_name,admin_surname,admin_code_hash) values (?,'Олена','Ткаченко',?)",
+            accountId,passwordEncoder.encode("ABC123"));
+        return accountId;
     }
 
     @Test void xlsxImportRevalidatesAndCreatesTeacherProfile() throws Exception {
@@ -443,13 +752,25 @@ class MessageIntegrationTest {
         assertThat(id("select count(*) from app_user where user_login=?",login("once"))).isEqualTo(1);
     }
 
-    private org.springframework.mock.web.MockMultipartFile importCsv(String role,String login,String subject,String schoolClass,String year,String code) throws Exception {
+    private org.springframework.mock.web.MockMultipartFile importCsv(String role,String login,String subject,String schoolClass,String year,String childLogin) throws Exception {
         var out=new java.io.StringWriter();
         try(var csv=new org.apache.commons.csv.CSVPrinter(out,org.apache.commons.csv.CSVFormat.RFC4180.builder().setDelimiter(';').get())) {
             csv.printRecord(com.ediary.backend.user.admin.service.UserImportFileService.COLUMNS);
-            csv.printRecord(role,login,"Петренко","Іван","Олександрович",login+"@example.invalid","+380671112233",role.equals("Учень")?"15.04.2011":"15.04.1980",schoolClass,year,subject,code);
+            csv.printRecord(role,login,"Петренко","Іван","Олександрович",login+"@example.invalid",role.equals("Учень")?"":"+380671112233",role.equals("Учень")?"15.04.2011":"15.04.1980",schoolClass,year,subject,childLogin);
         }
         return new org.springframework.mock.web.MockMultipartFile("file","users.csv","text/csv",out.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private org.springframework.mock.web.MockMultipartFile combineCsv(org.springframework.mock.web.MockMultipartFile first,
+        org.springframework.mock.web.MockMultipartFile... rest) throws Exception {
+        var charset=java.nio.charset.StandardCharsets.UTF_8;
+        var text=new StringBuilder(new String(first.getBytes(),charset));
+        for (var file : rest) text.append(new String(file.getBytes(),charset).split("\\R",2)[1]);
+        return new org.springframework.mock.web.MockMultipartFile("file","users.csv","text/csv",text.toString().getBytes(charset));
+    }
+
+    private long linkedStudentId(String parentLogin) {
+        return id("select sp.student_id from student_parents sp join parent p using(parent_id) join app_user u using(user_id) where u.user_login=?",parentLogin);
     }
 
     private String login(String type){return prefix+type;}

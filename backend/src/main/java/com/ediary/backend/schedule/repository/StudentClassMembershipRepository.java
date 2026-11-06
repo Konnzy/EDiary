@@ -12,6 +12,8 @@ public interface StudentClassMembershipRepository extends JpaRepository<StudentC
 
     long countBySchoolClassIdAndActiveTrue(Long classId);
 
+    long countBySchoolClassId(Long classId);
+
     long deleteBySchoolClassIdAndActiveFalse(Long classId);
 
     boolean existsByStudentIdAndSchoolClassId(Long studentId, Long classId);

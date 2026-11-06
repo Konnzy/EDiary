@@ -201,7 +201,10 @@ export function AdminLoginPage() {
 
               </form>
 
-              <div className="mt-8 flex justify-center">
+              <div className="mt-6 flex flex-col items-center gap-4">
+                <a href="#admin/forgot-password" className="text-sm font-semibold text-slate-700 hover:underline">
+                  Забули пароль?
+                </a>
                 <a
                   href="#login"
                   className="inline-flex items-center gap-4 text-[0.9rem] font-medium text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

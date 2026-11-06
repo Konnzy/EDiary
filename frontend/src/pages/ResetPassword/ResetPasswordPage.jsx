@@ -35,7 +35,7 @@ function validatePassword(password, confirmPassword) {
   return "";
 }
 
-export function ResetPasswordPage({ token = "" }) {
+export function ResetPasswordPage({ token = "", administrator = false }) {
   const passwordId = useId();
   const confirmPasswordId = useId();
 
@@ -67,7 +67,7 @@ export function ResetPasswordPage({ token = "" }) {
       setPassword("");
       setConfirmPassword("");
       setSubmitted(false);
-      window.history.replaceState(null, "", "#reset-password");
+      window.history.replaceState(null, "", administrator ? "#admin/reset-password" : "#reset-password");
     } catch (error) {
       setServerError(error.fieldErrors?.newPassword || error.message || "Не вдалося змінити пароль.");
     } finally {
@@ -164,7 +164,7 @@ export function ResetPasswordPage({ token = "" }) {
 
           <div className="mt-8 flex justify-center">
             <a
-              href="#login"
+              href={administrator ? "#admin" : "#login"}
               className="inline-flex items-center gap-5 text-[0.95rem] font-medium text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />

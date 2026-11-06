@@ -211,7 +211,8 @@ class AdminUserServiceTest {
                 "parent@example.com",
                 "+380671234567",
                 UserRole.PARENT
-            )
+            ),
+            "admin"
         ))
             .isInstanceOf(ApplicationException.class)
             .satisfies(exception -> assertThat(((ApplicationException) exception).getCode())
@@ -272,7 +273,8 @@ class AdminUserServiceTest {
                 "parent.new@example.com",
                 "+380672222222",
                 UserRole.PARENT
-            )
+            ),
+            "admin"
         );
 
         assertThat(result.firstName()).isEqualTo("Марія");
@@ -296,7 +298,7 @@ class AdminUserServiceTest {
 
     @Test
     void rejectsDeletedStatusAsAStatusTransition() {
-        assertThatThrownBy(() -> service.changeStatus(10L, com.ediary.backend.user.entity.UserStatus.DELETED, "admin"))
+        assertThatThrownBy(() -> service.changeStatus(10L, com.ediary.backend.user.entity.UserStatus.DELETED))
             .isInstanceOf(ApplicationException.class)
             .satisfies(exception -> assertThat(((ApplicationException) exception).getCode())
                 .isEqualTo("INVALID_USER_STATUS_TRANSITION"));
@@ -306,10 +308,10 @@ class AdminUserServiceTest {
     void blockingUserExpiresExistingHttpSessions() {
         AppUser user = parentUser();
         user.setStatus(com.ediary.backend.user.entity.UserStatus.ACTIVE);
-        when(userRepository.findById(10L)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(user));
         when(sessionRegistry.getAllSessions("parent.new", false)).thenReturn(List.of(sessionInformation));
 
-        service.changeStatus(10L, com.ediary.backend.user.entity.UserStatus.BLOCKED, "admin");
+        service.changeStatus(10L, com.ediary.backend.user.entity.UserStatus.BLOCKED);
 
         verify(sessionInformation).expireNow();
         assertThat(user.getStatus()).isEqualTo(com.ediary.backend.user.entity.UserStatus.BLOCKED);
@@ -365,7 +367,7 @@ class AdminUserServiceTest {
             "Коваленко",
             "Іванівна",
             "Student@Example.com",
-            "+380671234567",
+            null,
             birthDate,
             UserRole.STUDENT,
             5L,

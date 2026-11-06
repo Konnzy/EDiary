@@ -225,6 +225,12 @@ export const adminRegistrationApi = {
     return request("/admin/users/import/confirm", { method: "POST", body, csrf: true });
   },
   findMe: () => request("/admin/users/me"),
+  changeOwnPassword: (currentPassword, newPassword) => request("/admin/users/me/password", {
+    method: "POST",
+    body: { currentPassword, newPassword },
+    csrf: true,
+  }),
+  searchStudents: (query) => request(`/admin/users/students?${new URLSearchParams({ query })}`),
   create: (payload) => request("/admin/users", {
     method: "POST",
     body: payload,
@@ -339,6 +345,20 @@ export const adminSubjectsApi = {
 };
 
 export const adminScheduleApi = {
+  importTemplate: (format) => request(`/admin/schedules/import/template?${new URLSearchParams({ format })}`, { responseType: "blob" }),
+  previewImport: ({ classId, academicYear, file, format }) => {
+    const body = new FormData();
+    for (const [key, value] of Object.entries({ classId, academicYear, file, format })) body.append(key, value);
+    return request("/admin/schedules/import/preview", { method: "POST", body, csrf: true });
+  },
+  confirmImport: ({ classId, academicYear, file, format, fingerprint, decisions }) => {
+    const body = new FormData();
+    for (const [key, value] of Object.entries({ classId, academicYear, file, format, fingerprint })) body.append(key, value);
+    for (const [row, decision] of Object.entries(decisions)) {
+      body.append(decision === "replace" ? "replaceRows" : "keepRows", row);
+    }
+    return request("/admin/schedules/import/confirm", { method: "POST", body, csrf: true });
+  },
   findAcademicYears: () => request("/admin/schedules/academic-years"),
   createAcademicYear: (academicYear) => request("/admin/schedules/academic-years", {
     method: "POST",

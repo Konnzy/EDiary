@@ -12,12 +12,15 @@ import static org.assertj.core.api.Assertions.*;
 
 class UserImportFileServiceTest {
     private final UserImportFileService files = new UserImportFileService(Clock.fixed(Instant.parse("2026-11-05T10:00:00Z"),ZoneOffset.UTC));
-    @Test void bothTemplatesRoundTripAndPreserveUkrainianTextAndPhone() {
+    @Test void bothTemplatesRoundTripWithLinkedParentAndNoStudentPhone() {
         for (String format : List.of("csv","xlsx")) {
             var rows = files.parse(files.template(format),format);
-            assertThat(rows).hasSize(1);
+            assertThat(rows).hasSize(3);
             assertThat(rows.getFirst().number()).isEqualTo(2);
-            assertThat(rows.getFirst().values()).contains("Петренко","+380671112233","15.04.2011");
+            assertThat(rows.getFirst().values()).contains("Петренко","15.04.2011");
+            assertThat(rows.getFirst().values().get(6)).isEmpty();
+            assertThat(rows.getLast().values().get(11)).isEqualTo(rows.getFirst().values().get(1));
+            assertThat(rows.getLast().values().get(6)).isEqualTo("+380671112235");
         }
     }
     @Test void csvSupportsCommasQuotesReorderedHeadersBomAndBlankRows() throws Exception {

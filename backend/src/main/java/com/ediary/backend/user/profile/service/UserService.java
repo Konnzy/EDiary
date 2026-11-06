@@ -7,6 +7,7 @@ import com.ediary.backend.user.profile.dto.UserProfileResponse;
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.user.entity.AppUser;
 import com.ediary.backend.user.entity.UserStatus;
+import com.ediary.backend.user.password.repository.PasswordResetTokenRepository;
 import com.ediary.backend.user.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.time.Clock;
@@ -26,10 +27,11 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
     private final AuditService audit;
+    private final PasswordResetTokenRepository resetTokens;
 
     @Transactional
     public UserProfileResponse changeProfilePassword(String login, ChangePasswordRequest request) {
-        AppUser user = userRepository.findByLoginIgnoreCase(login)
+        AppUser user = userRepository.findByLoginForUpdate(login)
                 .orElseThrow(() -> new ApplicationException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "Користувача не знайдено"));
 
         validateUserStatus(user);
@@ -48,6 +50,7 @@ public class UserService {
         user.setUpdatedAt(LocalDateTime.now(clock));
 
         userRepository.save(user);
+        resetTokens.markAllUnusedAsUsed(user.getId());
         audit.record("PASSWORD_CHANGED", "USER", user.getId(), of(), of("passwordChanged", true));
 
         return toUserProfileResponse(user);

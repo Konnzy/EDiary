@@ -15,6 +15,11 @@ public interface UserRepository extends JpaRepository<AppUser, Long>, JpaSpecifi
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select u from AppUser u where u.id = :id")
     Optional<AppUser> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select u from AppUser u where lower(u.login) = lower(:login)")
+    Optional<AppUser> findByLoginForUpdate(@org.springframework.data.repository.query.Param("login") String login);
+
     Optional<AppUser> findByLoginIgnoreCase(String login);
 
     boolean existsByLoginIgnoreCase(String login);

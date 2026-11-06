@@ -116,14 +116,20 @@ public class AdminScheduleService {
         Integer week,
         SaveScheduleRequest request
     ) {
-        SchoolClass schoolClass = requirePeriodForUpdate(classId, academicYear, week);
-        if (schoolClass.isDraft()) {
-            throw new ApplicationException(
-                HttpStatus.CONFLICT,
-                "CLASS_TEACHER_REQUIRED",
-                "Спочатку призначте класного керівника, щоб складати розклад"
-            );
-        }
+        validatePeriod(academicYear, week);
+        SchoolClass schoolClass = requireEditableClass(classId, academicYear, true);
+        return persist(schoolClass, academicYear, week, request, false);
+    }
+
+    // The import holds the same class lock across both weeks.
+    void mergeImportedLessons(SchoolClass schoolClass, String academicYear, int week,
+                              List<SaveScheduleLessonRequest> changes) {
+        persist(schoolClass, academicYear, week, new SaveScheduleRequest(changes), true);
+    }
+
+    private AdminScheduleResponse persist(SchoolClass schoolClass, String academicYear, Integer week,
+                                          SaveScheduleRequest request, boolean merge) {
+        Long classId = schoolClass.getId();
         Map<Slot, SaveScheduleLessonRequest> requestedBySlot = validateUniqueSlots(request.lessons());
 
         Set<Long> subjectIds = request.lessons().stream()
@@ -151,10 +157,9 @@ public class AdminScheduleService {
             this::slot, entry -> new ScheduleDefinition(entry.getSubject().getId(),
                 entry.getTeacher().getId(), entry.getRoom())
         ));
-        Map<Slot, ScheduleDefinition> requestedDefinitions = requestedBySlot.entrySet().stream().collect(Collectors.toMap(
-            Map.Entry::getKey, item -> new ScheduleDefinition(item.getValue().subjectId(),
-                item.getValue().teacherId(), normalizeRoom(item.getValue().room()))
-        ));
+        Map<Slot, ScheduleDefinition> requestedDefinitions = merge ? new HashMap<>(previousDefinitions) : new HashMap<>();
+        requestedBySlot.forEach((slot, lesson) -> requestedDefinitions.put(slot,
+            new ScheduleDefinition(lesson.subjectId(), lesson.teacherId(), normalizeRoom(lesson.room()))));
         boolean changed = !previousDefinitions.equals(requestedDefinitions);
         Map<Long, TeacherProfile> previousTeachers = currentEntries.stream().map(ScheduleEntry::getTeacher)
             .collect(Collectors.toMap(TeacherProfile::getId, Function.identity(), (first, ignored) -> first));
@@ -200,7 +205,9 @@ public class AdminScheduleService {
 
         List<ScheduleEntry> entriesToDelete = new ArrayList<>();
         for (ScheduleEntry entry : currentBySlot.values()) {
-            if (referencedIds.contains(entry.getId())) {
+            if (merge) {
+                savedEntries.add(entry);
+            } else if (referencedIds.contains(entry.getId())) {
                 archive(entry, archivedEntries);
             } else {
                 entriesToDelete.add(entry);
@@ -243,7 +250,7 @@ public class AdminScheduleService {
                 "teacherId", entry.getTeacher().getId(), "room", entry.getRoom(), "start", entry.getStartTime(), "end", entry.getEndTime())).toList();
     }
 
-    private boolean sameDefinition(ScheduleEntry entry, SaveScheduleLessonRequest lesson) {
+    boolean sameDefinition(ScheduleEntry entry, SaveScheduleLessonRequest lesson) {
         LocalTime[] times = LESSON_TIMES.get(lesson.lessonNumber() - 1);
         return entry.getSubject().getId().equals(lesson.subjectId())
             && entry.getTeacher().getId().equals(lesson.teacherId())
@@ -252,7 +259,7 @@ public class AdminScheduleService {
             && entry.getEndTime().equals(times[1]);
     }
 
-    private String normalizeRoom(String room) {
+    static String normalizeRoom(String room) {
         return room.strip().replaceAll("\\s+", " ").replaceAll("\\s*-\\s*", "-");
     }
 
@@ -262,14 +269,26 @@ public class AdminScheduleService {
         archivedEntries.add(entry);
     }
 
-    private SchoolClass requirePeriodForUpdate(Long classId, String academicYear, Integer week) {
-        validatePeriod(academicYear, week);
+    SchoolClass requireEditableClass(Long classId, String academicYear, boolean lock) {
+        validateAcademicYear(academicYear);
+        if (!SchedulePeriod.academicYear(LocalDate.now(clock)).equals(academicYear)) {
+            throw new ApplicationException(HttpStatus.CONFLICT, "SCHEDULE_YEAR_READ_ONLY",
+                "Змінювати розклад можна лише для поточного навчального року");
+        }
+        if (classId == null) {
+            throw new ApplicationException(HttpStatus.BAD_REQUEST, "SCHEDULE_CLASS_REQUIRED",
+                "Оберіть клас, щоб змінити розклад");
+        }
         if (!academicYearRepository.existsById(academicYear)) {
             throw academicYearNotFound();
         }
-        SchoolClass schoolClass = schoolClassRepository.findByIdForUpdate(classId)
+        SchoolClass schoolClass = (lock ? schoolClassRepository.findByIdForUpdate(classId) : schoolClassRepository.findById(classId))
             .orElseThrow(this::schoolClassNotFound);
         ensureClassBelongsToAcademicYear(schoolClass, academicYear);
+        if (schoolClass.isDraft()) {
+            throw new ApplicationException(HttpStatus.CONFLICT, "CLASS_TEACHER_REQUIRED",
+                "Спочатку призначте класного керівника, щоб складати розклад");
+        }
         return schoolClass;
     }
 
@@ -415,7 +434,7 @@ public class AdminScheduleService {
         );
     }
 
-    private ScheduleLessonResponse toLessonResponse(ScheduleEntry entry) {
+    ScheduleLessonResponse toLessonResponse(ScheduleEntry entry) {
         return new ScheduleLessonResponse(
             entry.getId(),
             entry.getWeekday(),
@@ -428,6 +447,12 @@ public class AdminScheduleService {
             entry.getStartTime().format(TIME_FORMAT),
             entry.getEndTime().format(TIME_FORMAT)
         );
+    }
+
+    ScheduleLessonResponse describeImportedLesson(SaveScheduleLessonRequest lesson, Subject subject, TeacherProfile teacher) {
+        LocalTime[] times = LESSON_TIMES.get(lesson.lessonNumber() - 1);
+        return new ScheduleLessonResponse(null, lesson.weekday(), lesson.lessonNumber(), subject.getId(), subject.getTitle(),
+            teacher.getId(), fullName(teacher), lesson.room(), times[0].format(TIME_FORMAT), times[1].format(TIME_FORMAT));
     }
 
     private Slot slot(ScheduleEntry entry) {

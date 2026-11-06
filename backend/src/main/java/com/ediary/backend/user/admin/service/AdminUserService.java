@@ -17,6 +17,7 @@ import com.ediary.backend.schedule.repository.SchoolClassRepository;
 import com.ediary.backend.schedule.repository.StudentClassMembershipRepository;
 import com.ediary.backend.schedule.repository.SubjectRepository;
 import com.ediary.backend.user.admin.dto.CreateAdminUserRequest;
+import com.ediary.backend.user.admin.dto.AdminStudentOption;
 import com.ediary.backend.user.admin.dto.AdminUserCreationResponse;
 import com.ediary.backend.user.admin.dto.AdminUserResponse;
 import com.ediary.backend.user.admin.dto.UserDeletionEligibilityResponse;
@@ -54,6 +55,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.util.Locale;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -101,12 +103,12 @@ public class AdminUserService {
 
     @Transactional
     public AdminUserCreationResponse create(CreateAdminUserRequest input) {
-        CreationTargets targets = validateAndResolveCreation(input);
+        CreationTargets targets = validateCreation(input);
+        StudentProfile requestedStudent = resolveStudent(input);
         String login = normalizeLogin(input.login());
         String email = normalizeEmail(input.email());
         SchoolClass schoolClass = targets.schoolClass();
         Subject subject = targets.subject();
-        StudentProfile requestedStudent = targets.student();
         String temporaryPassword = temporaryPasswordGenerator.generate();
         LocalDateTime now = LocalDateTime.now(clock);
 
@@ -130,12 +132,8 @@ public class AdminUserService {
             "Користувача створено. Лист із даними для входу передано на надсилання.");
     }
 
-    // Called within the import transaction; validation does not create accounts or publish mail.
-    public void validateCreation(CreateAdminUserRequest input) {
-        validateAndResolveCreation(input);
-    }
-
-    private CreationTargets validateAndResolveCreation(CreateAdminUserRequest input) {
+    // Import validates the parent-to-student link separately, since the student may not exist yet.
+    CreationTargets validateCreation(CreateAdminUserRequest input) {
         if (input.role() == UserRole.ADMIN) {
             throw new ApplicationException(
                 HttpStatus.BAD_REQUEST,
@@ -148,15 +146,51 @@ public class AdminUserService {
         String email = normalizeEmail(input.email());
         ensureUniqueCredentials(login, email);
         validateBirthDate(input.birthDate(), input.role());
-        normalizePhone(input.phone());
+        if (input.role() != UserRole.STUDENT) {
+            normalizePhone(input.phone());
+        } else if (input.phone() != null && !input.phone().isBlank()) {
+            throw new ApplicationException(HttpStatus.BAD_REQUEST, "INVALID_PHONE", "Для учня залиште телефон порожнім");
+        }
 
         SchoolClass schoolClass = resolveClass(input);
         Subject subject = resolveSubject(input);
-        StudentProfile requestedStudent = resolveStudent(input);
-        return new CreationTargets(schoolClass, subject, requestedStudent);
+        return new CreationTargets(schoolClass, subject);
     }
 
-    private record CreationTargets(SchoolClass schoolClass, Subject subject, StudentProfile student) {}
+    record CreationTargets(SchoolClass schoolClass, Subject subject) {}
+
+    @Transactional(readOnly = true)
+    public List<AdminStudentOption> searchStudents(String query) {
+        String term = query.strip().replaceAll("\\s+", " ");
+        if (term.length() < 2 || term.length() > 152) {
+            return List.of();
+        }
+        String pattern = "%" + term.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+        return studentProfileRepository.searchLinkableStudents(
+                pattern, UserRole.STUDENT, UserStatus.ACTIVE, StudentStatus.STUDYING, PageRequest.of(0, 20)
+            ).stream()
+            .map(this::studentOption)
+            .toList();
+    }
+
+    Optional<AdminStudentOption> findLinkableStudent(String login) {
+        return studentProfileRepository.findByUser_LoginIgnoreCase(login)
+            .filter(this::isLinkableStudent)
+            .map(this::studentOption);
+    }
+
+    private boolean isLinkableStudent(StudentProfile student) {
+        return student.getUser().getRole() == UserRole.STUDENT
+            && student.getUser().getStatus() == UserStatus.ACTIVE
+            && student.getStatus() == StudentStatus.STUDYING;
+    }
+
+    private AdminStudentOption studentOption(StudentProfile student) {
+        String fullName = String.join(" ", student.getSurname(), student.getName(),
+            student.getPatronymic() == null ? "" : student.getPatronymic()).strip();
+        String className = student.getSchoolClass() == null ? null : student.getSchoolClass().getDisplayName();
+        return new AdminStudentOption(student.getId(), student.getUser().getLogin(), fullName, className);
+    }
 
     @Transactional(readOnly = true)
     public AdminUserResponse findCurrent(String login) {
@@ -210,7 +244,7 @@ public class AdminUserService {
     }
 
     @Transactional
-    public AdminUserResponse changeStatus(Long userId, UserStatus nextStatus, String actorLogin) {
+    public AdminUserResponse changeStatus(Long userId, UserStatus nextStatus) {
         if (nextStatus == UserStatus.DELETED) {
             throw new ApplicationException(
                 HttpStatus.BAD_REQUEST,
@@ -218,28 +252,18 @@ public class AdminUserService {
                 "Для видалення користувача використовуйте окрему дію «Видалити»"
             );
         }
-        AppUser user = userRepository.findById(userId)
+        AppUser user = userRepository.findByIdForUpdate(userId)
             .orElseThrow(() -> new ApplicationException(
                 HttpStatus.NOT_FOUND,
                 "USER_NOT_FOUND",
                 "Користувача не знайдено"
             ));
 
-        if (user.getLogin().equalsIgnoreCase(actorLogin) && nextStatus != UserStatus.ACTIVE) {
+        if (user.getRole() == UserRole.ADMIN) {
             throw new ApplicationException(
-                HttpStatus.CONFLICT,
-                "CANNOT_DISABLE_CURRENT_ADMIN",
-                "Не можна заблокувати або деактивувати власний обліковий запис"
-            );
-        }
-        if (user.getRole() == UserRole.ADMIN
-            && user.getStatus() == UserStatus.ACTIVE
-            && nextStatus != UserStatus.ACTIVE
-            && userRepository.countByRoleAndStatus(UserRole.ADMIN, UserStatus.ACTIVE) <= 1) {
-            throw new ApplicationException(
-                HttpStatus.CONFLICT,
-                "LAST_ACTIVE_ADMIN_REQUIRED",
-                "У системі має залишитися щонайменше один активний адміністратор"
+                HttpStatus.FORBIDDEN,
+                "ADMIN_STATUS_IS_PROTECTED",
+                "Статус адміністратора не можна змінити через керування користувачами"
             );
         }
 
@@ -257,7 +281,7 @@ public class AdminUserService {
     }
 
     @Transactional
-    public AdminUserResponse update(Long userId, UpdateAdminUserRequest input) {
+    public AdminUserResponse update(Long userId, UpdateAdminUserRequest input, String actorLogin) {
         AppUser user = userRepository.findByIdForUpdate(userId)
             .orElseThrow(() -> new ApplicationException(
                 HttpStatus.NOT_FOUND,
@@ -269,8 +293,6 @@ public class AdminUserService {
         String firstName = normalizeName(input.firstName());
         String lastName = normalizeName(input.lastName());
         String patronymic = normalizeOptionalName(input.patronymic());
-        ensureUniqueCredentials(userId, login, email);
-
         UserRole previousRole = user.getRole();
         if ((previousRole == UserRole.ADMIN || input.role() == UserRole.ADMIN)
             && previousRole != input.role()) {
@@ -283,6 +305,12 @@ public class AdminUserService {
 
         String previousLogin = user.getLogin();
         boolean emailChanged = !user.getEmail().equalsIgnoreCase(email);
+        if (previousRole == UserRole.ADMIN && !previousLogin.equalsIgnoreCase(actorLogin)
+            && (emailChanged || !previousLogin.equalsIgnoreCase(login))) {
+            throw new ApplicationException(HttpStatus.FORBIDDEN, "ADMIN_CREDENTIALS_ARE_PROTECTED",
+                "Логін і пошту адміністратора може змінити лише власник акаунта");
+        }
+        ensureUniqueCredentials(userId, login, email);
         String parentLinkCode = null;
         if (previousRole == input.role()) {
             updateRoleProfile(
@@ -327,6 +355,9 @@ public class AdminUserService {
         user.setEmail(email);
         user.setUpdatedAt(LocalDateTime.now(clock));
         userRepository.saveAndFlush(user);
+        if (previousRole == UserRole.ADMIN && emailChanged) {
+            passwordResetTokenRepository.markAllUnusedAsUsed(userId);
+        }
 
         boolean securityIdentityChanged = !previousLogin.equalsIgnoreCase(login)
             || previousRole != input.role();
@@ -354,6 +385,10 @@ public class AdminUserService {
                 "USER_NOT_FOUND",
                 "Користувача не знайдено"
             ));
+        if (user.getRole() == UserRole.ADMIN) {
+            throw new ApplicationException(HttpStatus.FORBIDDEN, "ADMIN_PASSWORD_RESET_FORBIDDEN",
+                "Пароль адміністратора не можна скинути через керування користувачами");
+        }
         if (user.getStatus() == UserStatus.DELETED) {
             throw new ApplicationException(
                 HttpStatus.CONFLICT,
@@ -800,9 +835,14 @@ public class AdminUserService {
 
     private StudentProfile resolveStudent(CreateAdminUserRequest input) {
         if (input.role() == UserRole.PARENT) {
-            return parentLinkCodeService.requireActiveStudent(input.parentLinkCode());
+            return Optional.ofNullable(input.studentId())
+                .flatMap(studentProfileRepository::findById)
+                .filter(this::isLinkableStudent)
+                .orElseThrow(() -> new ApplicationException(
+                    HttpStatus.BAD_REQUEST, "INVALID_LINKED_STUDENT", "Оберіть активного учня для прив’язки"
+                ));
         }
-        if (input.parentLinkCode() != null && !input.parentLinkCode().isBlank()) {
+        if (input.studentId() != null) {
             throw invalidRoleDetails();
         }
         return null;
@@ -918,6 +958,9 @@ public class AdminUserService {
     }
 
     private String normalizePhone(String value) {
+        if (value == null || value.isBlank()) {
+            throw new ApplicationException(HttpStatus.BAD_REQUEST, "INVALID_PHONE", "Введіть номер телефону");
+        }
         String digits = value.replaceAll("\\D", "");
         if (digits.startsWith("380") && digits.length() == 12) {
             return "+" + digits;

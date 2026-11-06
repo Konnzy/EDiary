@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils.js";
 import { AdminLayout } from "@/pages/AdminHome/AdminLayout.jsx";
 import { isValidRoom, normalizeRoom, ROOM_MAX_LENGTH } from "./roomValidation.js";
 import { COPY_MODES, copySchedule, countCopiedLessons, countLessons } from "./scheduleCopy.js";
+import { ScheduleImportDialog } from "./ScheduleImportDialog.jsx";
 
 const weekdays = [
   { id: "MONDAY", label: "Понеділок" },
@@ -66,11 +67,14 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
   const [selectedYear, setSelectedYear] = useState(() => initialAcademicYear);
   const [week, setWeek] = useState(1);
   const [schedule, setSchedule] = useState(createEmptySchedule);
+  const [loadedContext, setLoadedContext] = useState("");
   const [lessonDialog, setLessonDialog] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [yearDialogOpen, setYearDialogOpen] = useState(false);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [reloadVersion, setReloadVersion] = useState(0);
   const [pendingChange, setPendingChange] = useState(null);
   const [openMenu, setOpenMenu] = useState("");
   const [loadingClasses, setLoadingClasses] = useState(true);
@@ -81,6 +85,11 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
   const [success, setSuccess] = useState("");
   const pendingCopiedSchedule = useRef(null);
   const savedSchedule = useRef(createEmptySchedule());
+  const currentYear = getCurrentAcademicYear();
+  const selectedClass = classes.find((item) => String(item.id) === selectedClassId && item.academicYear === selectedYear);
+  const contextKey = `${selectedYear}:${selectedClassId}:${week}`;
+  const scheduleReady = Boolean(selectedClass && !loadingClasses && !loadingSchedule && loadedContext === contextKey);
+  const canEdit = scheduleReady && selectedYear === currentYear && selectedClass.status !== "DRAFT" && !savingSchedule;
 
   useEffect(() => {
     if (!dirty) return undefined;
@@ -107,15 +116,15 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
     adminScheduleApi.findAcademicYears()
       .then((years) => {
         if (!active) return;
-        const availableYears = years.length ? years : ["2026/2027"];
-        setAcademicYears(availableYears);
         const currentAcademicYear = getCurrentAcademicYear();
+        const availableYears = years.length ? years : [currentAcademicYear];
+        setAcademicYears(availableYears);
         const requestedYear = availableYears.includes(initialAcademicYear) ? initialAcademicYear : "";
         setSelectedYear(requestedYear || (availableYears.includes(currentAcademicYear) ? currentAcademicYear : availableYears.at(-1)));
       })
       .catch((requestError) => {
         if (!active) return;
-        setAcademicYears(["2026/2027"]);
+        setAcademicYears([getCurrentAcademicYear()]);
         setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити навчальні роки.");
       });
     return () => { active = false; };
@@ -125,6 +134,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
     if (!selectedYear) return undefined;
     let active = true;
     setLoadingClasses(true);
+    setError("");
     adminClassesApi.findAll({ academicYear: selectedYear })
       .then((items) => {
         if (!active) return;
@@ -133,22 +143,27 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
           ? current
           : (items[0] ? String(items[0].id) : ""));
       })
-      .catch(() => {
+      .catch((requestError) => {
         if (!active) return;
         setClasses([]);
         setSelectedClassId("");
+        setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити класи.");
       })
       .finally(() => active && setLoadingClasses(false));
     return () => { active = false; };
   }, [selectedYear]);
 
   useEffect(() => {
+    setOpenMenu("");
     if (!selectedClassId || !selectedYear || loadingClasses ||
         !classes.some((schoolClass) => String(schoolClass.id) === selectedClassId && schoolClass.academicYear === selectedYear)) {
       const emptySchedule = createEmptySchedule();
       savedSchedule.current = emptySchedule;
       setSchedule(emptySchedule);
+      setLoadedContext("");
+      setLoadingSchedule(false);
       setDirty(false);
+      setSuccess("");
       return undefined;
     }
     const pending = pendingCopiedSchedule.current;
@@ -156,6 +171,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
       pendingCopiedSchedule.current = null;
       savedSchedule.current = pending.baseline;
       setSchedule(pending.schedule);
+      setLoadedContext(contextKey);
       setDirty(true);
       setLoadingSchedule(false);
       setError("");
@@ -172,6 +188,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
         const loadedSchedule = scheduleFromResponse(response);
         savedSchedule.current = loadedSchedule;
         setSchedule(loadedSchedule);
+        setLoadedContext(contextKey);
         setDirty(false);
       })
       .catch((requestError) => {
@@ -179,14 +196,16 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
         const emptySchedule = createEmptySchedule();
         savedSchedule.current = emptySchedule;
         setSchedule(emptySchedule);
+        setLoadedContext("");
         setDirty(false);
         setError(requestError instanceof ApiError ? requestError.message : "Не вдалося завантажити розклад.");
       })
       .finally(() => active && setLoadingSchedule(false));
     return () => { active = false; };
-  }, [classes, loadingClasses, selectedClassId, selectedYear, week]);
+  }, [classes, contextKey, loadingClasses, reloadVersion, selectedClassId, selectedYear, week]);
 
   const updateSchedule = (updater) => {
+    if (!canEdit) return;
     setSchedule(updater);
     setDirty(true);
     setError("");
@@ -233,7 +252,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
   };
 
   const saveSchedule = async () => {
-    if (!selectedClassId || !selectedYear || savingSchedule) return false;
+    if (!canEdit || !dirty) return false;
     setSavingSchedule(true);
     setError("");
     setSuccess("");
@@ -301,6 +320,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
 
   const applyCopiedSchedule = (targetWeek, copiedSchedule, baseline) => {
     setCopyDialogOpen(false);
+    if (!canEdit) return;
     setOpenMenu("");
     if (targetWeek === week) {
       setSchedule(copiedSchedule);
@@ -322,16 +342,16 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
   };
 
   const clearSchedule = () => {
+    setClearDialogOpen(false);
+    if (!canEdit) return;
     setSchedule(createEmptySchedule());
     setDirty(true);
-    setClearDialogOpen(false);
     setOpenMenu("");
     setError("");
     setSuccess("Розклад очищено в чернетці. Щоб застосувати зміни, збережіть їх.");
   };
 
-  const selectedClass = classes.find((schoolClass) => String(schoolClass.id) === selectedClassId);
-  const lessonCount = countLessons(schedule);
+  const lessonCount = scheduleReady ? countLessons(schedule) : 0;
 
   return (
     <AdminLayout
@@ -373,10 +393,11 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
                 <button
                   key={item}
                   type="button"
+                  aria-pressed={week === item}
                   onClick={() => item !== week && requestContextChange(() => setWeek(item))}
                   className={cn(
                     "min-w-0 whitespace-nowrap rounded px-2 text-[0.75rem] font-semibold transition-colors",
-                    week === item ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800",
+                    week === item ? "bg-white text-slate-900 shadow-xs hover:bg-slate-50" : "text-slate-500 hover:bg-slate-100 hover:text-slate-800",
                   )}
                 >
                   {item === 1 ? "Перший тиждень" : "Другий тиждень"}
@@ -389,9 +410,10 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
             <Button
               type="button"
               variant="ghost"
-              disabled
-              title="Імпорт розкладу з файлів буде доступний пізніше"
-              className="h-10 shrink-0 whitespace-nowrap rounded-md border border-slate-300 bg-white px-2.5 text-[0.7rem] text-slate-500"
+              disabled={!canEdit}
+              onClick={() => requestContextChange(() => setImportDialogOpen(true))}
+              title="Імпортувати розклад з CSV або XLSX"
+              className="h-10 shrink-0 whitespace-nowrap rounded-md border border-slate-300 bg-white px-2.5 text-[0.7rem] hover:border-slate-400 hover:bg-slate-100"
             >
               <FileUp className="h-4 w-4" aria-hidden="true" />
               Імпорт
@@ -401,9 +423,9 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
               type="button"
               variant="ghost"
               onClick={() => setCopyDialogOpen(true)}
-              disabled={!selectedClassId || selectedClass?.status === "DRAFT" || loadingSchedule || savingSchedule}
+              disabled={!canEdit}
               title="Скопіювати розклад"
-              className="h-10 shrink-0 whitespace-nowrap rounded-md border border-slate-300 bg-white px-2.5 text-[0.7rem]"
+              className="h-10 shrink-0 whitespace-nowrap rounded-md border border-slate-300 bg-white px-2.5 text-[0.7rem] hover:border-slate-400 hover:bg-slate-100"
             >
               <Copy className="h-4 w-4" aria-hidden="true" />
               Копіювати
@@ -413,7 +435,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
               type="button"
               variant="ghost"
               onClick={() => setClearDialogOpen(true)}
-              disabled={!selectedClassId || selectedClass?.status === "DRAFT" || loadingSchedule || savingSchedule || lessonCount === 0}
+              disabled={!canEdit || lessonCount === 0}
               title="Очистити розклад"
               className="h-10 shrink-0 whitespace-nowrap rounded-md border border-red-300 bg-white px-2.5 text-[0.7rem] text-red-600 hover:border-red-400 hover:bg-red-50 hover:text-red-700"
             >
@@ -424,12 +446,12 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
             <div className="w-[148px] shrink-0">
               <p className={cn("mb-2 inline-flex items-center gap-2 whitespace-nowrap text-[0.68rem] font-medium", dirty ? "text-amber-700" : "text-emerald-700")}>
                 <span className={cn("h-2 w-2 rounded-full", dirty ? "bg-amber-400" : "bg-emerald-500")} aria-hidden="true" />
-                {dirty ? "Є незбережені зміни" : "Усі зміни збережено"}
+                {dirty ? "Є незбережені зміни" : selectedYear && selectedYear < currentYear ? "Лише перегляд" : "Усі зміни збережено"}
               </p>
               <Button
                 type="button"
                 onClick={saveSchedule}
-                disabled={!selectedClassId || selectedClass?.status === "DRAFT" || loadingSchedule || savingSchedule || !dirty}
+                disabled={!canEdit || !dirty}
                 title="Зберегти зміни"
                 className="h-10 w-full rounded-md px-2.5 text-[0.7rem]"
               >
@@ -441,7 +463,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
         </div>
       </Card>
 
-      {selectedClass?.status === "DRAFT" ? (
+      {selectedYear === currentYear && selectedClass?.status === "DRAFT" ? (
         <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[0.82rem] text-amber-800">
           Призначте класного керівника, щоб складати розклад для цього класу.
         </p>
@@ -454,13 +476,20 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
         </div>
       ) : null}
 
-      <fieldset disabled={selectedClass?.status === "DRAFT"} className={cn("mt-5 min-w-0 overflow-x-auto pb-3 transition-opacity", loadingSchedule && "pointer-events-none opacity-50")} aria-busy={loadingSchedule}>
+      {!loadingClasses && !selectedClass && !error ? (
+        <p className="mt-4 rounded-md border border-slate-200 bg-white px-4 py-3 text-[0.82rem] text-slate-600">
+          Для цього навчального року немає класів.
+        </p>
+      ) : null}
+
+      {scheduleReady ? <fieldset disabled={!canEdit} className="mt-5 min-w-0 overflow-x-auto pb-3">
         <div className="grid min-w-[1180px] grid-cols-5 gap-4">
           {weekdays.map((day) => (
             <DayColumn
               key={day.id}
               day={day}
               lessons={schedule[day.id] || []}
+              editable={canEdit}
               openMenu={openMenu}
               onToggleMenu={(menuId) => setOpenMenu((current) => current === menuId ? "" : menuId)}
               onAdd={(lessonNumber) => setLessonDialog({ dayId: day.id, lessonNumber, lesson: null })}
@@ -469,7 +498,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
             />
           ))}
         </div>
-      </fieldset>
+      </fieldset> : null}
 
       {lessonDialog ? (
         <LessonDialog
@@ -480,6 +509,13 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
       ) : null}
       {deleteTarget ? <DeleteLessonDialog target={deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={deleteLesson} /> : null}
       {yearDialogOpen ? <AcademicYearDialog years={academicYears} onClose={() => setYearDialogOpen(false)} onCreate={addAcademicYear} /> : null}
+      {importDialogOpen && selectedClass ? <ScheduleImportDialog
+        classId={selectedClassId}
+        className={`${selectedClass.number}-${selectedClass.letter}`}
+        academicYear={selectedYear}
+        onClose={() => setImportDialogOpen(false)}
+        onImported={() => { setLoadedContext(""); setReloadVersion((version) => version + 1); }}
+      /> : null}
       {copyDialogOpen ? (
         <CopyScheduleDialog
           currentWeek={week}
@@ -796,7 +832,7 @@ function normalizeClassSearch(value) {
   return value.toLocaleLowerCase("uk-UA").replace(/[\s.-]/g, "");
 }
 
-function DayColumn({ day, lessons, openMenu, onToggleMenu, onAdd, onEdit, onDelete }) {
+function DayColumn({ day, lessons, editable, openMenu, onToggleMenu, onAdd, onEdit, onDelete }) {
   const lessonsByNumber = new Map(lessons.map((lesson) => [lesson.lessonNumber, lesson]));
   return (
     <section aria-labelledby={`day-${day.id}`}>
@@ -813,12 +849,13 @@ function DayColumn({ day, lessons, openMenu, onToggleMenu, onAdd, onEdit, onDele
               key={lesson.id}
               dayId={day.id}
               lesson={lesson}
+              editable={editable}
               menuOpen={openMenu === `${day.id}-${lesson.id}`}
               onToggleMenu={() => onToggleMenu(`${day.id}-${lesson.id}`)}
               onEdit={() => onEdit(lesson)}
               onDelete={() => onDelete(lesson)}
             />
-          ) : (
+          ) : editable ? (
             <button
               key={`${day.id}-${lessonNumber}`}
               type="button"
@@ -829,14 +866,14 @@ function DayColumn({ day, lessons, openMenu, onToggleMenu, onAdd, onEdit, onDele
               Додати урок
               <span className="mt-1 text-[0.68rem] font-normal text-slate-400">{lessonNumber}-й урок · {times[0]}</span>
             </button>
-          );
+          ) : <div key={lessonNumber} aria-hidden="true" className="h-[154px] rounded-lg border border-dashed border-slate-200" />;
         })}
       </div>
     </section>
   );
 }
 
-function LessonCard({ lesson, menuOpen, onToggleMenu, onEdit, onDelete }) {
+function LessonCard({ lesson, editable, menuOpen, onToggleMenu, onEdit, onDelete }) {
   const [startTime, endTime] = lessonTimes[lesson.lessonNumber - 1];
   return (
     <article className="relative h-[154px] rounded-lg border border-slate-200 bg-white p-3.5 shadow-[0_10px_30px_-26px_rgba(15,23,42,0.6)]">
@@ -845,11 +882,11 @@ function LessonCard({ lesson, menuOpen, onToggleMenu, onEdit, onDelete }) {
           <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
           {startTime}–{endTime}
         </div>
-        <button type="button" onClick={onToggleMenu} className="-mr-1 -mt-1 flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={`Дії для уроку ${lesson.subject}`} aria-expanded={menuOpen}>
+        {editable ? <button type="button" onClick={onToggleMenu} className="-mr-1 -mt-1 flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={`Дії для уроку ${lesson.subject}`} aria-expanded={menuOpen}>
           <EllipsisVertical className="h-4 w-4" aria-hidden="true" />
-        </button>
+        </button> : null}
       </div>
-      {menuOpen ? (
+      {editable && menuOpen ? (
         <div className="absolute right-2 top-10 z-20 w-36 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
           <button type="button" onClick={onEdit} className="flex h-8 w-full items-center gap-2 rounded px-2 text-left text-[0.72rem] font-medium text-slate-600 hover:bg-slate-50"><Pencil className="h-3.5 w-3.5" />Редагувати</button>
           <button type="button" onClick={onDelete} className="flex h-8 w-full items-center gap-2 rounded px-2 text-left text-[0.72rem] font-medium text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" />Видалити</button>

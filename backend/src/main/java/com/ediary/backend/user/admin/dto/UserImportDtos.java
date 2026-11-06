@@ -6,7 +6,8 @@ import java.util.Map;
 public final class UserImportDtos {
     private UserImportDtos() {}
     public record RawRow(int number, List<String> values) {}
-    public record Row(int number, List<String> values, Map<String,String> errors) {}
+    public record LinkedStudent(String fullName, String className) {}
+    public record Row(int number, List<String> values, Map<String,String> errors, LinkedStudent linkedStudent) {}
     public record Preview(String fingerprint, List<String> columns, List<Row> rows, int total, int valid, int invalid) {}
     public record Result(int created, String message) {}
 }

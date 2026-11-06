@@ -6,15 +6,15 @@ import { adminUsersApi } from "@/lib/api.js";
 import { cn } from "@/lib/utils.js";
 import { IMPORT_PAGE_SIZE as PAGE_SIZE, importRows, importCellError } from "./userImportModel.js";
 
-const columns = ["Роль", "Логін", "Прізвище", "Ім’я", "По батькові", "Електронна пошта", "Телефон", "Дата народження", "Клас", "Навчальний рік", "Предмет", "Код прив’язки"];
+const columns = ["Роль", "Логін", "Прізвище", "Ім’я", "По батькові", "Електронна пошта", "Телефон", "Дата народження", "Клас", "Навчальний рік", "Предмет", "Логін учня"];
 const start = new Date().getMonth() >= 8 ? new Date().getFullYear() : new Date().getFullYear() - 1;
 const examples = [
-  ["Учень", "student.example", "Петренко", "Іван", "Олександрович", "student@example.org", "+380671112233", `15.04.${new Date().getFullYear() - 15}`, "9-А", `${start}/${start + 1}`, "", ""],
+  ["Учень", "student.example", "Петренко", "Іван", "Олександрович", "student@example.org", "", `15.04.${new Date().getFullYear() - 15}`, "9-А", `${start}/${start + 1}`, "", ""],
   ["Вчитель", "teacher.example", "Коваленко", "Олена", "Іванівна", "teacher@example.org", "+380671112234", "20.03.1985", "", "", "Математика", ""],
-  ["Батьки", "parent.example", "Петренко", "Олександр", "Іванович", "parent@example.org", "+380671112235", "10.05.1980", "", "", "", "XXXX-XXXX"],
+  ["Батьки", "parent.example", "Петренко", "Олександр", "Іванович", "parent@example.org", "+380671112235", "10.05.1980", "", "", "", "student.example"],
 ];
 
-function ImportCell({ number, index, value, reason }) {
+function ImportCell({ number, index, value, reason, linkedStudent }) {
   const cell = useRef(null), tooltip = useRef(null), timer = useRef(null);
   const id = useId();
   const [open, setOpen] = useState(false), [position, setPosition] = useState(null);
@@ -36,6 +36,9 @@ function ImportCell({ number, index, value, reason }) {
     onFocus={() => { if(reason)setOpen(true); }} onBlur={hide} onKeyDown={event => { if(event.key==="Escape"){event.stopPropagation();hide();} }}
     className={cn("max-w-72 whitespace-nowrap border-b border-slate-200 px-3 py-2.5 text-slate-700",reason && "bg-red-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red-400")}>
     {value || "—"}
+    {linkedStudent ? <span className="mt-0.5 block min-w-36 whitespace-normal text-xs leading-4 text-slate-500">
+      {linkedStudent.fullName} · {linkedStudent.className ? `${linkedStudent.className} клас` : "Без класу"}
+    </span> : null}
     {open ? <span ref={tooltip} id={id} role="tooltip" className="pointer-events-none fixed z-[110] px-3 py-2.5 text-xs font-normal leading-4 shadow-lg" style={{...position,visibility:position ? "visible" : "hidden",width:"max-content",maxWidth:"min(280px, calc(100vw - 24px))",whiteSpace:"normal",borderRadius:6,backgroundColor:"#17212b",color:"#fff"}}>{reason}</span> : null}
   </td>;
 }
@@ -143,13 +146,13 @@ export function UserImportDialog({ onClose, onImported }) {
               {report ? <th className="sticky right-0 z-30 min-w-28 border-b border-l border-slate-200 bg-slate-50 px-3 py-2.5">Перевірка</th> : null}
             </tr></thead><tbody>{rows.map(row => <tr key={row.number}>
               <td className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white px-3 py-2.5 text-slate-500">{row.number}</td>
-              {row.values.map((value,index) => <ImportCell key={index} number={row.number} index={index} value={value} reason={importCellError(row,headings[index],index,headings)} />)}
+              {row.values.map((value,index) => <ImportCell key={index} number={row.number} index={index} value={value} linkedStudent={headings[index] === "Логін учня" ? row.linkedStudent : null} reason={importCellError(row,headings[index],index,headings)} />)}
               {report ? <td className="sticky right-0 z-10 border-b border-l border-slate-200 bg-white px-3 py-2.5">{Object.keys(row.errors).length ? <button type="button" onClick={() => revealError(row)} aria-label={`Помилка в рядку ${row.number}`} className="inline-flex items-center gap-1.5 whitespace-nowrap font-semibold text-red-600 underline-offset-2 hover:underline"><AlertCircle className="h-3.5 w-3.5" />Помилка</button> : <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Готово</span>}</td> : null}
             </tr>)}</tbody></table>
             {report && !rows.length ? <p className="sticky left-0 w-full px-4 py-6 text-center text-xs text-slate-500">Записів із помилками немає.</p> : null}
           </div> : null}
           {report && pageCount > 1 ? <nav aria-label="Сторінки імпорту" className="mt-3 flex items-center justify-end gap-3 text-xs text-slate-500"><span>{rowStart + 1}–{Math.min(rowStart + PAGE_SIZE,filtered.length)} із {filtered.length}</span><button type="button" disabled={!page || busy} onClick={() => setPage(value => value - 1)} aria-label="Попередні записи імпорту" className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button><button type="button" disabled={page >= pageCount - 1 || busy} onClick={() => setPage(value => value + 1)} aria-label="Наступні записи імпорту" className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></nav> : null}
-          <p className="mt-3 text-xs leading-5 text-slate-500">{report ? (report.invalid ? "Виправте файл і завантажте його повторно." : "Готово до імпорту. Будуть створені лише нові акаунти.") : `${format === "csv" ? "Збережіть файл у кодуванні UTF-8 із роздільником комою або крапкою з комою. " : ""}Дата народження у форматі дд.мм.рррр. Для учня вкажіть клас і поточний навчальний рік, для вчителя вкажіть предмет, для батьків вкажіть чинний код прив’язки до учня. Непотрібні для ролі колонки залиште порожніми. Приклади замініть власними даними.`}</p>
+          <p className="mt-3 text-xs leading-5 text-slate-500">{report ? (report.invalid ? "Виправте файл і завантажте його повторно." : "Готово до імпорту. Будуть створені лише нові акаунти.") : `${format === "csv" ? "Збережіть файл у кодуванні UTF-8 із роздільником комою або крапкою з комою. " : ""}Дата народження у форматі дд.мм.рррр. Для учня вкажіть клас і поточний навчальний рік, телефон залиште порожнім. Для вчителя вкажіть предмет, для батьків вкажіть логін наявного учня або учня з цього файлу. Непотрібні для ролі колонки залиште порожніми. Приклади замініть власними даними.`}</p>
         </>}
       </>}
     </div>

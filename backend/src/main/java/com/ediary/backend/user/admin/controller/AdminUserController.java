@@ -5,13 +5,17 @@ import com.ediary.backend.user.admin.dto.UpdateUserStatusRequest;
 import com.ediary.backend.user.admin.dto.UpdateAdminUserRequest;
 import com.ediary.backend.user.admin.dto.AdminUserActionResponse;
 import com.ediary.backend.user.admin.dto.CreateAdminUserRequest;
+import com.ediary.backend.user.admin.dto.AdminStudentOption;
 import com.ediary.backend.user.admin.dto.AdminUserCreationResponse;
 import com.ediary.backend.user.admin.dto.AdminUserResponse;
 import com.ediary.backend.user.admin.dto.UserDeletionEligibilityResponse;
 import com.ediary.backend.user.entity.UserRole;
 import com.ediary.backend.user.entity.UserStatus;
 import com.ediary.backend.user.admin.service.AdminUserService;
+import com.ediary.backend.user.profile.dto.ChangePasswordRequest;
+import com.ediary.backend.user.profile.service.UserService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -34,16 +38,28 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 public class AdminUserController {
 
     private final AdminUserService adminUserService;
+    private final UserService userService;
 
     @GetMapping("/me")
     public AdminUserResponse me(Authentication authentication) {
         return adminUserService.findCurrent(authentication.getName());
     }
 
+    @PostMapping("/me/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changeOwnPassword(@Valid @RequestBody ChangePasswordRequest request, Authentication authentication) {
+        userService.changeProfilePassword(authentication.getName(), request);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AdminUserCreationResponse create(@Valid @RequestBody CreateAdminUserRequest request) {
         return adminUserService.create(request);
+    }
+
+    @GetMapping("/students")
+    public List<AdminStudentOption> searchStudents(@RequestParam(defaultValue = "") String query) {
+        return adminUserService.searchStudents(query);
     }
 
     @GetMapping
@@ -60,18 +76,18 @@ public class AdminUserController {
     @PatchMapping("/{userId}/status")
     public AdminUserResponse changeStatus(
         @PathVariable Long userId,
-        @Valid @RequestBody UpdateUserStatusRequest request,
-        Authentication authentication
+        @Valid @RequestBody UpdateUserStatusRequest request
     ) {
-        return adminUserService.changeStatus(userId, request.status(), authentication.getName());
+        return adminUserService.changeStatus(userId, request.status());
     }
 
     @PatchMapping("/{userId}")
     public AdminUserResponse update(
         @PathVariable Long userId,
-        @Valid @RequestBody UpdateAdminUserRequest request
+        @Valid @RequestBody UpdateAdminUserRequest request,
+        Authentication authentication
     ) {
-        return adminUserService.update(userId, request);
+        return adminUserService.update(userId, request, authentication.getName());
     }
 
     @PostMapping("/{userId}/reset-password")

@@ -68,7 +68,7 @@ public class AdminSchoolClassService {
             .filter(schoolClass -> matchesQuery(schoolClass, normalizedQuery))
             .map(schoolClass -> toResponse(
                 schoolClass,
-                membershipRepository.countBySchoolClassIdAndActiveTrue(schoolClass.getId())
+                countClassStudents(schoolClass)
             ))
             .toList();
     }
@@ -100,28 +100,43 @@ public class AdminSchoolClassService {
     @Transactional(readOnly = true)
     public AdminSchoolClassResponse findById(Long classId) {
         SchoolClass schoolClass = requireClass(classId);
-        return toResponse(schoolClass, membershipRepository.countBySchoolClassIdAndActiveTrue(classId));
+        return toResponse(schoolClass, countClassStudents(schoolClass));
     }
 
     @Transactional(readOnly = true)
     public TeacherClassResponse.Statistics findStatistics(Long classId) {
         SchoolClass schoolClass = requireClass(classId);
-        List<Long> studentIds = membershipRepository
-            .findAllBySchoolClassIdAndActiveTrueOrderByStudentSurnameAscStudentNameAsc(classId).stream()
+        List<Long> studentIds = classRoster(schoolClass).stream()
             .map(membership -> membership.getStudent().getId()).toList();
         return teacherClassService.statistics(schoolClass, studentIds);
     }
 
     @Transactional(readOnly = true)
     public List<AdminClassStudentResponse> findStudents(Long classId, String query) {
-        requireClass(classId);
+        SchoolClass schoolClass = requireClass(classId);
         String normalizedQuery = normalize(query);
-        return membershipRepository.findAllBySchoolClassIdAndActiveTrueOrderByStudentSurnameAscStudentNameAsc(classId)
+        return classRoster(schoolClass)
             .stream()
             .map(StudentClassMembership::getStudent)
             .filter(student -> matchesStudentQuery(student, normalizedQuery))
             .map(this::toStudentResponse)
             .toList();
+    }
+
+    private boolean isHistorical(SchoolClass schoolClass) {
+        return schoolClass.getAcademicYear().getValue().compareTo(currentAcademicYear()) < 0;
+    }
+
+    private long countClassStudents(SchoolClass schoolClass) {
+        return isHistorical(schoolClass)
+            ? membershipRepository.countBySchoolClassId(schoolClass.getId())
+            : membershipRepository.countBySchoolClassIdAndActiveTrue(schoolClass.getId());
+    }
+
+    private List<StudentClassMembership> classRoster(SchoolClass schoolClass) {
+        return isHistorical(schoolClass)
+            ? membershipRepository.findAllBySchoolClassIdOrderByStudentSurnameAscStudentNameAsc(schoolClass.getId())
+            : membershipRepository.findAllBySchoolClassIdAndActiveTrueOrderByStudentSurnameAscStudentNameAsc(schoolClass.getId());
     }
 
     @Transactional(readOnly = true)

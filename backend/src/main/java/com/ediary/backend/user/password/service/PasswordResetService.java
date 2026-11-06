@@ -5,6 +5,7 @@ import static com.ediary.backend.common.audit.AuditValues.of;
 import com.ediary.backend.common.error.ApplicationException;
 import com.ediary.backend.notification.service.EmailService;
 import com.ediary.backend.user.password.entity.PasswordResetToken;
+import com.ediary.backend.user.entity.UserRole;
 import com.ediary.backend.user.entity.UserStatus;
 import com.ediary.backend.user.password.repository.PasswordResetTokenRepository;
 import com.ediary.backend.user.repository.UserRepository;
@@ -38,6 +39,7 @@ public class PasswordResetService {
     private final String frontendUrl;
     private final AuditService audit;
     private final SecureRandom random = new SecureRandom();
+    private record ResetLink(String token, boolean administrator) {}
 
     public PasswordResetService(UserRepository users, PasswordResetTokenRepository tokens,
         UserSessionRepository userSessions, TransactionTemplate transactions, PasswordEncoder encoder,
@@ -57,7 +59,7 @@ public class PasswordResetService {
 
     public void request(String address) {
         String normalized = address.strip().toLowerCase(Locale.ROOT);
-        String token = transactions.execute(transaction -> {
+        ResetLink link = transactions.execute(transaction -> {
             var user = users.findByEmailForUpdate(normalized).orElse(null);
             if (user == null || user.getStatus() != UserStatus.ACTIVE) return null;
             LocalDateTime now = LocalDateTime.now(clock);
@@ -72,16 +74,17 @@ public class PasswordResetService {
             resetToken.setCreatedAt(now);
             tokens.save(resetToken);
             audit.record("PASSWORD_RESET_REQUESTED", "USER", user.getId(), of(), of("created", true));
-            return raw;
+            return new ResetLink(raw, user.getRole() == UserRole.ADMIN);
         });
-        if (token != null) {
+        if (link != null) {
             // Send only after the token transaction has committed.
             boolean sent = email.sendText(normalized, "Відновлення пароля електронного щоденника",
                 "Для встановлення нового пароля відкрийте посилання:\n\n"
-                + frontendUrl + "/#reset-password?token=" + token
+                + frontendUrl + (link.administrator() ? "/#admin/reset-password?token=" : "/#reset-password?token=")
+                + link.token()
                 + "\n\nПосилання діє 30 хвилин і може бути використане лише один раз."
                 + "\nЯкщо ви не запитували зміну пароля, проігноруйте цей лист.");
-            if (!sent) tokens.deleteByTokenHash(hash(token));
+            if (!sent) tokens.deleteByTokenHash(hash(link.token()));
         }
     }
 

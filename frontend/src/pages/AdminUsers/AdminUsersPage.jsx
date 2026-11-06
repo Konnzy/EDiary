@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   Ban,
   CheckCircle2,
@@ -23,9 +23,11 @@ import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { ApiError, adminUsersApi, registrationApi } from "@/lib/api.js";
+import { CurrentUserContext } from "@/lib/currentUser.jsx";
 import { cn } from "@/lib/utils.js";
 import { AdminLayout } from "@/pages/AdminHome/AdminLayout.jsx";
 import { UserImportDialog } from "./UserImportDialog.jsx";
+import { AdminStudentPicker } from "./AdminStudentPicker.jsx";
 
 const roleLabels = {
   ADMIN: "Адміністратор",
@@ -62,7 +64,7 @@ const createInitialForm = {
   role: "STUDENT",
   classId: "",
   subjectId: "",
-  parentLinkCode: "",
+  student: null,
 };
 
 const UKRAINIAN_NAME_PATTERN = /^[А-Яа-яІіЇїЄєҐґ]+(?:[ '’-][А-Яа-яІіЇїЄєҐґ]+)*$/;
@@ -105,13 +107,6 @@ function validateEditForm(form) {
   return errors;
 }
 
-function formatParentLinkCode(value) {
-  const characters = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
-  return characters.length > 4
-    ? `${characters.slice(0, 4)}-${characters.slice(4)}`
-    : characters;
-}
-
 function parseBirthDate(value) {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
   if (!match) return null;
@@ -143,7 +138,7 @@ function validateCreateForm(form) {
   if (!UKRAINIAN_NAME_PATTERN.test(form.lastName.trim())) errors.lastName = "Введіть прізвище українськими літерами";
   if (form.patronymic.trim() && !UKRAINIAN_NAME_PATTERN.test(form.patronymic.trim())) errors.patronymic = "Введіть по батькові українськими літерами";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errors.email = "Некоректний формат пошти";
-  if (form.phone.replace(/\D/g, "").length !== 9) errors.phone = "Введіть номер у форматі XX XXX XX XX";
+  if (form.role !== "STUDENT" && form.phone.replace(/\D/g, "").length !== 9) errors.phone = "Введіть номер у форматі XX XXX XX XX";
 
   const parsedDate = parseBirthDate(form.birthDate);
   if (!parsedDate) {
@@ -155,9 +150,7 @@ function validateCreateForm(form) {
   }
   if (form.role === "STUDENT" && !form.classId) errors.classId = "Оберіть клас";
   if (form.role === "TEACHER" && !form.subjectId) errors.subjectId = "Оберіть предмет";
-  if (form.role === "PARENT" && !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(form.parentLinkCode)) {
-    errors.parentLinkCode = "Введіть код у форматі XXXX-XXXX";
-  }
+  if (form.role === "PARENT" && !form.student) errors.student = "Оберіть учня зі списку";
   return errors;
 }
 
@@ -394,9 +387,10 @@ function CreateUserDialog({ onClose, onCompleted }) {
     setForm((current) => ({
       ...current,
       [field]: value,
-      ...(field === "role" ? { classId: "", subjectId: "", parentLinkCode: "" } : null),
+      ...(field === "role" ? { classId: "", subjectId: "", student: null } : null),
     }));
     setErrors((current) => {
+      if (field === "role") return {};
       if (!current[field]) return current;
       const next = { ...current };
       delete next[field];
@@ -420,12 +414,12 @@ function CreateUserDialog({ onClose, onCompleted }) {
         lastName: form.lastName.trim(),
         patronymic: form.patronymic.trim() || null,
         email: form.email.trim(),
-        phone: `+380${form.phone.replace(/\D/g, "")}`,
+        phone: form.role === "STUDENT" ? null : `+380${form.phone.replace(/\D/g, "")}`,
         birthDate: parseBirthDate(form.birthDate).iso,
         role: form.role,
         classId: form.role === "STUDENT" ? Number(form.classId) : null,
         subjectId: form.role === "TEACHER" ? Number(form.subjectId) : null,
-        parentLinkCode: form.role === "PARENT" ? form.parentLinkCode : null,
+        studentId: form.role === "PARENT" ? form.student.id : null,
       });
       await onCompleted(result.message);
     } catch (requestError) {
@@ -476,12 +470,12 @@ function CreateUserDialog({ onClose, onCompleted }) {
             <CreateField label="Електронна пошта" error={errors.email}>
               <Input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} maxLength={100} autoComplete="off" placeholder="name@example.com" />
             </CreateField>
-            <CreateField label="Номер телефону" error={errors.phone}>
+            {form.role !== "STUDENT" ? <CreateField label="Номер телефону" error={errors.phone}>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[0.82rem] text-slate-600">+380</span>
                 <Input type="tel" inputMode="numeric" value={form.phone} onChange={(event) => update("phone", formatPhone(event.target.value))} className="pl-[3.8rem]" placeholder="XX XXX XX XX" />
               </div>
-            </CreateField>
+            </CreateField> : null}
             <CreateField label="Дата народження" error={errors.birthDate}>
               <BirthDateInput
                 value={form.birthDate}
@@ -508,18 +502,7 @@ function CreateUserDialog({ onClose, onCompleted }) {
               </CreateField>
             ) : null}
             {form.role === "PARENT" ? (
-              <CreateField label="Код прив’язки до дитини" error={errors.parentLinkCode}>
-                <Input
-                  value={form.parentLinkCode}
-                  onChange={(event) => update("parentLinkCode", formatParentLinkCode(event.target.value))}
-                  maxLength={9}
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                  className="uppercase"
-                  placeholder="XXXX-XXXX"
-                />
-              </CreateField>
+              <AdminStudentPicker student={form.student} onChange={(student) => update("student", student)} error={errors.student} />
             ) : null}
           </div>
 
@@ -606,15 +589,19 @@ function UserActions({ user, onChangeStatus, onEdit, onResetPassword, onDelete, 
   return (
     <div className={cn("flex flex-wrap gap-2", alignRight && "justify-end")}>
       <button type="button" onClick={() => onEdit(user)} className={cn(actionClass, "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-400")}><Pencil className="h-3.5 w-3.5" />Редагувати</button>
+      {user.role !== "ADMIN" ? <>
       <button type="button" onClick={() => onResetPassword(user)} className={cn(actionClass, "border border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 focus-visible:ring-sky-400")}><KeyRound className="h-3.5 w-3.5" />Скинути пароль</button>
       {user.status === "BLOCKED" ? <button type="button" onClick={() => onChangeStatus({ user, nextStatus: "ACTIVE" })} className={cn(actionClass, "border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 focus-visible:ring-emerald-400")}><CheckCircle2 className="h-3.5 w-3.5" />Розблокувати</button> : null}
       {user.status === "ACTIVE" ? <button type="button" onClick={() => onChangeStatus({ user, nextStatus: "BLOCKED" })} className={cn(actionClass, "border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 focus-visible:ring-amber-400")}><Ban className="h-3.5 w-3.5" />Блокувати</button> : null}
-      {user.role !== "ADMIN" ? <button type="button" onClick={() => onDelete(user)} className={cn(actionClass, "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 focus-visible:ring-red-400")}><Trash2 className="h-3.5 w-3.5" />Видалити</button> : null}
+      <button type="button" onClick={() => onDelete(user)} className={cn(actionClass, "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 focus-visible:ring-red-400")}><Trash2 className="h-3.5 w-3.5" />Видалити</button>
+      </> : null}
     </div>
   );
 }
 
 function EditUserDialog({ user, onClose, onCompleted }) {
+  const currentUser = useContext(CurrentUserContext);
+  const credentialsProtected = user.role === "ADMIN" && user.id !== currentUser?.session?.userId;
   const [form, setForm] = useState({
     login: user.login,
     firstName: user.firstName || "",
@@ -688,7 +675,7 @@ function EditUserDialog({ user, onClose, onCompleted }) {
         <form onSubmit={submit} className="mt-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <CreateField label="Логін" error={errors.login}>
-              <Input value={form.login} onChange={(event) => update("login", formatLogin(event.target.value))} maxLength={50} autoComplete="off" autoCapitalize="none" spellCheck={false} />
+              <Input value={form.login} onChange={(event) => update("login", formatLogin(event.target.value))} maxLength={50} autoComplete="off" autoCapitalize="none" spellCheck={false} disabled={credentialsProtected} />
             </CreateField>
             <CreateField label="Роль" error={errors.role}>
               <select value={form.role} onChange={(event) => update("role", event.target.value)} disabled={user.role === "ADMIN"} className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[0.82rem] text-slate-700 outline-hidden focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">
@@ -708,15 +695,14 @@ function EditUserDialog({ user, onClose, onCompleted }) {
               <Input value={form.patronymic} onChange={(event) => update("patronymic", formatName(event.target.value))} maxLength={50} autoComplete="off" />
             </CreateField>
             <CreateField label="Електронна пошта" error={errors.email}>
-              <Input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} maxLength={100} autoComplete="off" />
+              <Input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} maxLength={100} autoComplete="off" disabled={credentialsProtected} />
             </CreateField>
-            <CreateField label="Номер телефону" error={errors.phone}>
+            {phoneEnabled ? <CreateField label="Номер телефону" error={errors.phone}>
               <div className="relative">
-                <span className={cn("pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[0.82rem]", phoneEnabled ? "text-slate-600" : "text-slate-400")}>+380</span>
-                <Input type="tel" inputMode="numeric" value={form.phone} onChange={(event) => update("phone", formatPhone(event.target.value))} disabled={!phoneEnabled} className="pl-[3.8rem] disabled:cursor-not-allowed disabled:bg-slate-100" placeholder="XX XXX XX XX" />
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[0.82rem] text-slate-600">+380</span>
+                <Input type="tel" inputMode="numeric" value={form.phone} onChange={(event) => update("phone", formatPhone(event.target.value))} className="pl-[3.8rem]" placeholder="XX XXX XX XX" />
               </div>
-              {!phoneEnabled ? <span className="mt-1.5 block text-[0.7rem] font-normal text-slate-400">Особистий телефон для цієї ролі не зберігається</span> : null}
-            </CreateField>
+            </CreateField> : null}
           </div>
 
           {user.role !== "ADMIN" && form.role !== user.role ? (

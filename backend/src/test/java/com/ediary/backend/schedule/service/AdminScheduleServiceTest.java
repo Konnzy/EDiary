@@ -76,6 +76,30 @@ class AdminScheduleServiceTest {
     }
 
     @Test
+    void rejectsScheduleWritesWithoutClassOrOutsideCurrentYear() {
+        var request = new SaveScheduleRequest(List.of());
+        assertThatThrownBy(() -> service.save(null, "2026/2027", 1, request))
+            .isInstanceOfSatisfying(ApplicationException.class,
+                error -> assertThat(error.getCode()).isEqualTo("SCHEDULE_CLASS_REQUIRED"));
+        for (String year : List.of("2025/2026", "2027/2028")) {
+            assertThatThrownBy(() -> service.save(1L, year, 1, request))
+                .isInstanceOfSatisfying(ApplicationException.class,
+                    error -> assertThat(error.getCode()).isEqualTo("SCHEDULE_YEAR_READ_ONLY"));
+        }
+        org.mockito.Mockito.verifyNoInteractions(scheduleRepository, schoolClassRepository);
+    }
+
+    @Test
+    void allowsReadingHistoricalSchedule() {
+        SchoolClass schoolClass = new SchoolClass();
+        schoolClass.setAcademicYear(academicYear("2025/2026"));
+        when(academicYearRepository.existsById("2025/2026")).thenReturn(true);
+        when(schoolClassRepository.findById(1L)).thenReturn(Optional.of(schoolClass));
+
+        assertThat(service.find(1L, "2025/2026", 1).academicYear()).isEqualTo("2025/2026");
+    }
+
+    @Test
     void savesLessonUsingFixedBellTimes() {
         SchoolClass schoolClass = new SchoolClass();
         schoolClass.setId(1L);

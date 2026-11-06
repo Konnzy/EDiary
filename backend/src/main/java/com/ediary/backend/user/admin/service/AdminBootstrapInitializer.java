@@ -10,8 +10,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -20,12 +19,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Component
 @ConditionalOnProperty(name = "app.bootstrap-admin.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class AdminBootstrapInitializer implements ApplicationRunner {
 
-    private static final Logger log = LoggerFactory.getLogger(AdminBootstrapInitializer.class);
     private static final String LOGIN_PATTERN = "^[A-Za-z0-9._-]{4,50}$";
     private static final String ACCESS_CODE_PATTERN = "^[A-Z0-9]{6}$";
 

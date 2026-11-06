@@ -125,8 +125,8 @@ function AppContent() {
     return <RequestRegistrationPage />;
   }
 
-  if (route === "forgot-password") {
-    return <ForgetPasswordPage />;
+  if (route === "forgot-password" || route === "admin/forgot-password") {
+    return <ForgetPasswordPage key={route} administrator={route.startsWith("admin/")} />;
   }
 
   if (route === "terms-of-use") {
@@ -137,8 +137,10 @@ function AppContent() {
     return <PrivacyPolicyPage />;
   }
 
-  if (route === "reset-password" || route.startsWith("reset-password?")) {
-    return <ResetPasswordPage key={route} token={new URLSearchParams(route.split("?")[1] || "").get("token") || ""} />;
+  const resetPasswordRoute = /^(admin\/)?reset-password(?:\?(.*))?$/.exec(route);
+  if (resetPasswordRoute) {
+    return <ResetPasswordPage key={route} administrator={Boolean(resetPasswordRoute[1])}
+      token={new URLSearchParams(resetPasswordRoute[2]).get("token") || ""} />;
   }
 
   if (route === "admin") {

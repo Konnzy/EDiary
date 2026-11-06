@@ -46,9 +46,8 @@ public record CreateAdminUserRequest(
     @Size(max = 100, message = "Email не може перевищувати 100 символів")
     String email,
 
-    @NotBlank(message = "Введіть номер телефону")
     @Pattern(
-        regexp = "^(?:\\+?380)?[0-9 ()-]{9,18}$",
+        regexp = "^$|^(?:\\+?380)?[0-9 ()-]{9,18}$",
         message = "Некоректний формат номера телефону"
     )
     String phone,
@@ -62,12 +61,10 @@ public record CreateAdminUserRequest(
 
     Long classId,
     Long subjectId,
-
-    @Size(max = 9, message = "Код прив’язки не може перевищувати 9 символів")
-    @Pattern(
-        regexp = "^$|^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$",
-        message = "Код прив’язки має формат XXXX-XXXX"
-    )
-    String parentLinkCode
+    Long studentId
 ) {
+    public CreateAdminUserRequest withStudentId(Long id) {
+        return new CreateAdminUserRequest(login, firstName, lastName, patronymic, email, phone,
+            birthDate, role, classId, subjectId, id);
+    }
 }

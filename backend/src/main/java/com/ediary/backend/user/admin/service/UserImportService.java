@@ -3,6 +3,7 @@ package com.ediary.backend.user.admin.service;
 import com.ediary.backend.common.audit.AuditService;
 import static com.ediary.backend.common.audit.AuditValues.of;
 import com.ediary.backend.common.error.ApplicationException;
+import com.ediary.backend.user.admin.dto.AdminStudentOption;
 import com.ediary.backend.user.admin.dto.CreateAdminUserRequest;
 import com.ediary.backend.user.admin.dto.UserImportDtos.*;
 import com.ediary.backend.user.entity.UserRole;
@@ -32,9 +33,10 @@ public class UserImportService {
     private static final Pattern CLASS = Pattern.compile("^(\\d{1,2})\\s*-\\s*([\\p{L}]{1,5})$");
     private static final Map<String,String> FIELDS = Map.ofEntries(Map.entry("role","Роль"),Map.entry("login","Логін"),
         Map.entry("lastName","Прізвище"),Map.entry("firstName","Ім’я"),Map.entry("patronymic","По батькові"),
-        Map.entry("email","Електронна пошта"),Map.entry("phone","Телефон"),Map.entry("birthDate","Дата народження"),
-        Map.entry("parentLinkCode","Код прив’язки"));
-    private record Checked(Preview preview, List<CreateAdminUserRequest> requests) {}
+        Map.entry("email","Електронна пошта"),Map.entry("phone","Телефон"),Map.entry("birthDate","Дата народження"));
+    private static final String STUDENT_LOGIN = "Логін учня";
+    private record PreparedRow(int number, CreateAdminUserRequest request, AdminStudentOption student) {}
+    private record Checked(Preview preview, List<PreparedRow> requests) {}
 
     @Transactional
     public Preview preview(MultipartFile file, String format) {
@@ -49,10 +51,24 @@ public class UserImportService {
         jdbc.execute("select pg_advisory_xact_lock(15342941)");
         Checked checked = check(bytes,format);
         if (checked.preview().invalid() != 0) throw invalid("IMPORT_VALIDATION_FAILED", "Дані не пройшли повторну перевірку. Жодного користувача не створено.");
-        for (int index = 0; index < checked.requests().size(); index++) {
-            try { users.create(checked.requests().get(index)); }
+        var ordered = checked.requests().stream()
+            .sorted(Comparator.comparing(row -> row.request().role() == UserRole.PARENT))
+            .toList();
+        for (var row : ordered) {
+            try {
+                var request = row.request();
+                if (row.student() != null) {
+                    var student = row.student();
+                    if (student.id() == null) {
+                        student = users.findLinkableStudent(student.login())
+                            .orElseThrow(() -> invalid("INVALID_LINKED_STUDENT", "Учня для прив’язки не знайдено"));
+                    }
+                    request = request.withStudentId(student.id());
+                }
+                users.create(request);
+            }
             catch (ApplicationException error) {
-                throw invalid("IMPORT_CREATION_FAILED", "Рядок " + checked.preview().rows().get(index).number() + ": " + error.getMessage() + ". Імпорт скасовано повністю.");
+                throw invalid("IMPORT_CREATION_FAILED", "Рядок " + row.number() + ": " + error.getMessage() + ". Імпорт скасовано повністю.");
             }
         }
         int count = checked.requests().size();
@@ -105,7 +121,12 @@ public class UserImportService {
             String login = values.get(1).toLowerCase(Locale.ROOT), email = values.get(5).toLowerCase(Locale.ROOT);
             logins.computeIfAbsent(login,key->new ArrayList<>()).add(index);
             emails.computeIfAbsent(email,key->new ArrayList<>()).add(index);
-            var input = new CreateAdminUserRequest(login,values.get(3),values.get(2),values.get(4),email,values.get(6),birth,role,classId,subjectId,values.get(11).toUpperCase(Locale.ROOT));
+            if (role == UserRole.PARENT && values.get(11).isBlank()) {
+                problems.put(STUDENT_LOGIN,"Вкажіть логін учня для прив’язки.");
+            } else if (role != UserRole.PARENT && !values.get(11).isBlank()) {
+                problems.put(STUDENT_LOGIN,"Логін учня заповнюється лише для батьків.");
+            }
+            var input = new CreateAdminUserRequest(login,values.get(3),values.get(2),values.get(4),email,values.get(6),birth,role,classId,subjectId,null);
             requests.add(input);
             validator.validate(input).stream().sorted(Comparator.comparing(v->v.getPropertyPath().toString())).forEach(v->
                 problems.putIfAbsent(FIELDS.getOrDefault(v.getPropertyPath().toString(),v.getPropertyPath().toString()),v.getMessage()));
@@ -113,22 +134,29 @@ public class UserImportService {
         logins.values().stream().filter(items->items.size()>1).forEach(items->items.forEach(index->errors.get(index).put("Логін","Повторюється у файлі.")));
         emails.values().stream().filter(items->items.size()>1).forEach(items->items.forEach(index->errors.get(index).put("Електронна пошта","Повторюється у файлі.")));
         Map<Long,List<Integer>> classes = new TreeMap<>();
-        for (int index=0;index<requests.size();index++) if (requests.get(index).classId()!=null)
+        for (int index=0;index<requests.size();index++) if (requests.get(index).classId()!=null && errors.get(index).isEmpty())
             classes.computeIfAbsent(requests.get(index).classId(),id->new ArrayList<>()).add(index);
         classes.forEach((id,items)->{
             jdbc.queryForObject("select class_id from school_class where class_id=? for update",Long.class,id);
             Long free = jdbc.queryForObject("select class_limit-(select count(*) from student where class_id=?) from school_class where class_id=?",Long.class,id,id);
             if (free == null || items.size()>free) items.forEach(index->errors.get(index).put("Клас","Недостатньо вільних місць для всіх учнів із файлу."));
         });
+        Map<String,AdminStudentOption> pendingStudents = new HashMap<>();
         for (int index=0;index<requests.size();index++) if (errors.get(index).isEmpty()) {
-            try { users.validateCreation(requests.get(index)); }
+            var input = requests.get(index);
+            try {
+                var targets = users.validateCreation(input);
+                if (input.role() == UserRole.STUDENT) {
+                    String fullName = String.join(" ", input.lastName(), input.firstName(), input.patronymic()).strip();
+                    pendingStudents.put(input.login(), new AdminStudentOption(null, input.login(), fullName, targets.schoolClass().getDisplayName()));
+                }
+            }
             catch (ApplicationException error) {
                 String field = switch (error.getCode()) {
                     case "LOGIN_ALREADY_EXISTS" -> "Логін";
                     case "EMAIL_ALREADY_REGISTERED" -> "Електронна пошта";
                     case "INVALID_PHONE" -> "Телефон";
                     case "INVALID_BIRTH_DATE", "ADULT_ROLE_REQUIRES_ADULT_AGE" -> "Дата народження";
-                    case "INVALID_PARENT_LINK_CODE" -> "Код прив’язки";
                     case "CLASS_ACADEMIC_YEAR_MISMATCH" -> "Навчальний рік";
                     case "CLASS_NOT_FOUND", "CLASS_TEACHER_REQUIRED", "SCHOOL_CLASS_IS_FULL" -> "Клас";
                     case "SUBJECT_NOT_FOUND" -> "Предмет";
@@ -138,13 +166,30 @@ public class UserImportService {
             }
         }
         List<Row> rows = new ArrayList<>();
+        List<PreparedRow> prepared = new ArrayList<>();
         for (int index=0;index<raw.size();index++) {
-            var values = new ArrayList<>(raw.get(index).values());
-            if (!values.get(11).isEmpty()) values.set(11,"••••-••••");
-            rows.add(new Row(raw.get(index).number(),values,errors.get(index)));
+            var row = raw.get(index);
+            var problems = errors.get(index);
+            var request = requests.get(index);
+            AdminStudentOption student = null;
+            if (request.role() == UserRole.PARENT && !problems.containsKey(STUDENT_LOGIN)) {
+                String childLogin = row.values().get(11).toLowerCase(Locale.ROOT);
+                student = pendingStudents.get(childLogin);
+                if (student == null) {
+                    if (logins.containsKey(childLogin)) {
+                        problems.put(STUDENT_LOGIN,"Логін має належати коректному рядку учня у файлі.");
+                    } else {
+                        student = users.findLinkableStudent(childLogin).orElse(null);
+                        if (student == null) problems.put(STUDENT_LOGIN,"Активного учня з таким логіном не знайдено.");
+                    }
+                }
+            }
+            var linkedStudent = student == null ? null : new LinkedStudent(student.fullName(), student.className());
+            rows.add(new Row(row.number(),row.values(),problems,linkedStudent));
+            if (problems.isEmpty()) prepared.add(new PreparedRow(row.number(),request,student));
         }
-        int valid = (int)errors.stream().filter(Map::isEmpty).count();
-        return new Checked(new Preview(digest(bytes),UserImportFileService.COLUMNS,rows,rows.size(),valid,rows.size()-valid),requests);
+        int valid = prepared.size();
+        return new Checked(new Preview(digest(bytes),UserImportFileService.COLUMNS,rows,rows.size(),valid,rows.size()-valid),prepared);
     }
     private String digest(byte[] bytes) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)); }

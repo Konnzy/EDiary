@@ -16,6 +16,10 @@ public interface TeacherProfileRepository extends JpaRepository<TeacherProfile, 
 
     Optional<TeacherProfile> findByUser_LoginIgnoreCase(String login);
 
+    @EntityGraph(attributePaths = {"user", "subjects"})
+    @Query("select teacher from TeacherProfile teacher where lower(teacher.user.login) in :logins")
+    List<TeacherProfile> findAllByNormalizedLogins(@Param("logins") Set<String> logins);
+
     long deleteByUser_Id(Long userId);
 
     @Query("""

@@ -2,10 +2,12 @@ package com.ediary.backend.user.repository;
 
 import com.ediary.backend.user.entity.StudentProfile;
 import com.ediary.backend.user.entity.StudentStatus;
+import com.ediary.backend.user.entity.UserRole;
 import com.ediary.backend.user.entity.UserStatus;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -18,6 +20,25 @@ public interface StudentProfileRepository extends JpaRepository<StudentProfile, 
 
     @EntityGraph(attributePaths = {"user", "schoolClass"})
     Optional<StudentProfile> findByUser_LoginIgnoreCase(String login);
+
+    @EntityGraph(attributePaths = {"user", "schoolClass"})
+    @Query("""
+        select student from StudentProfile student
+        where student.user.role = :role
+          and student.user.status = :userStatus
+          and student.status = :studentStatus
+          and (lower(student.user.login) like lower(:pattern) escape '!'
+            or lower(concat(student.surname, ' ', student.name, ' ', coalesce(student.patronymic, '')))
+                like lower(:pattern) escape '!')
+        order by student.surname, student.name, student.id
+        """)
+    List<StudentProfile> searchLinkableStudents(
+        @Param("pattern") String pattern,
+        @Param("role") UserRole role,
+        @Param("userStatus") UserStatus userStatus,
+        @Param("studentStatus") StudentStatus studentStatus,
+        Pageable pageable
+    );
 
     long countBySchoolClassId(Long classId);
 
