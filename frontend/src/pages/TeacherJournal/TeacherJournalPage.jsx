@@ -41,7 +41,7 @@ const attendanceOptions = [
 ];
 const resultDescriptions = { PASSED: "Зараховано", NOT_PASSED: "Не зараховано", EXEMPTED: "Звільнено від оцінювання" };
 
-function JournalHintButton({ hint, onClick, children, buttonRef, hintDisabled = false, showOnClick = true, ...props }) {
+function JournalHintButton({ as: Element = "button", hint, onClick, children, buttonRef, hintDisabled = false, showOnClick = true, ...props }) {
   const button = useRef(null);
   const tooltip = useRef(null);
   const timer = useRef(null);
@@ -85,9 +85,9 @@ function JournalHintButton({ hint, onClick, children, buttonRef, hintDisabled = 
     };
   }, []);
   return <>
-    <button {...props} ref={node => { button.current = node; if (buttonRef) buttonRef.current = node; }} aria-label={props["aria-label"] || hint} aria-describedby={open ? id : undefined}
+    <Element {...props} ref={node => { button.current = node; if (buttonRef) buttonRef.current = node; }} aria-label={props["aria-label"] || hint || undefined} aria-describedby={open ? id : undefined}
       onMouseEnter={schedule} onMouseLeave={dismiss} onFocus={show} onBlur={dismiss}
-      onClick={event => { if (showOnClick) show(); else dismiss(); onClick?.(event); }}>{children}</button>
+      onClick={Element === "button" ? event => { if (showOnClick) show(); else dismiss(); onClick?.(event); } : undefined}>{children}</Element>
     {open ? createPortal(<span ref={tooltip} id={id} role="tooltip"
       style={{ left: position?.left ?? 0, top: position?.top ?? 0, width: "max-content", maxWidth: "min(280px, calc(100vw - 24px))", visibility: position ? "visible" : "hidden", borderRadius: 6, backgroundColor: "#17212b", color: "#fff" }}
       className="pointer-events-none fixed z-[110] rounded-md px-3 py-2.5 text-center text-xs leading-4 shadow-lg">
@@ -142,6 +142,9 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
     ? String(subjectId) === String(initialSubjectId)
     : sameOptionLabel(selectedSubject?.label, initialSubjectName);
   const periods = useMemo(() => monthPeriods(academicYear), [academicYear]);
+  const readOnly = Boolean(options?.currentAcademicYear && academicYear && academicYear < options.currentAcademicYear);
+  const canEdit = !readOnly && periods.some((item) => item.value === journal?.month)
+    && journal.month === period && String(journal.classId) === String(classId) && String(journal.subjectId) === String(subjectId);
 
   useEffect(() => {
     let active = true;
@@ -199,6 +202,7 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
   };
 
   const saveLesson = async (lesson, value) => {
+    if (!canEdit) return;
     setSaving(true);
     setError("");
     try {
@@ -213,6 +217,7 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
   };
 
   const saveGrade = async (studentId, lesson, value) => {
+    if (!canEdit) return;
     setSaving(true);
     setError("");
     try {
@@ -236,6 +241,7 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
   });
 
   const markAllPresent = async (lesson) => {
+    if (!canEdit) return;
     if (!lesson.workType) {
       setError("Спочатку вкажіть тип роботи уроку.");
       setLessonEditor(lesson);
@@ -258,7 +264,7 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
   };
 
   const clearAttendance = async (lesson) => {
-    if (!lesson.id) return;
+    if (!canEdit || !lesson.id) return;
     setSaving(true);
     setError("");
     setGradeEditor(null);
@@ -293,7 +299,7 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
                 classes={options.classes}
                 academicYears={options.academicYears}
                 academicYear={academicYear}
-                onAcademicYearChange={(value) => { setAcademicYear(value); setClassId(""); setSubjectId(""); setJournal(null); }}
+                onAcademicYearChange={(value) => { setAcademicYear(value); changeClass(""); setJournal(null); }}
                 classId={classId}
                 subjectId={subjectId}
                 period={period}
@@ -314,9 +320,11 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
                     <h2 className="truncate text-[0.95rem] font-bold text-slate-900">{journal.subjectName} · {journal.className}</h2>
                     <p className="mt-1 text-[0.72rem] text-slate-500">{journal.students.length} учнів · {journal.lessons.length} уроків</p>
                   </div>
+                  {readOnly ? <span className="rounded-md bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700">Лише перегляд</span> : null}
                 </div>
 
                 <JournalTable
+                  editable={canEdit}
                   passFail={journal.assessmentPolicy?.mode === "PASS_FAIL"}
                   key={`${classId}:${subjectId}:${period}`}
                   lessons={journal.lessons}
@@ -355,7 +363,7 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
         </div>
       </div>
 
-      {lessonEditor ? (
+      {canEdit && lessonEditor ? (
         <LessonDetailsDialog
           date={lessonEditor.date}
           className={journal.className}
@@ -368,7 +376,7 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
         />
       ) : null}
 
-      {gradeEditor ? (
+      {canEdit && gradeEditor ? (
         <GradePopover
           key={`${gradeEditor.student.id}:${gradeEditor.lesson.scheduleId}:${gradeEditor.date}`}
           editor={gradeEditor}
@@ -517,7 +525,7 @@ function SelectField({ label, value, onChange, children }) {
   );
 }
 
-function JournalTable({ lessons, students, initialTarget, onLessonClick, onGradeClick, onMarkAllPresent, onClearAttendance, onPageChange, saving, passFail = false }) {
+function JournalTable({ lessons, students, editable, initialTarget, onLessonClick, onGradeClick, onMarkAllPresent, onClearAttendance, onPageChange, saving, passFail = false }) {
   const tableContainer = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(0);
   const [page, setPage] = useState(null);
@@ -574,6 +582,7 @@ function JournalTable({ lessons, students, initialTarget, onLessonClick, onGrade
                 key={`${lesson.scheduleId}:${lesson.date}`}
                 date={lesson.date}
                 lesson={lesson}
+                editable={editable}
                 onClick={() => onLessonClick(lesson)}
                 onMarkAllPresent={() => onMarkAllPresent(lesson)}
                 onClearAttendance={() => onClearAttendance(lesson)}
@@ -595,7 +604,7 @@ function JournalTable({ lessons, students, initialTarget, onLessonClick, onGrade
               </th>
               {visibleLessons.map((lesson) => {
                 const cell = lesson.cells.find((item) => item.studentId === student.id);
-                return <GradeCell key={`${lesson.scheduleId}:${lesson.date}`} grade={cell} onClick={(event) => onGradeClick(event, student, lesson)} />;
+                return <GradeCell key={`${lesson.scheduleId}:${lesson.date}`} grade={cell} editable={editable} onClick={(event) => onGradeClick(event, student, lesson)} />;
               })}
               <td className="sticky right-0 z-10 border-b border-l border-slate-200 bg-slate-50 px-1 text-center text-[0.8rem] font-bold text-slate-700">
                 {passFail ? "Залікова" : formatThematicEstimate(student.thematicEstimate)}
@@ -639,11 +648,12 @@ function monthPeriods(academicYear) {
     .map(([year, month]) => ({ value: `${year}-${String(month).padStart(2, "0")}`, label: `${names[month - 1]} ${year}` }));
 }
 
-function DateHeader({ date, lesson, onClick, onMarkAllPresent, onClearAttendance, studentCount, saving }) {
+function DateHeader({ date, lesson, editable, onClick, onMarkAllPresent, onClearAttendance, studentCount, saving }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState(null);
   const menuButton = useRef(null);
   const menu = useRef(null);
+  const Header = editable ? "button" : "div";
   const parts = dateParts(date);
   const type = lesson?.id ? workTypes.find((item) => item.value === lesson?.workType) : null;
   const today = date === new Date().toLocaleDateString("sv-SE");
@@ -691,7 +701,8 @@ function DateHeader({ date, lesson, onClick, onMarkAllPresent, onClearAttendance
   return (
     <th className={cn("border-b border-r border-slate-200 p-0 text-center align-top", today && "bg-emerald-50")}>
       <div className="relative">
-        <button type="button" onClick={onClick} className="group/date flex min-h-[154px] w-full flex-col items-center px-2 py-2.5 text-left hover:bg-slate-100" title="Редагувати дані уроку">
+        <Header {...(editable ? { type: "button", onClick, title: "Редагувати дані уроку" } : {})}
+          className={cn("group/date flex min-h-[154px] w-full flex-col items-center px-2 py-2.5 text-left", editable && "hover:bg-slate-100")}>
           <span className="max-w-full truncate text-[0.64rem] font-semibold text-slate-500">{parts.weekday}</span>
           <span className="mt-0.5 text-[0.82rem] font-bold text-slate-800">{parts.day}.{parts.month}</span>
           <span className="text-[0.61rem] font-medium text-slate-500">{lesson.lessonNumber}-й урок</span>
@@ -701,15 +712,15 @@ function DateHeader({ date, lesson, onClick, onMarkAllPresent, onClearAttendance
               ? cn("border", workTypeClasses[type.value])
               : "text-slate-300 group-hover/date:bg-white group-hover/date:text-slate-500",
           )}>
-            {type?.label || (lesson?.id ? "Не вказано" : <Pencil className="h-3 w-3" aria-hidden="true" />)}
+            {type?.label || (lesson?.id || !editable ? "Не вказано" : <Pencil className="h-3 w-3" aria-hidden="true" />)}
           </span>
           <span className="mt-2.5 w-full border-t border-slate-200 pt-2 text-[0.66rem] font-normal leading-4 text-slate-600" title={`Тема: ${topic}`}>
-            <span className="block truncate"><span className="font-semibold">Тема:</span> {topic}</span>
-            <span className="mt-0.5 block truncate" title={`Домашнє завдання: ${homework}`}><span className="font-semibold">ДЗ:</span> {homework}</span>
+            <span className={cn("block", editable ? "truncate" : "wrap-anywhere")}><span className="font-semibold">Тема:</span> {topic}</span>
+            <span className={cn("mt-0.5 block", editable ? "truncate" : "wrap-anywhere")} title={`Домашнє завдання: ${homework}`}><span className="font-semibold">ДЗ:</span> {homework}</span>
             {homeworkDeadline ? <span className="mt-0.5 block truncate text-slate-400"><span className="font-semibold">До:</span> {homeworkDeadline}</span> : null}
           </span>
-        </button>
-        <JournalHintButton
+        </Header>
+        {editable ? <JournalHintButton
           buttonRef={menuButton}
           hint="Дії з відвідуванням"
           hintDisabled={menuOpen}
@@ -720,9 +731,9 @@ function DateHeader({ date, lesson, onClick, onMarkAllPresent, onClearAttendance
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 shadow-xs hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 focus-visible:outline-2 focus-visible:outline-sky-400"
-        ><Ellipsis className="h-4 w-4" aria-hidden="true" /></JournalHintButton>
+        ><Ellipsis className="h-4 w-4" aria-hidden="true" /></JournalHintButton> : null}
       </div>
-      {menuOpen && menuPosition ? createPortal(
+      {editable && menuOpen && menuPosition ? createPortal(
         <div ref={menu} role="menu" aria-label={`Відвідування ${parts.day}.${parts.month}`} className="fixed z-[100] rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl" style={menuPosition}>
           <button type="button" role="menuitem" disabled={saving || studentCount === 0 || presentCount >= studentCount} onClick={() => { setMenuOpen(false); onMarkAllPresent(); }} className="flex h-9 w-full items-center gap-2 rounded-md bg-sky-50 px-2.5 text-left text-[0.76rem] font-semibold text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50"><UsersRound className="h-4 w-4 shrink-0" aria-hidden="true" />Позначити всіх присутніми</button>
           <button type="button" role="menuitem" disabled={saving || !lesson.id || markedCount === 0} onClick={() => { setMenuOpen(false); onClearAttendance(); }} className="mt-1 flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-[0.76rem] font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"><Eraser className="h-4 w-4 shrink-0" aria-hidden="true" />Очистити відвідування</button>
@@ -732,7 +743,7 @@ function DateHeader({ date, lesson, onClick, onMarkAllPresent, onClearAttendance
   );
 }
 
-function GradeCell({ grade, onClick }) {
+function GradeCell({ grade, editable, onClick }) {
   const gradeValue = String(gradeDisplay(grade));
   const attendanceStatus = grade?.attendanceStatus || "";
   const attendanceLabel = attendanceStatus === "ABSENT"
@@ -755,15 +766,17 @@ function GradeCell({ grade, onClick }) {
     attendanceStatus === "EXCUSED_ABSENCE" && "Відсутній з поважної причини",
     attendanceStatus === "LATE" && "Запізнився",
     attendanceStatus === "EXEMPTED" && "Звільнений від заняття",
-  ].filter(Boolean).join(" · ") || "Виставити оцінку";
+    !editable && grade?.homeworkStatus && homeworkStatuses.find((item) => item.value === grade.homeworkStatus)?.label,
+  ].filter(Boolean).join(" · ") || (editable ? "Виставити оцінку" : "");
   return (
     <td className="h-[58px] border-b border-r border-slate-200 p-1.5 text-center">
       <JournalHintButton
-        type="button"
-        onClick={onClick}
+        {...(editable ? { type: "button", onClick } : { as: "span", tabIndex: title ? 0 : undefined, hintDisabled: !title })}
+        aria-label={!editable && title ? [numeric && `Оцінка: ${gradeValue}`, title].filter(Boolean).join(" · ") : undefined}
         className={cn(
           "group/cell relative mx-auto flex h-10 w-12 items-center justify-center rounded border text-[0.82rem] font-bold transition-colors",
-          !grade && "border-transparent text-slate-300 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600",
+          !grade && "border-transparent text-slate-300",
+          !grade && editable && "hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600",
           numeric && Number(gradeValue) >= 10 && "border-sky-300 bg-sky-100 text-sky-700",
           numeric && Number(gradeValue) >= 7 && Number(gradeValue) < 10 && "border-emerald-200 bg-emerald-50 text-emerald-700",
           numeric && Number(gradeValue) >= 4 && Number(gradeValue) < 7 && "border-amber-200 bg-amber-50 text-amber-700",
@@ -777,7 +790,7 @@ function GradeCell({ grade, onClick }) {
         )}
         hint={title}
       >
-        {gradeValue || attendanceLabel || <Plus className="h-4 w-4 opacity-0 transition-opacity group-hover/cell:opacity-100" aria-hidden="true" />}
+        {gradeValue || attendanceLabel || (editable ? <Plus className="h-4 w-4 opacity-0 transition-opacity group-hover/cell:opacity-100" aria-hidden="true" /> : null)}
         {gradeValue && attendanceLabel ? (
           <span className={cn(
             "absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded px-1 text-[0.52rem] font-bold leading-4 shadow-xs",

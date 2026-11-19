@@ -326,6 +326,7 @@ public class JournalService {
     @Transactional
     public void saveCell(String teacherLogin, Long lessonId, Long studentId, SaveJournalCellRequest request) {
         Lesson lesson = lessonRepository.findForTeacher(lessonId, teacherLogin).orElseThrow(this::journalNotFound);
+        LessonService.requireEditableAcademicYear(lesson.getDate(), LocalDate.now(clock));
         if (lesson.getStatus() == com.ediary.backend.schedule.entity.LessonStatus.CANCELLED) {
             throw new ApplicationException(HttpStatus.CONFLICT, "LESSON_CANCELLED", "Скасований урок не можна редагувати");
         }
@@ -454,6 +455,7 @@ public class JournalService {
     @Transactional
     public void clearAttendance(String teacherLogin, Long lessonId) {
         Lesson lesson = lessonRepository.findForTeacher(lessonId, teacherLogin).orElseThrow(this::journalNotFound);
+        LessonService.requireEditableAcademicYear(lesson.getDate(), LocalDate.now(clock));
         if (lesson.getStatus() == LessonStatus.CANCELLED) {
             throw new ApplicationException(HttpStatus.CONFLICT, "LESSON_CANCELLED", "Скасований урок не можна редагувати");
         }

@@ -24,6 +24,8 @@ public interface UserRepository extends JpaRepository<AppUser, Long>, JpaSpecifi
 
     boolean existsByLoginIgnoreCase(String login);
 
+    boolean existsByLoginIgnoreCaseAndMustChangePasswordTrue(String login);
+
     boolean existsByLoginIgnoreCaseAndIdNot(String login, Long id);
 
     boolean existsByEmailIgnoreCase(String email);

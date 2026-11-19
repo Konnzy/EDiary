@@ -20,6 +20,10 @@ public class SecurityErrorHandler implements AuthenticationEntryPoint, AccessDen
 
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException error) throws IOException {
+        if (error instanceof PasswordChangeRequiredException) {
+            write(request, response, 403, "PASSWORD_CHANGE_REQUIRED", error.getMessage());
+            return;
+        }
         write(request, response, 403, error instanceof CsrfException ? "CSRF_INVALID" : "ACCESS_DENIED", "Недостатньо прав для виконання цієї дії");
     }
 

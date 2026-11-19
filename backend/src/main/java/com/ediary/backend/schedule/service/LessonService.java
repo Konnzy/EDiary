@@ -37,6 +37,7 @@ public class LessonService {
         ScheduleEntry schedule = scheduleRepository.findByIdForLessonCreation(scheduleId)
             .orElseThrow(this::scheduleNotFound);
         requireAssignedTeacher(schedule, teacherLogin);
+        requireEditableAcademicYear(date, LocalDate.now(clock));
 
         Lesson lesson = lessonRepository.findByScheduleEntry_IdAndDate(scheduleId, date)
             .orElse(null);
@@ -84,6 +85,7 @@ public class LessonService {
         UpdateLessonRequest request
     ) {
         Lesson lesson = requireTeacherLesson(teacherLogin, lessonId);
+        requireEditableAcademicYear(lesson.getDate(), LocalDate.now(clock));
         var beforeLesson = of("topic", lesson.getTopic(), "status", lesson.getStatus());
         String topic = normalizeTopic(request.topic());
         validateStatusTransition(lesson.getStatus(), request.status());
@@ -118,6 +120,13 @@ public class LessonService {
                 "LESSON_NOT_FOUND",
                 "Урок не знайдено"
             ));
+    }
+
+    public static void requireEditableAcademicYear(LocalDate date, LocalDate today) {
+        if (date != null && SchedulePeriod.academicYear(date).compareTo(SchedulePeriod.academicYear(today)) < 0) {
+            throw new ApplicationException(HttpStatus.CONFLICT, "JOURNAL_YEAR_READ_ONLY",
+                "Журнал за минулі навчальні роки доступний лише для перегляду");
+        }
     }
 
     private void requireAssignedTeacher(ScheduleEntry schedule, String teacherLogin) {

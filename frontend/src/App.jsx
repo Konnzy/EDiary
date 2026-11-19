@@ -13,6 +13,7 @@ import { ForgetPasswordPage } from "@/pages/ForgetPassword/ForgetPasswordPage.js
 import { LoginPage } from "@/pages/Login/LoginPage.jsx";
 import { RequestRegistrationPage } from "@/pages/RequestRegistration/RequestRegistrationPage.jsx";
 import { ResetPasswordPage } from "@/pages/ResetPassword/ResetPasswordPage.jsx";
+import { TemporaryPasswordPage } from "@/pages/TemporaryPassword/TemporaryPasswordPage.jsx";
 import { StudentHomePage } from "@/pages/StudentHome/StudentHomePage.jsx";
 import { TeacherHomePage } from "@/pages/TeacherHome/TeacherHomePage.jsx";
 import { TeacherJournalPage } from "@/pages/TeacherJournal/TeacherJournalPage.jsx";
@@ -44,7 +45,9 @@ const homeRoutes = {
   PARENT: "parent",
 };
 
-function ProtectedRoute({ allowedRole, loginRoute, children }) {
+const temporaryPasswordRoute = "change-temporary-password";
+
+function ProtectedRoute({ allowedRole, loginRoute, changingPassword = false, children }) {
   const [checking, setChecking] = useState(true);
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -56,7 +59,15 @@ function ProtectedRoute({ allowedRole, loginRoute, children }) {
       .then((session) => {
         if (!active) return;
 
-        if (session.role !== allowedRole) {
+        if (session.mustChangePassword && !changingPassword) {
+          window.location.replace(`#${temporaryPasswordRoute}`);
+          return;
+        }
+        if (!session.mustChangePassword && changingPassword) {
+          window.location.replace(`#${homeRoutes[session.role] || loginRoute}`);
+          return;
+        }
+        if (allowedRole && session.role !== allowedRole) {
           showRouteAccessNotice("ACCESS_DENIED");
           window.location.hash = allowedRole === "ADMIN"
             ? loginRoute
@@ -66,7 +77,7 @@ function ProtectedRoute({ allowedRole, loginRoute, children }) {
 
         setSession(session);
         setChecking(false);
-        if (session.role !== "ADMIN") {
+        if (!changingPassword && session.role !== "ADMIN") {
           userProfileApi.find().then((details) => {
             if (active && details.role === session.role) setProfile(details);
           }).catch(() => {
@@ -86,7 +97,7 @@ function ProtectedRoute({ allowedRole, loginRoute, children }) {
     return () => {
       active = false;
     };
-  }, [allowedRole, loginRoute]);
+  }, [allowedRole, loginRoute, changingPassword]);
 
   if (checking) {
     return (
@@ -141,6 +152,14 @@ function AppContent() {
   if (resetPasswordRoute) {
     return <ResetPasswordPage key={route} administrator={Boolean(resetPasswordRoute[1])}
       token={new URLSearchParams(resetPasswordRoute[2]).get("token") || ""} />;
+  }
+
+  if (route === temporaryPasswordRoute) {
+    return (
+      <ProtectedRoute key={route} loginRoute="login" changingPassword>
+        <TemporaryPasswordPage onChanged={(role) => window.location.replace(`#${homeRoutes[role] || "login"}`)} />
+      </ProtectedRoute>
+    );
   }
 
   if (route === "admin") {

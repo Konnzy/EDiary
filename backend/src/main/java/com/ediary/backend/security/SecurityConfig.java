@@ -1,17 +1,24 @@
 package com.ediary.backend.security;
 
+import com.ediary.backend.user.repository.UserRepository;
 import java.time.Clock;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authorization.AuthenticatedAuthorizationManager;
+import org.springframework.security.authorization.AuthorityAuthorizationManager;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationManager;
+import org.springframework.security.authorization.AuthorizationManagers;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -53,9 +60,20 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityErrorHandler errorHandler) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+        HttpSecurity http, SecurityErrorHandler errorHandler, UserRepository users
+    ) throws Exception {
         CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfRepository.setCookieCustomizer(cookie -> cookie.sameSite("Strict").path("/"));
+
+        var authenticated = AuthenticatedAuthorizationManager.<RequestAuthorizationContext>authenticated();
+        var administrator = AuthorityAuthorizationManager.<RequestAuthorizationContext>hasRole("ADMIN");
+        AuthorizationManager<RequestAuthorizationContext> passwordChanged = (authentication, context) -> {
+            if (users.existsByLoginIgnoreCaseAndMustChangePasswordTrue(authentication.get().getName())) {
+                throw new PasswordChangeRequiredException();
+            }
+            return new AuthorizationDecision(true);
+        };
 
         http
             .exceptionHandling(errors -> errors.authenticationEntryPoint(errorHandler).accessDeniedHandler(errorHandler))
@@ -81,9 +99,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/password/forgot", "/api/auth/password/reset").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/admin/login").permitAll()
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.POST, "/api/auth/admin/logout").hasRole("ADMIN")
-                .anyRequest().authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/auth/session").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/auth/logout", "/api/users/me/password").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/auth/admin/logout", "/api/admin/users/me/password").hasRole("ADMIN")
+                .requestMatchers("/api/admin/**").access(AuthorizationManagers.allOf(administrator, passwordChanged))
+                .anyRequest().access(AuthorizationManagers.allOf(authenticated, passwordChanged))
             )
             .headers(headers -> headers
                 .frameOptions(frame -> frame.deny())

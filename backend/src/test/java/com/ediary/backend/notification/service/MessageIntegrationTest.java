@@ -24,6 +24,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -618,6 +619,7 @@ class MessageIntegrationTest {
             """,slot);
         jdbc.update("insert into mark(student_id,lesson_id,mark_date,mark_type,mark_score) values (?,?,'2026-05-18','YEAR',11)",
             studentId,lesson);
+        jdbc.update("insert into attendance(student_id,lesson_id,attendance_status) values (?,?,'ABSENT')",studentId,lesson);
 
         mvc.perform(get("/api/admin/classes/{id}/students",pastClass).with(user("admin").roles("ADMIN")))
             .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(studentId));
@@ -632,6 +634,30 @@ class MessageIntegrationTest {
             assertThat(item.id()).isEqualTo(lesson);
             assertThat(item.cells()).singleElement().satisfies(cell->assertThat(cell.score()).isEqualTo(11));
         });
+        var teacherAuth=user(login("teacher")).roles("TEACHER");
+        mvc.perform(get("/api/teacher/journal").param("classId",String.valueOf(pastClass)).param("subjectId",String.valueOf(subject))
+            .param("month","2026-05").with(teacherAuth)).andExpect(status().isOk());
+        mvc.perform(put("/api/teacher/journal/lessons/schedule/{id}",slot).param("date","2026-05-18")
+            .with(teacherAuth).with(csrf()).contentType("application/json")
+            .content("{\"topic\":\"Інша тема\",\"workType\":\"YEAR\"}"))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("JOURNAL_YEAR_READ_ONLY"));
+        mvc.perform(put("/api/teacher/journal/lessons/{id}/students/{studentId}",lesson,studentId)
+            .with(teacherAuth).with(csrf()).contentType("application/json").content("{\"score\":12}"))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("JOURNAL_YEAR_READ_ONLY"));
+        mvc.perform(put("/api/teacher/journal/lessons/schedule/{id}/attendance",slot).param("date","2026-05-18")
+            .with(teacherAuth).with(csrf())).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("JOURNAL_YEAR_READ_ONLY"));
+        mvc.perform(delete("/api/teacher/journal/lessons/{id}/attendance",lesson).with(teacherAuth).with(csrf()))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("JOURNAL_YEAR_READ_ONLY"));
+        mvc.perform(put("/api/teacher/lessons/{id}",lesson).with(teacherAuth).with(csrf())
+            .contentType("application/json").content("{\"topic\":\"Інша тема\",\"status\":\"COMPLETED\"}"))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("JOURNAL_YEAR_READ_ONLY"));
+        mvc.perform(put("/api/teacher/lessons/schedule/{id}",slot).param("date","2026-05-25").with(teacherAuth).with(csrf()))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("JOURNAL_YEAR_READ_ONLY"));
+        assertThat(id("select count(*) from lesson where schedule_id=?",slot)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select lesson_topic from lesson where lesson_id=?",String.class,lesson))
+            .isEqualTo("Підсумок за рік");
+        assertThat(jdbc.queryForObject("select attendance_status::text from attendance where lesson_id=?",String.class,lesson))
+            .isEqualTo("ABSENT");
         assertThat(progress.forStudent(login("student"),"2025/2026").subjects().getFirst().grades())
             .singleElement().satisfies(grade->assertThat(grade.score()).isEqualTo(11));
         assertThat(progress.forParent(login("parent"),studentId,"2025/2026").subjects().getFirst().grades())
@@ -639,11 +665,62 @@ class MessageIntegrationTest {
         assertThat(id("select class_id from student where student_id=?",studentId)).isEqualTo(currentClass);
     }
 
+    @Test
+    void temporaryPasswordRestrictsAuthenticatedSessionUntilChanged() throws Exception {
+        String temporary = "TempStudent!2026";
+        String permanent = "NewStudent!2026";
+        jdbc.update("update app_user set user_password_hash=?, user_must_change_password=true where user_id=?",
+            passwordEncoder.encode(temporary), studentUser);
+
+        String credentials = """
+            {"login":"%s","password":"%s"}
+            """.formatted(login("student"), temporary);
+        var loginResult = mvc.perform(post("/api/auth/login").with(csrf()).contentType("application/json").content(credentials))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.mustChangePassword").value(true))
+            .andReturn();
+        var session = (MockHttpSession) loginResult.getRequest().getSession(false);
+        assertThat(session).isNotNull();
+
+        mvc.perform(get("/api/auth/session").session(session))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(true));
+        mvc.perform(get("/api/security/csrf").session(session)).andExpect(status().isOk());
+        mvc.perform(get("/api/notifications").session(session))
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
+        mvc.perform(post("/api/notifications/read-all").session(session).with(csrf()))
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
+
+        String change = """
+            {"currentPassword":"%s","newPassword":"%s"}
+            """.formatted(temporary, permanent);
+        mvc.perform(post("/api/users/me/password").session(session).contentType("application/json").content(change))
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("CSRF_INVALID"));
+        mvc.perform(post("/api/users/me/password").session(session).with(csrf()).contentType("application/json")
+            .content(change.replace(temporary, "Incorrect!2026")))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_CURRENT_PASSWORD"));
+        mvc.perform(get("/api/auth/session").session(session))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(true));
+
+        mvc.perform(post("/api/users/me/password").session(session).with(csrf()).contentType("application/json").content(change))
+            .andExpect(status().isOk());
+        mvc.perform(get("/api/auth/session").session(session))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(false));
+        mvc.perform(get("/api/notifications").session(session)).andExpect(status().isOk());
+        mvc.perform(post("/api/auth/login").with(csrf()).contentType("application/json").content(credentials))
+            .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/login").with(csrf()).contentType("application/json")
+            .content(credentials.replace(temporary, permanent)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(false));
+    }
+
     @Test void adminCanChangeOwnPasswordButManagementCannotResetOrChangeAdminStatus() throws Exception {
         long adminId=administrator("admin");
         long otherId=administrator("otheradmin");
         var admin=user(login("admin")).roles("ADMIN");
         String change="{\"currentPassword\":\"OldAdmin!2026\",\"newPassword\":\"NewAdmin!2026\"}";
+        jdbc.update("update app_user set user_must_change_password=true where user_id=?",adminId);
+        mvc.perform(get("/api/admin/users/me").with(admin))
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
         mvc.perform(post("/api/admin/users/me/password").with(user(login("teacher")).roles("TEACHER")).with(csrf())
             .contentType("application/json").content(change)).andExpect(status().isForbidden());
         mvc.perform(post("/api/admin/users/me/password").with(admin).contentType("application/json").content(change))
@@ -659,6 +736,8 @@ class MessageIntegrationTest {
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_NEW_PASSWORD"));
         mvc.perform(post("/api/admin/users/me/password").with(admin).with(csrf()).contentType("application/json").content(change))
             .andExpect(status().isNoContent());
+        mvc.perform(get("/api/admin/users/me").with(admin))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(false));
         assertThat(passwordEncoder.matches("NewAdmin!2026",
             jdbc.queryForObject("select user_password_hash from app_user where user_id=?",String.class,adminId))).isTrue();
         assertThat(passwordEncoder.matches("OldAdmin!2026",
