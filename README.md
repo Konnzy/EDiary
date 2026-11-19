@@ -2,6 +2,15 @@
 
 EDiary is a school web application for grades, attendance, timetables, homework, and messaging. The backend uses Java and Spring Boot, the frontend uses React and Vite, and data is stored in PostgreSQL.
 
+## Core stack
+
+![Java 25](https://img.shields.io/badge/Java-25-C74634?style=for-the-badge&logo=openjdk&logoColor=white)
+![Spring Boot 4.1.1](https://img.shields.io/badge/Spring_Boot-4.1.1-367E22?style=for-the-badge&logo=springboot&logoColor=white)
+![PostgreSQL 18](https://img.shields.io/badge/PostgreSQL-18-336791?style=for-the-badge&logo=postgresql&logoColor=white)
+![React 19.2.6](https://img.shields.io/badge/React-19.2.6-087EA4?style=for-the-badge&logo=react&logoColor=white)
+![Vite 8.3.0](https://img.shields.io/badge/Vite-8.3.0-593DCB?style=for-the-badge&logo=vite&logoColor=white)
+![Tailwind CSS 4.3.3](https://img.shields.io/badge/Tailwind_CSS-4.3.3-0F7285?style=for-the-badge&logo=tailwindcss&logoColor=white)
+
 ## Run with Docker Compose
 
 Start PostgreSQL 18 on the host and create an `ediary` database. Copy `.env.example` to `.env`, set the database connection details, and run this command from the repository root:
@@ -50,3 +59,7 @@ Adjust the database name and username if your local settings differ.
 | Student | `student.test` | `AdminPass!234` | — |
 
 These accounts are for local development and demonstrations only.
+
+## License
+
+The original EDiary source code is licensed under the [Mozilla Public License 2.0](LICENSE).
