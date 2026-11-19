@@ -1,0 +1,57 @@
+name: SonarQube
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Build and analyze
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up JDK 25
+        id: java
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Compile backend and collect dependencies
+        working-directory: backend
+        run: >-
+          .\mvnw.cmd --batch-mode --no-transfer-progress compile
+          org.apache.maven.plugins:maven-dependency-plugin:3.10.0:copy-dependencies
+          "-DincludeScope=compile"
+
+      - name: Analyze backend and frontend
+        uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=konnzy
+            -Dsonar.projectKey=Konnzy_EDiary
+            -Dsonar.sources=backend/src/main,frontend/src
+            -Dsonar.exclusions=frontend/src/**/*.test.*
+            -Dsonar.java.binaries=backend/target/classes
+            -Dsonar.java.libraries=backend/target/dependency/*.jar
+            -Dsonar.java.source=25
+            "-Dsonar.java.jdkHome=${{ steps.java.outputs.path }}"
