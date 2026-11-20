@@ -1,5 +1,6 @@
 package com.ediary.backend.user.admin.dto;
 
+import com.ediary.backend.common.validation.UkrainianNamePatterns;
 import com.ediary.backend.user.entity.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -21,7 +22,7 @@ public record CreateAdminUserRequest(
     @NotBlank(message = "Введіть ім'я")
     @Size(max = 50, message = "Ім'я не може перевищувати 50 символів")
     @Pattern(
-        regexp = "^[А-Яа-яІіЇїЄєҐґ]+(?:[ '’-][А-Яа-яІіЇїЄєҐґ]+)*$",
+        regexp = UkrainianNamePatterns.REQUIRED,
         message = "Ім'я має містити лише українські літери"
     )
     String firstName,
@@ -29,14 +30,14 @@ public record CreateAdminUserRequest(
     @NotBlank(message = "Введіть прізвище")
     @Size(max = 50, message = "Прізвище не може перевищувати 50 символів")
     @Pattern(
-        regexp = "^[А-Яа-яІіЇїЄєҐґ]+(?:[ '’-][А-Яа-яІіЇїЄєҐґ]+)*$",
+        regexp = UkrainianNamePatterns.REQUIRED,
         message = "Прізвище має містити лише українські літери"
     )
     String lastName,
 
     @Size(max = 50, message = "По батькові не може перевищувати 50 символів")
     @Pattern(
-        regexp = "^$|^[А-Яа-яІіЇїЄєҐґ]+(?:[ '’-][А-Яа-яІіЇїЄєҐґ]+)*$",
+        regexp = UkrainianNamePatterns.OPTIONAL,
         message = "По батькові має містити лише українські літери"
     )
     String patronymic,
