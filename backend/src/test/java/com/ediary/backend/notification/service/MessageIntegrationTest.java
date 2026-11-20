@@ -667,7 +667,7 @@ class MessageIntegrationTest {
 
     @Test
     void temporaryPasswordRestrictsAuthenticatedSessionUntilChanged() throws Exception {
-        String temporary = "TempStudent!2026";
+        String temporary = "Aa1!" + UUID.randomUUID();
         String permanent = "NewStudent!2026";
         jdbc.update("update app_user set user_password_hash=?, user_must_change_password=true where user_id=?",
             passwordEncoder.encode(temporary), studentUser);

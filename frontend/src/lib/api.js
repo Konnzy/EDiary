@@ -79,7 +79,7 @@ async function request(path, { method = "GET", body, csrf = false, responseType 
 
 export const registrationApi = {
   getOptions: () => request("/registration-requests/options"),
-  submit: (payload) => request("/registration-requests", { method: "POST", body: payload }),
+  submit: (payload) => request("/registration-requests", { method: "POST", body: payload, csrf: true }),
 };
 
 export const authApi = {

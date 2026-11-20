@@ -22,7 +22,6 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -63,7 +62,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
         HttpSecurity http, SecurityErrorHandler errorHandler, UserRepository users
     ) throws Exception {
-        CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        CookieCsrfTokenRepository csrfRepository = new CookieCsrfTokenRepository();
         csrfRepository.setCookieCustomizer(cookie -> cookie.sameSite("Strict").path("/"));
 
         var authenticated = AuthenticatedAuthorizationManager.<RequestAuthorizationContext>authenticated();
@@ -78,15 +77,7 @@ public class SecurityConfig {
         http
             .exceptionHandling(errors -> errors.authenticationEntryPoint(errorHandler).accessDeniedHandler(errorHandler))
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(csrfRepository)
-                .ignoringRequestMatchers(
-                    PathPatternRequestMatcher.pathPattern(
-                        HttpMethod.POST,
-                        "/api/registration-requests"
-                    )
-                )
-            )
+            .csrf(csrf -> csrf.csrfTokenRepository(csrfRepository))
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 .maximumSessions(1)

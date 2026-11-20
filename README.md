@@ -10,6 +10,7 @@ EDiary is a school web application for grades, attendance, timetables, homework,
 ![React 19.2.6](https://img.shields.io/badge/React-19.2.6-087EA4?style=for-the-badge&logo=react&logoColor=white&labelColor=087EA4)
 ![Vite 8.3.0](https://img.shields.io/badge/Vite-8.3.0-593DCB?style=for-the-badge&logo=vite&logoColor=white&labelColor=593DCB)
 ![Tailwind CSS 4.3.3](https://img.shields.io/badge/Tailwind_CSS-4.3.3-0F7285?style=for-the-badge&logo=tailwindcss&logoColor=white&labelColor=0F7285)
+![NGINX 1.31.9](https://img.shields.io/badge/NGINX-1.31.9-009639?style=for-the-badge&logo=nginx&logoColor=white&labelColor=009639)
 
 ## Run with Docker Compose
 

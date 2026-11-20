@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { cn } from "@/lib/utils.js";
 import { authApi } from "@/lib/api.js";
+import { hasEmailFormat } from "@/lib/emailValidation.js";
 
 function validateEmail(email) {
-  if (!email.trim()) {
+  const address = email.trim();
+  if (!address) {
     return "Будь ласка, введіть електронну пошту.";
   }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+  if (!hasEmailFormat(address)) {
     return "Некоректний формат електронної пошти.";
   }
 

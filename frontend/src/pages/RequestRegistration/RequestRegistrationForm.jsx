@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card.jsx";
 import { Checkbox } from "@/components/ui/checkbox.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { ApiError, registrationApi } from "@/lib/api.js";
+import { hasEmailFormat } from "@/lib/emailValidation.js";
 import { cn } from "@/lib/utils.js";
 
 const initialForm = {
@@ -111,7 +112,7 @@ function validateForm(values) {
     errors.patronymic = "Використовуйте лише українські літери";
   }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
+  if (!hasEmailFormat(values.email.trim())) {
     errors.email = "Некоректний формат електронної пошти";
   }
 

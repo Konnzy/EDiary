@@ -14,7 +14,7 @@ public record CreateRegistrationRequest(
     @NotBlank(message = "Введіть ім'я")
     @Size(max = 50, message = "Ім'я не може перевищувати 50 символів")
     @Pattern(
-        regexp = "^[А-Яа-яІіЇїЄєҐґ]+(?:[ '’-][А-Яа-яІіЇїЄєҐґ]+)*$",
+        regexp = CreateRegistrationRequest.NAME_PATTERN,
         message = "Ім'я має містити лише українські літери"
     )
     String firstName,
@@ -22,14 +22,14 @@ public record CreateRegistrationRequest(
     @NotBlank(message = "Введіть прізвище")
     @Size(max = 50, message = "Прізвище не може перевищувати 50 символів")
     @Pattern(
-        regexp = "^[А-Яа-яІіЇїЄєҐґ]+(?:[ '’-][А-Яа-яІіЇїЄєҐґ]+)*$",
+        regexp = CreateRegistrationRequest.NAME_PATTERN,
         message = "Прізвище має містити лише українські літери"
     )
     String lastName,
 
     @Size(max = 50, message = "По батькові не може перевищувати 50 символів")
     @Pattern(
-        regexp = "^$|^[А-Яа-яІіЇїЄєҐґ]+(?:[ '’-][А-Яа-яІіЇїЄєҐґ]+)*$",
+        regexp = "(?:" + CreateRegistrationRequest.NAME_PATTERN + ")?",
         message = "По батькові має містити лише українські літери"
     )
     String patronymic,
@@ -66,4 +66,5 @@ public record CreateRegistrationRequest(
     @AssertTrue(message = "Потрібно погодитися з умовами користування")
     boolean termsAccepted
 ) {
+    private static final String NAME_PATTERN = "[А-Яа-яІіЇїЄєҐґ]++(?:[ '’-][А-Яа-яІіЇїЄєҐґ]++)*+";
 }
