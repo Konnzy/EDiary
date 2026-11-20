@@ -245,7 +245,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
 
   const addAcademicYear = async (year) => {
     const response = await adminScheduleApi.createAcademicYear(year);
-    setAcademicYears((current) => [...current, response.academicYear].sort());
+    setAcademicYears((current) => [...current, response.academicYear].sort((first, second) => Number(first.slice(0, 4)) - Number(second.slice(0, 4))));
     setSelectedClassId("");
     setSelectedYear(response.academicYear);
     setYearDialogOpen(false);

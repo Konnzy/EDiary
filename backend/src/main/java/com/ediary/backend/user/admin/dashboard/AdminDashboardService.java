@@ -87,7 +87,7 @@ public class AdminDashboardService {
         Integer week
     ) {
         DayOfWeek dayOfWeek = today.getDayOfWeek();
-        if (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY) {
+        if (DayOfWeek.SATURDAY.equals(dayOfWeek) || DayOfWeek.SUNDAY.equals(dayOfWeek)) {
             return List.of();
         }
         return scheduleRepository
