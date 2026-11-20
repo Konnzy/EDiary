@@ -1,5 +1,6 @@
 package com.ediary.backend.registration.dto.request;
 
+import com.ediary.backend.common.validation.UkrainianNamePatterns;
 import com.ediary.backend.user.entity.UserRole;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
@@ -14,7 +15,7 @@ public record CreateRegistrationRequest(
     @NotBlank(message = "Введіть ім'я")
     @Size(max = 50, message = "Ім'я не може перевищувати 50 символів")
     @Pattern(
-        regexp = CreateRegistrationRequest.NAME_PATTERN,
+        regexp = UkrainianNamePatterns.REQUIRED,
         message = "Ім'я має містити лише українські літери"
     )
     String firstName,
@@ -22,14 +23,14 @@ public record CreateRegistrationRequest(
     @NotBlank(message = "Введіть прізвище")
     @Size(max = 50, message = "Прізвище не може перевищувати 50 символів")
     @Pattern(
-        regexp = CreateRegistrationRequest.NAME_PATTERN,
+        regexp = UkrainianNamePatterns.REQUIRED,
         message = "Прізвище має містити лише українські літери"
     )
     String lastName,
 
     @Size(max = 50, message = "По батькові не може перевищувати 50 символів")
     @Pattern(
-        regexp = "(?:" + CreateRegistrationRequest.NAME_PATTERN + ")?",
+        regexp = UkrainianNamePatterns.OPTIONAL,
         message = "По батькові має містити лише українські літери"
     )
     String patronymic,
@@ -66,5 +67,4 @@ public record CreateRegistrationRequest(
     @AssertTrue(message = "Потрібно погодитися з умовами користування")
     boolean termsAccepted
 ) {
-    private static final String NAME_PATTERN = "[А-Яа-яІіЇїЄєҐґ]++(?:[ '’-][А-Яа-яІіЇїЄєҐґ]++)*+";
 }

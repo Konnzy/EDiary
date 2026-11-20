@@ -19,7 +19,7 @@ public record SaveScheduleLessonRequest(
     @NotBlank(message = "Вкажіть кабінет")
     @Size(max = 20, message = "Назва кабінету має містити не більше 20 символів")
     @Pattern(
-        regexp = "^ *[\\p{L}\\p{N}]+(?:(?: +| *- *)[\\p{L}\\p{N}]+)* *$",
+        regexp = " *+[\\p{L}\\p{N}]++(?:(?: *+- *+| ++)[\\p{L}\\p{N}]++)*+ *+",
         message = "Кабінет може містити лише літери, цифри, пробіли та дефіс"
     )
     String room
