@@ -46,14 +46,18 @@ class RegistrationRequestCsrfTest {
         }
         """;
 
-    @Autowired
-    private MockMvc mvc;
+    private final MockMvc mvc;
 
     @MockitoBean
     private RegistrationRequestService registrationRequests;
 
     @MockitoBean
     private UserRepository users;
+
+    @Autowired
+    RegistrationRequestCsrfTest(MockMvc mvc) {
+        this.mvc = mvc;
+    }
 
     @Test
     void rejectsAnonymousRegistrationWithoutCsrfToken() throws Exception {

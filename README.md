@@ -6,8 +6,11 @@ EDiary is a school web application for grades, attendance, timetables, homework,
 
 ![Java 25][java-badge]
 ![Spring Boot 4.1.1](https://img.shields.io/badge/Spring_Boot-4.1.1-367E22?style=for-the-badge&logo=springboot&logoColor=white&labelColor=367E22)
+![Hibernate ORM 7.4.10](https://img.shields.io/badge/Hibernate_ORM-7.4.10-59666C?style=for-the-badge&logo=hibernate&logoColor=white&labelColor=59666C)
 ![PostgreSQL 18](https://img.shields.io/badge/PostgreSQL-18-336791?style=for-the-badge&logo=postgresql&logoColor=white&labelColor=336791)
+![Flyway 12.4.0](https://img.shields.io/badge/Flyway-12.4.0-CC0200?style=for-the-badge&logo=flyway&logoColor=white&labelColor=CC0200)
 ![React 19.2.6](https://img.shields.io/badge/React-19.2.6-087EA4?style=for-the-badge&logo=react&logoColor=white&labelColor=087EA4)
+![Node.js 24](https://img.shields.io/badge/Node.js-24-417E38?style=for-the-badge&logo=nodedotjs&logoColor=white&labelColor=417E38)
 ![Vite 8.3.0](https://img.shields.io/badge/Vite-8.3.0-593DCB?style=for-the-badge&logo=vite&logoColor=white&labelColor=593DCB)
 ![Tailwind CSS 4.3.3](https://img.shields.io/badge/Tailwind_CSS-4.3.3-0F7285?style=for-the-badge&logo=tailwindcss&logoColor=white&labelColor=0F7285)
 ![NGINX 1.31.9](https://img.shields.io/badge/NGINX-1.31.9-009639?style=for-the-badge&logo=nginx&logoColor=white&labelColor=009639)
