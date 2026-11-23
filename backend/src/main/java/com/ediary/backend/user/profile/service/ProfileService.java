@@ -24,14 +24,11 @@ import com.ediary.backend.user.repository.StudentParentLinkRepository;
 import com.ediary.backend.user.repository.StudentProfileRepository;
 import com.ediary.backend.user.repository.TeacherProfileRepository;
 import com.ediary.backend.user.repository.UserRepository;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
-import javax.imageio.ImageIO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -41,8 +38,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @RequiredArgsConstructor
 public class ProfileService {
-    private static final long MAX_AVATAR_BYTES = 5L * 1024 * 1024;
-
     private final UserRepository users;
     private final StudentProfileRepository students;
     private final ParentProfileRepository parents;
@@ -201,28 +196,13 @@ public class ProfileService {
     @Transactional
     public ProfileDetailsResponse uploadAvatar(String login, MultipartFile file) {
         AppUser user = requireUser(login);
-        if (file == null || file.isEmpty() || file.getSize() > MAX_AVATAR_BYTES) {
-            throw invalidAvatar();
-        }
-        byte[] bytes;
-        try {
-            bytes = file.getBytes();
-        } catch (IOException exception) {
-            throw invalidAvatar();
-        }
-        String detected = detectImageType(bytes);
-        if (detected == null || !detected.equals(file.getContentType())) throw invalidAvatar();
-        try {
-            if (ImageIO.read(new ByteArrayInputStream(bytes)) == null) throw invalidAvatar();
-        } catch (IOException exception) {
-            throw invalidAvatar();
-        }
+        byte[] bytes = AvatarImage.normalize(file);
         UserAvatar avatar = avatars.findById(user.getId()).orElseGet(() -> {
             UserAvatar created = new UserAvatar();
             created.setUser(user);
             return created;
         });
-        avatar.setContentType(detected);
+        avatar.setContentType(AvatarImage.CONTENT_TYPE);
         avatar.setImageData(bytes);
         avatar.setUpdatedAt(LocalDateTime.now(clock));
         avatars.saveAndFlush(avatar);
@@ -275,19 +255,6 @@ public class ProfileService {
         LocalDate today = LocalDate.now(clock);
         int startYear = today.getMonthValue() >= 9 ? today.getYear() : today.getYear() - 1;
         return startYear + "/" + (startYear + 1);
-    }
-
-    private static String detectImageType(byte[] bytes) {
-        if (bytes.length >= 3 && (bytes[0] & 255) == 0xff && (bytes[1] & 255) == 0xd8 && (bytes[2] & 255) == 0xff)
-            return "image/jpeg";
-        if (bytes.length >= 8 && (bytes[0] & 255) == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4e
-            && bytes[3] == 0x47 && bytes[4] == 0x0d && bytes[5] == 0x0a && bytes[6] == 0x1a && bytes[7] == 0x0a)
-            return "image/png";
-        return null;
-    }
-
-    private ApplicationException invalidAvatar() {
-        return new ApplicationException(HttpStatus.BAD_REQUEST, "INVALID_AVATAR", "Завантажте коректний JPG або PNG розміром до 5 МБ");
     }
 
     private ApplicationException invalidPreferences() {

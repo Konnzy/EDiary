@@ -178,6 +178,10 @@ export const teacherClassApi = {
 export const learnerTeachersApi = {
   student: () => request("/student/teachers"),
   parent: (studentId) => request(`/parent/children/${studentId}/teachers`),
+  homeroomAvatarUrl: (teacherId, studentId) => {
+    const path = studentId ? `/parent/children/${studentId}/teachers` : "/student/teachers";
+    return `${API_BASE_URL}${path}/${teacherId}/avatar`;
+  },
 };
 
 export const subjectsApi = {

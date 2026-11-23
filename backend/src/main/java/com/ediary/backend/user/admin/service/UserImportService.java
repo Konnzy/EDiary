@@ -3,10 +3,14 @@ package com.ediary.backend.user.admin.service;
 import com.ediary.backend.common.audit.AuditService;
 import static com.ediary.backend.common.audit.AuditValues.of;
 import com.ediary.backend.common.error.ApplicationException;
+import com.ediary.backend.schedule.repository.SchoolClassRepository;
+import com.ediary.backend.schedule.repository.SubjectRepository;
 import com.ediary.backend.user.admin.dto.AdminStudentOption;
 import com.ediary.backend.user.admin.dto.CreateAdminUserRequest;
 import com.ediary.backend.user.admin.dto.UserImportDtos.*;
+import com.ediary.backend.user.admin.repository.UserImportLockRepository;
 import com.ediary.backend.user.entity.UserRole;
+import com.ediary.backend.user.repository.StudentProfileRepository;
 import jakarta.validation.Validator;
 import java.io.IOException;
 import java.security.*;
@@ -16,7 +20,6 @@ import java.util.*;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,7 +30,10 @@ public class UserImportService {
     private final UserImportFileService files;
     private final AdminUserService users;
     private final Validator validator;
-    private final JdbcTemplate jdbc;
+    private final SchoolClassRepository schoolClasses;
+    private final SubjectRepository subjects;
+    private final StudentProfileRepository students;
+    private final UserImportLockRepository importLock;
     private final AuditService audit;
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd.MM.uuuu").withResolverStyle(ResolverStyle.STRICT);
     private static final Pattern CLASS = Pattern.compile("^(\\d{1,2})\\s*-\\s*([\\p{L}]{1,5})$");
@@ -47,8 +53,8 @@ public class UserImportService {
     public Result confirm(MultipartFile file, String format, String fingerprint) {
         byte[] bytes = read(file,format);
         if (!digest(bytes).equals(fingerprint)) throw invalid("IMPORT_FILE_CHANGED", "Файл змінився. Перевірте його повторно.");
-        // Serialize competing imports without retaining uploaded files or adding history tables.
-        jdbc.execute("select pg_advisory_xact_lock(15342941)");
+        // Hold the same database row until the whole import commits or rolls back.
+        importLock.acquire().orElseThrow(() -> new IllegalStateException("Missing user import lock row"));
         Checked checked = check(bytes,format);
         if (checked.preview().invalid() != 0) throw invalid("IMPORT_VALIDATION_FAILED", "Дані не пройшли повторну перевірку. Жодного користувача не створено.");
         var ordered = checked.requests().stream()
@@ -108,15 +114,15 @@ public class UserImportService {
                 var match = CLASS.matcher(values.get(8));
                 if (!match.matches()) problems.put("Клас","Вкажіть клас, наприклад 9-А.");
                 else {
-                    var ids = jdbc.queryForList("select class_id from school_class where class_number=? and upper(class_letter)=upper(?) and class_academic_year=?",
-                        Long.class,Integer.parseInt(match.group(1)),match.group(2),values.get(9));
-                    if (ids.size()!=1) problems.put("Клас","Клас для вказаного навчального року не знайдено."); else classId=ids.getFirst();
+                    var matches = schoolClasses.findIdsByYearAndNumberAndLetter(
+                        values.get(9), Integer.parseInt(match.group(1)), match.group(2));
+                    if (matches.size()!=1) problems.put("Клас","Клас для вказаного навчального року не знайдено."); else classId=matches.getFirst();
                 }
                 if (!values.get(10).isBlank()) problems.put("Предмет","Для учня залиште предмет порожнім.");
             } else if (!values.get(8).isBlank() || !values.get(9).isBlank()) problems.put("Клас","Клас і навчальний рік заповнюються лише для учнів.");
             if (role == UserRole.TEACHER) {
-                var ids = jdbc.queryForList("select subject_id from subject where lower(subject_title)=lower(?)",Long.class,values.get(10));
-                if (ids.size()!=1) problems.put("Предмет","Вкажіть назву наявного предмета."); else subjectId=ids.getFirst();
+                var matches = subjects.findIdsByTitleIgnoreCase(values.get(10));
+                if (matches.size()!=1) problems.put("Предмет","Вкажіть назву наявного предмета."); else subjectId=matches.getFirst();
             } else if (role != UserRole.STUDENT && !values.get(10).isBlank()) problems.put("Предмет","Предмет заповнюється лише для вчителя.");
             String login = values.get(1).toLowerCase(Locale.ROOT), email = values.get(5).toLowerCase(Locale.ROOT);
             logins.computeIfAbsent(login,key->new ArrayList<>()).add(index);
@@ -137,9 +143,12 @@ public class UserImportService {
         for (int index=0;index<requests.size();index++) if (requests.get(index).classId()!=null && errors.get(index).isEmpty())
             classes.computeIfAbsent(requests.get(index).classId(),id->new ArrayList<>()).add(index);
         classes.forEach((id,items)->{
-            jdbc.queryForObject("select class_id from school_class where class_id=? for update",Long.class,id);
-            Long free = jdbc.queryForObject("select class_limit-(select count(*) from student where class_id=?) from school_class where class_id=?",Long.class,id,id);
-            if (free == null || items.size()>free) items.forEach(index->errors.get(index).put("Клас","Недостатньо вільних місць для всіх учнів із файлу."));
+            var schoolClass = schoolClasses.findByIdForUpdate(id);
+            if (schoolClass.isEmpty()) {
+                items.forEach(index -> errors.get(index).put("Клас", "Клас для вказаного навчального року не знайдено."));
+            } else if (items.size() > schoolClass.get().getLimit() - students.countBySchoolClassId(id)) {
+                items.forEach(index -> errors.get(index).put("Клас", "Недостатньо вільних місць для всіх учнів із файлу."));
+            }
         });
         Map<String,AdminStudentOption> pendingStudents = new HashMap<>();
         for (int index=0;index<requests.size();index++) if (errors.get(index).isEmpty()) {

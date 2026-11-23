@@ -21,6 +21,13 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Long> 
     List<SchoolClass> findAllByAcademicYearValueOrderByNumberAscLetterAsc(String academicYear);
 
     boolean existsByAcademicYearValueAndNumberAndLetterIgnoreCase(String academicYear, Integer number, String letter);
+    @Query("""
+        select schoolClass.id from SchoolClass schoolClass
+        where schoolClass.academicYear.value = :year and schoolClass.number = :number
+          and upper(schoolClass.letter) = upper(:letter)
+        """)
+    List<Long> findIdsByYearAndNumberAndLetter(
+        @Param("year") String year, @Param("number") Integer number, @Param("letter") String letter);
 
     boolean existsByAcademicYearValueAndNumberAndLetterIgnoreCaseAndIdNot(
         String academicYear,
@@ -35,10 +42,10 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Long> 
 
     List<SchoolClass> findAllByClassTeacherIdOrderByNumberAscLetterAsc(Long teacherId);
 
-    @Query(value = "SELECT EXISTS (SELECT 1 FROM schedule WHERE class_id = :classId)", nativeQuery = true)
+    @Query("select exists (select entry.id from ScheduleEntry entry where entry.schoolClass.id = :classId)")
     boolean hasSchedule(@Param("classId") Long classId);
 
-    @Query(value = "SELECT EXISTS (SELECT 1 FROM registration_request WHERE requested_class_id = :classId)", nativeQuery = true)
+    @Query("select exists (select request.id from RegistrationRequest request where request.requestedClass.id = :classId)")
     boolean hasRegistrationRequests(@Param("classId") Long classId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

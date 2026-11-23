@@ -34,6 +34,19 @@ public interface RegistrationRequestRepository extends JpaRepository<Registratio
     Page<RegistrationRequest> findAllByStatusNot(RegistrationStatus status, Pageable pageable);
 
     @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})
+    @Query("""
+        select request from RegistrationRequest request
+        where request.status <> :pending and not exists (
+            select 1 from AdminNotificationDismissal dismissal
+            where dismissal.id.adminId = :adminId and dismissal.id.requestId = request.id
+              and dismissal.id.requestStatus = cast(request.status as String)
+        )
+        order by request.reviewedAt desc nulls last, request.id desc
+        """)
+    List<RegistrationRequest> findReviewedNotDismissed(
+        @Param("adminId") long adminId, @Param("pending") RegistrationStatus pending, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"requestedClass", "requestedSubject", "requestedStudent.user", "requestedStudent.schoolClass", "reviewedBy", "processedUser"})
     @Query(value = """
         select request from RegistrationRequest request
         order by case when cast(request.status as string) = 'PENDING' then 0 else 1 end,

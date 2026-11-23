@@ -86,7 +86,7 @@ public interface ScheduleRepository extends JpaRepository<ScheduleEntry, Long> {
         @Param("weekNumber") Integer weekNumber
     );
 
-    @Query(value = "SELECT DISTINCT schedule_id FROM lesson WHERE schedule_id IN (:scheduleIds)", nativeQuery = true)
+    @Query("select distinct lesson.scheduleEntry.id from Lesson lesson where lesson.scheduleEntry.id in :scheduleIds")
     List<Long> findIdsReferencedByLessons(@Param("scheduleIds") Collection<Long> scheduleIds);
 
     @EntityGraph(attributePaths = {"schoolClass", "teacher"})

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   Bell,
   BookOpen,
@@ -41,10 +41,10 @@ import { teacherNavigationItems } from "@/lib/teacherNavigation.js";
 import { TeacherNavigation } from "@/components/TeacherNavigation.jsx";
 import { formatShortName } from "@/lib/userIdentity.js";
 import { cn } from "@/lib/utils.js";
+import { AvatarDialog } from "./AvatarDialog.jsx";
 import {
   normalizePhone,
   mapProfileResponse,
-  validateAvatarFile,
   validatePasswordChange,
   validatePhone,
 } from "./profileModel.js";
@@ -116,6 +116,7 @@ export function UserProfilePage({ role, openAddChild = false, focusNotifications
   const [pending, setPending] = useState("");
   const [avatarError, setAvatarError] = useState("");
   const [avatarNotice, setAvatarNotice] = useState("");
+  const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [phoneNotice, setPhoneNotice] = useState("");
@@ -128,7 +129,6 @@ export function UserProfilePage({ role, openAddChild = false, focusNotifications
   const [linkError, setLinkError] = useState("");
   const [isLinking, setIsLinking] = useState(false);
   const [linkNotice, setLinkNotice] = useState("");
-  const fileInput = useRef(null);
 
   useEffect(() => {
     if (role === "PARENT" && openAddChild) setIsLinkModalOpen(true);
@@ -162,29 +162,16 @@ export function UserProfilePage({ role, openAddChild = false, focusNotifications
 
   const avatar = data?.avatarVersion != null ? userProfileApi.avatarUrl(data.avatarVersion) : "";
 
-  const handleAvatar = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
+  const openAvatarDialog = () => {
     setAvatarError("");
     setAvatarNotice("");
+    setIsAvatarDialogOpen(true);
+  };
 
-    const fileError = validateAvatarFile(file);
-    if (fileError) {
-      setAvatarError(fileError);
-      return;
-    }
-
-    try {
-      setPending("avatar");
-      await readAvatar(file);
-      const response = await userProfileApi.uploadAvatar(file);
-      setData(mapProfileResponse(response));
-      setAvatarNotice("Фото профілю оновлено.");
-    } catch (error) {
-      setAvatarError(error.message || "Не вдалося обробити зображення.");
-    } finally {
-      setPending("");
-    }
+  const saveAvatar = async (file) => {
+    const response = await userProfileApi.uploadAvatar(file);
+    setData((current) => ({ ...current, avatarVersion: response.avatarVersion }));
+    setAvatarNotice("Фото профілю оновлено.");
   };
 
   const removeAvatar = async () => {
@@ -312,14 +299,12 @@ export function UserProfilePage({ role, openAddChild = false, focusNotifications
               </header>
 
               <ProfileSummary
-                role={role}
                 data={data}
                 avatar={avatar}
                 busy={pending === "avatar"}
-                fileInput={fileInput}
                 avatarError={avatarError}
                 avatarNotice={avatarNotice}
-                onAvatarChange={handleAvatar}
+                onAvatarChange={openAvatarDialog}
                 onRemoveAvatar={removeAvatar}
               />
 
@@ -358,6 +343,7 @@ export function UserProfilePage({ role, openAddChild = false, focusNotifications
           <AppFooter />
         </div>
       </div>
+      {isAvatarDialogOpen && <AvatarDialog onClose={() => setIsAvatarDialogOpen(false)} onSave={saveAvatar} />}
       {role === "PARENT" && isLinkModalOpen ? (
         <LinkChildModal
           code={linkCode}
@@ -372,12 +358,15 @@ export function UserProfilePage({ role, openAddChild = false, focusNotifications
   );
 }
 
-function ProfileSummary({ data, avatar, busy, fileInput, avatarError, avatarNotice, onAvatarChange, onRemoveAvatar }) {
+function ProfileSummary({ data, avatar, busy, avatarError, avatarNotice, onAvatarChange, onRemoveAvatar }) {
   return (
     <Card className="rounded-lg px-4 py-5 sm:px-6">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-4">
-          <Avatar avatar={avatar} initials={data.initials} size="large" />
+          <button type="button" disabled={busy} onClick={onAvatarChange} aria-label="Змінити фото профілю" aria-haspopup="dialog"
+            className="shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-slate-500">
+            <Avatar avatar={avatar} initials={data.initials} size="large" />
+          </button>
           <div className="min-w-0">
             <h2 className="break-words text-[1.05rem] font-bold text-slate-900 sm:text-[1.2rem]">{data.fullName}</h2>
             <span className="mt-2 inline-flex rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.7rem] font-bold text-slate-600">{data.roleLabel}</span>
@@ -386,8 +375,7 @@ function ProfileSummary({ data, avatar, busy, fileInput, avatarError, avatarNoti
 
         <div className="sm:text-right">
             <div className="flex flex-wrap gap-2 sm:justify-end">
-              <input ref={fileInput} type="file" accept="image/jpeg,image/png" onChange={onAvatarChange} className="sr-only" aria-label="Оберіть фото профілю" />
-              <Button type="button" disabled={busy} onClick={() => fileInput.current?.click()} className="h-9 rounded-md px-3 text-xs">
+              <Button type="button" disabled={busy} onClick={onAvatarChange} aria-haspopup="dialog" className="h-9 rounded-md px-3 text-xs">
                 <Camera className="h-4 w-4" aria-hidden="true" />Змінити фото
               </Button>
               {avatar ? (
@@ -396,7 +384,6 @@ function ProfileSummary({ data, avatar, busy, fileInput, avatarError, avatarNoti
                 </Button>
               ) : null}
             </div>
-            <p className="mt-2 text-[0.68rem] leading-4 text-slate-400">JPG або PNG · до 5 МБ</p>
             {avatarError ? <p className="mt-2 text-[0.7rem] font-medium text-red-600" role="alert">{avatarError}</p> : null}
             {avatarNotice ? <SuccessMessage className="sm:justify-end">{avatarNotice}</SuccessMessage> : null}
         </div>
@@ -740,20 +727,4 @@ function Navigation({ config, compact = false }) {
   return config.homeRoute === "teacher"
     ? <TeacherNavigation activeRoute="teacher/profile" compact={compact} />
     : <LearnerNavigation role={config.homeRoute.toUpperCase()} activeRoute={config.profileRoute} compact={compact} />;
-}
-
-function readAvatar(file) {
-  return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve();
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error("Файл не вдалося розпізнати як зображення."));
-    };
-    image.src = objectUrl;
-  });
 }

@@ -1,65 +1,104 @@
 package com.ediary.backend.notification.repository;
 
 import com.ediary.backend.notification.dto.MessageDtos.Recipient;
+import com.ediary.backend.user.entity.StudentStatus;
 import com.ediary.backend.user.entity.UserRole;
-import java.util.*;
+import com.ediary.backend.user.entity.UserStatus;
+import jakarta.persistence.EntityManager;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @RequiredArgsConstructor
 public class MessageDirectory {
-    private final NamedParameterJdbcTemplate jdbc;
-    private static final String DIRECTORY = """
-        select u.user_id, u.user_role::text as role,
-            coalesce(nullif(concat_ws(' ',t.teacher_surname,t.teacher_name,t.teacher_patronymic),''),
-                     nullif(concat_ws(' ',s.student_surname,s.student_name,s.student_patronymic),''),
-                     nullif(concat_ws(' ',p.parent_surname,p.parent_name,p.parent_patronymic),''), u.user_login) as full_name
-        from app_user u
-        left join teacher t on t.user_id=u.user_id and u.user_role='TEACHER'
-        left join student s on s.user_id=u.user_id and u.user_role='STUDENT'
-        left join parent p on p.user_id=u.user_id and u.user_role='PARENT'
-        """;
-    private static final String CONTACTS = """
-        with teaching as (
-          select distinct s.student_id, s.user_id as student_user, t.user_id as teacher_user,
-            coalesce(t.teacher_id=c.class_teacher_id,false) as homeroom
-          from student s join school_class c on c.class_id=s.class_id
-          join teacher t on t.teacher_id=c.class_teacher_id or exists (
-            select 1 from schedule e where e.class_id=c.class_id and e.teacher_id=t.teacher_id
-              and e.schedule_active and e.schedule_academic_year=:year)
-          where c.class_academic_year=:year and s.student_status='STUDYING'
-        ), pairs as (
-          select teacher_user as first_id, student_user as second_id,homeroom from teaching
-          union select teaching.teacher_user,p.user_id,teaching.homeroom from teaching
-            join student_parents sp on sp.student_id=teaching.student_id join parent p on p.parent_id=sp.parent_id
-        ), contacts as (
-          select second_id as id,false as homeroom from pairs where first_id=:actor
-          union select first_id,homeroom from pairs where second_id=:actor
-        ), directory as (
-        """ + DIRECTORY + """
-          where u.user_status='ACTIVE' and u.user_id in (select id from contacts) and u.user_id<>:actor
-        ) select directory.*,exists(select 1 from contacts where contacts.id=directory.user_id and contacts.homeroom) as homeroom
-          from directory where 1=1
+    private final EntityManager entities;
+
+    private static final String FULL_NAME = """
+        case
+            when teacher.id is not null then concat(teacher.surname, ' ', teacher.name,
+                case when teacher.patronymic is null then '' else concat(' ', teacher.patronymic) end)
+            when student.id is not null then concat(student.surname, ' ', student.name,
+                case when student.patronymic is null then '' else concat(' ', student.patronymic) end)
+            when parent.id is not null then concat(parent.surname, ' ', parent.name,
+                case when parent.patronymic is null then '' else concat(' ', parent.patronymic) end)
+            else account.login
+        end
         """;
 
+    private static final String PROFILES = """
+        from AppUser account
+        left join TeacherProfile teacher on teacher.user = account and account.role = :teacherRole
+        left join StudentProfile student on student.user = account and account.role = :studentRole
+        left join ParentProfile parent on parent.user = account and account.role = :parentRole
+        """;
+
+    private static final String CLASS_IN_YEAR = "classroom.academicYear.value = :year and pupil.status = :studying";
+
+    private static final String LEARNER_MATCH = """
+        (pupil.user.id = %1$s or exists (
+            select 1 from StudentParentLink link
+            where link.student = pupil and link.parent.user.id = %1$s
+        ))
+        """;
+
+    private static final String HOMEROOM = """
+        exists (
+            select 1 from StudentProfile pupil
+            join pupil.schoolClass classroom
+            join classroom.classTeacher classTeacher
+            where %s and classTeacher.user = account and %s
+        )
+        """.formatted(CLASS_IN_YEAR, LEARNER_MATCH.formatted(":actor"));
+
+    private static final String CAN_CONTACT = """
+        exists (
+            select 1 from StudentProfile pupil
+            join pupil.schoolClass classroom
+            join TeacherProfile educator on educator.user.id in (:actor, account.id)
+            where %s
+              and (classroom.classTeacher = educator or exists (
+                  select 1 from ScheduleEntry entry
+                  where entry.schoolClass = classroom and entry.teacher = educator
+                    and entry.active = true and entry.academicYear = :year
+              ))
+              and ((educator.user.id = :actor and %s) or (educator.user = account and %s))
+        )
+        """.formatted(CLASS_IN_YEAR, LEARNER_MATCH.formatted("account.id"), LEARNER_MATCH.formatted(":actor"));
+
     public List<Recipient> search(Long actor, String year, String query, Long id) {
-        var params = new HashMap<String,Object>();
-        params.put("actor", actor); params.put("year", year);
-        var sql = new StringBuilder(CONTACTS);
-        if (id != null) { sql.append(" and user_id=:id"); params.put("id",id); }
-        String[] terms = query.trim().toLowerCase(Locale.ROOT).split("\\s+");
-        for (int i=0; i<terms.length && i<10; i++) {
-            if (terms[i].isEmpty()) continue;
-            sql.append(" and position(:term" + i + " in lower(full_name))>0"); params.put("term"+i,terms[i]);
+        var terms = Arrays.stream(query.trim().toLowerCase(Locale.ROOT).split("\\s+"))
+            .filter(term -> !term.isEmpty()).limit(10).toList();
+        var hql = new StringBuilder("select account.id, ").append(FULL_NAME).append(" as fullName, account.role, ")
+            .append(HOMEROOM).append(" as homeroom ").append(PROFILES)
+            .append(" where account.status = :active and account.id <> :actor and ").append(CAN_CONTACT);
+        if (id != null) hql.append(" and account.id = :recipient");
+        for (int index = 0; index < terms.size(); index++) {
+            hql.append(" and locate(:term").append(index).append(", lower(").append(FULL_NAME).append(")) > 0");
         }
-        sql.append(" order by homeroom desc,full_name,user_id limit 20");
-        return jdbc.query(sql.toString(),params,(rs,row)->new Recipient(rs.getLong("user_id"),rs.getString("full_name"),UserRole.valueOf(rs.getString("role")),rs.getBoolean("homeroom")));
+        hql.append(" order by homeroom desc, fullName, account.id");
+
+        var recipients = recipientQuery(hql.toString())
+            .setParameter("actor", actor).setParameter("year", year).setParameter("active", UserStatus.ACTIVE)
+            .setParameter("studying", StudentStatus.STUDYING)
+            .setMaxResults(20);
+        if (id != null) recipients.setParameter("recipient", id);
+        for (int index = 0; index < terms.size(); index++) recipients.setParameter("term" + index, terms.get(index));
+        return recipients.getResultList();
     }
 
     public Recipient identity(Long id) {
-        return jdbc.queryForObject(DIRECTORY + " where u.user_id=:id",Map.of("id",id),
-            (rs,row)->new Recipient(rs.getLong("user_id"),rs.getString("full_name"),UserRole.valueOf(rs.getString("role"))));
+        return recipientQuery("select account.id, " + FULL_NAME + ", account.role, false " + PROFILES + " where account.id = :id")
+            .setParameter("id", id)
+            .getSingleResult();
+    }
+
+    private jakarta.persistence.TypedQuery<Recipient> recipientQuery(String hql) {
+        return entities.createQuery(hql, Recipient.class)
+            .setParameter("teacherRole", UserRole.TEACHER)
+            .setParameter("studentRole", UserRole.STUDENT)
+            .setParameter("parentRole", UserRole.PARENT);
     }
 }

@@ -55,6 +55,8 @@ export function UserTeachersPage({ role }) {
     return (data?.teachers || []).filter(teacher => (!subjectId || teacher.subjects.some(subject => String(subject.id) === subjectId)) && terms.every(term => teacher.fullName.toLocaleLowerCase("uk-UA").includes(term)));
   }, [data, query, subjectId]);
   const reset = () => { setSubjectId(""); setQuery(""); };
+  const homeroomAvatar = data?.homeroomTeacher?.hasAvatar
+    ? learnerTeachersApi.homeroomAvatarUrl(data.homeroomTeacher.id, studentId) : "";
 
   return <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
     <TopBar root={root} /><LearnerNavigation role={role} activeRoute={`${root}/teachers`} compact />
@@ -70,7 +72,7 @@ export function UserTeachersPage({ role }) {
           </div>
         </section>
         {error ? <><Alert>{error}</Alert><button type="button" onClick={() => setReload(value => value + 1)} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700"><RotateCcw className="h-4 w-4" />Повторити</button></> : loading || loadingChildren ? <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />Завантаження вчителів...</div> : data?.className ? <>
-          {data.homeroomTeacher ? <TeacherCard teacher={data.homeroomTeacher} root={root} className={data.className} homeroom /> : <div className="mb-5 rounded-lg border border-slate-200 bg-white p-6"><h2 className="text-base font-bold text-slate-900">Класний керівник</h2><p className="mt-2 text-sm text-slate-500">Не призначено</p></div>}
+          {data.homeroomTeacher ? <TeacherCard teacher={data.homeroomTeacher} root={root} className={data.className} avatar={homeroomAvatar} homeroom /> : <div className="mb-5 rounded-lg border border-slate-200 bg-white p-6"><h2 className="text-base font-bold text-slate-900">Класний керівник</h2><p className="mt-2 text-sm text-slate-500">Не призначено</p></div>}
           <div className="mb-3 mt-5 flex items-center justify-between gap-3"><h2 className="text-[0.98rem] font-bold text-slate-900">Вчителі предметів</h2><span role="status" className="text-[0.72rem] text-slate-500">Показано {visibleTeachers.length} із {data.teachers.length}</span></div>
           {visibleTeachers.length ? <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{visibleTeachers.map(teacher => <TeacherCard key={teacher.id} teacher={teacher} root={root} className={data.className} />)}</div> : <div className="flex min-h-40 flex-col items-center justify-center rounded-lg border border-slate-200 bg-white p-5 text-center"><Users className="h-7 w-7 text-slate-400" /><p className="mt-3 text-sm text-slate-500">{subjectId || query ? "За цими фільтрами вчителів не знайдено" : "Інших учителів предметів поки немає"}</p></div>}
         </> : <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">{role === "PARENT" && !children.length ? <>Додайте дитину у профілі, щоб переглянути її вчителів. <a href="#parent/profile?addChild=1" className="font-semibold text-slate-800 hover:underline">Додати дитину</a></> : "Учня ще не зараховано до класу."}</div>}
@@ -79,14 +81,20 @@ export function UserTeachersPage({ role }) {
   </div>;
 }
 
-function TeacherCard({ teacher, root, className, homeroom = false }) {
+function TeacherCard({ teacher, root, className, avatar, homeroom = false }) {
+  const [failedAvatar, setFailedAvatar] = useState("");
   const initials = teacher.fullName.split(/\s+/).slice(0, 2).map(part => part[0]).join("");
   const params = new URLSearchParams({ recipient: teacher.fullName, recipientId: String(teacher.userId) });
   return <article className={cn("flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white shadow-[0_12px_36px_-30px_rgba(15,23,42,0.45)]", homeroom ? "p-5 sm:p-6" : "p-5")}>
     {homeroom ? <h2 className="mb-5 flex items-center gap-2 text-[0.98rem] font-bold text-slate-900"><School className="h-5 w-5 text-slate-500" />Класний керівник <span className="ml-auto text-[0.78rem] font-medium text-slate-500">{className} клас</span></h2> : null}
     <div className={cn(homeroom && "grid gap-5 lg:grid-cols-[minmax(240px,1fr)_minmax(220px,1fr)_auto] lg:items-start")}>
       <div className="min-w-0">
-        <div className="flex min-w-0 items-start gap-3"><div className={cn("flex shrink-0 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-600", homeroom ? "h-16 w-16 text-lg" : "h-12 w-12 text-sm")}>{initials}</div><div className="min-w-0"><h3 className={cn("break-words font-bold leading-6 text-slate-900", homeroom ? "text-base" : "text-[0.92rem]")}>{teacher.fullName}</h3><p className="mt-1 text-[0.75rem] text-slate-500">{homeroom ? "Класний керівник" : `${className} клас`}</p></div></div>
+        <div className="flex min-w-0 items-start gap-3">
+          {avatar && avatar !== failedAvatar
+            ? <img src={avatar} alt="" onError={() => setFailedAvatar(avatar)} className="h-16 w-16 shrink-0 rounded-full border border-slate-200 object-cover" />
+            : <div aria-hidden="true" className={cn("flex shrink-0 items-center justify-center rounded-full bg-slate-100 font-bold text-slate-600", homeroom ? "h-16 w-16 text-lg" : "h-12 w-12 text-sm")}>{initials}</div>}
+          <div className="min-w-0"><h3 className={cn("break-words font-bold leading-6 text-slate-900", homeroom ? "text-base" : "text-[0.92rem]")}>{teacher.fullName}</h3><p className="mt-1 text-[0.75rem] text-slate-500">{homeroom ? "Класний керівник" : `${className} клас`}</p></div>
+        </div>
       </div>
       <div className={cn("min-w-0", homeroom ? "border-t border-slate-200 pt-4 lg:border-t-0 lg:border-l lg:pl-5 lg:pt-0" : "mt-4 border-t border-slate-200 pt-4")}>
         <p className="flex items-center gap-2 text-[0.75rem] font-semibold text-slate-500"><BookOpen className="h-4 w-4" />Викладає предмети</p><div className="mt-2 flex flex-wrap gap-1.5">{teacher.subjects.length ? teacher.subjects.map(subject => <span key={subject.id} className="break-words rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[0.72rem] text-slate-700">{subject.name}</span>) : <span className="text-[0.78rem] text-slate-400">Не викладає предметів у цьому класі</span>}</div>

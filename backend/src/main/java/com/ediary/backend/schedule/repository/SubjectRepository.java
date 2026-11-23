@@ -18,6 +18,8 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
     List<Subject> findAllByNormalizedTitles(@Param("titles") Set<String> titles);
 
     boolean existsByTitleIgnoreCase(String title);
+    @Query("select subject.id from Subject subject where lower(subject.title) = lower(:title)")
+    List<Long> findIdsByTitleIgnoreCase(@Param("title") String title);
 
     boolean existsByTitleIgnoreCaseAndIdNot(String title, Long id);
 
@@ -25,16 +27,16 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
     @Query("select subject from Subject subject where subject.id = :subjectId")
     Optional<Subject> findByIdForUpdate(@Param("subjectId") Long subjectId);
 
-    @Query(value = "SELECT EXISTS (SELECT 1 FROM teacher_subject WHERE subject_id = :subjectId)", nativeQuery = true)
+    @Query("select exists (select teacher.id from TeacherProfile teacher join teacher.subjects subject where subject.id = :subjectId)")
     boolean hasTeachers(@Param("subjectId") Long subjectId);
 
-    @Query(value = "SELECT EXISTS (SELECT 1 FROM schedule WHERE subject_id = :subjectId)", nativeQuery = true)
+    @Query("select exists (select entry.id from ScheduleEntry entry where entry.subject.id = :subjectId)")
     boolean hasSchedule(@Param("subjectId") Long subjectId);
 
-    @Query(value = "SELECT EXISTS (SELECT 1 FROM registration_request WHERE requested_subject_id = :subjectId)", nativeQuery = true)
+    @Query("select exists (select request.id from RegistrationRequest request where request.requestedSubject.id = :subjectId)")
     boolean hasRegistrationRequests(@Param("subjectId") Long subjectId);
 
-    @Query(value = "SELECT EXISTS (SELECT 1 FROM schedule WHERE subject_id = :subjectId AND teacher_id = :teacherId)", nativeQuery = true)
+    @Query("select exists (select entry.id from ScheduleEntry entry where entry.subject.id = :subjectId and entry.teacher.id = :teacherId)")
     boolean isTeacherAssignmentUsedInSchedule(
         @Param("subjectId") Long subjectId,
         @Param("teacherId") Long teacherId
