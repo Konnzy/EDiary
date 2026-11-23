@@ -27,20 +27,29 @@ import com.ediary.backend.schedule.repository.SubjectRepository;
 import com.ediary.backend.user.admin.repository.UserImportLockRepository;
 import com.ediary.backend.user.admin.entity.UserImportLock;
 import com.ediary.backend.user.entity.*;
+import com.ediary.backend.user.profile.service.ProfileService;
+import com.ediary.backend.user.teacher.controller.StudentTeachersController;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.PessimisticLockException;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,9 +70,11 @@ class JpaPersistenceIntegrationTest {
     @Autowired ScheduleRepository schedules;
     @Autowired UserImportLockRepository importLock;
     @Autowired PlatformTransactionManager transactions;
+    @Autowired ProfileService profiles;
+    @Autowired StudentTeachersController teachers;
 
     @Test
-    void recipientSearchRestrictsContactsToTheCurrentClassAndLinkedFamily() {
+    void classroomAndFamilyLinksDetermineContactsAndHomeroomAvatarAccess() throws Exception {
         var teacher = teacher("Леся", "Гнатюк");
         var subjectTeacher = teacher("Іван", "Антоненко");
 
@@ -134,6 +145,7 @@ class JpaPersistenceIntegrationTest {
         assertThat(subjects.hasTeachers(subject.getId())).isTrue();
         assertThat(subjects.hasSchedule(subject.getId())).isTrue();
         assertThat(subjects.isTeacherAssignmentUsedInSchedule(subject.getId(), subjectTeacher.getId())).isTrue();
+        verifyHomeroomAvatarAccess(teacher, subjectTeacher, student, parent);
 
         var lesson = new Lesson();
         lesson.setScheduleEntry(entry);
@@ -154,6 +166,42 @@ class JpaPersistenceIntegrationTest {
         assertThatThrownBy(() -> policies.save(subject.getId(), new Policy(Mode.PASS_FAIL, false, false)))
             .isInstanceOfSatisfying(ApplicationException.class, error ->
                 assertThat(error.getCode()).isEqualTo("ASSESSMENT_POLICY_HAS_RESULTS"));
+    }
+
+    private void verifyHomeroomAvatarAccess(TeacherProfile homeroom, TeacherProfile other,
+        StudentProfile student, ParentProfile parent) throws Exception {
+        var studentAuth = new TestingAuthenticationToken(student.getUser().getLogin(), null, "ROLE_STUDENT");
+        var parentAuth = new TestingAuthenticationToken(parent.getUser().getLogin(), null, "ROLE_PARENT");
+        var previousContext = SecurityContextHolder.getContext();
+        var context = SecurityContextHolder.createEmptyContext();
+        SecurityContextHolder.setContext(context);
+        try {
+            context.setAuthentication(studentAuth);
+            assertThat(teachers.student(studentAuth).homeroomTeacher().hasAvatar()).isFalse();
+            assertThatThrownBy(() -> teachers.studentAvatar(homeroom.getId(), studentAuth))
+                .isInstanceOfSatisfying(ApplicationException.class, error -> assertThat(error.getCode()).isEqualTo("AVATAR_NOT_FOUND"));
+
+            var image = new ByteArrayOutputStream();
+            ImageIO.write(new BufferedImage(24, 24, BufferedImage.TYPE_INT_RGB), "jpeg", image);
+            String login = homeroom.getUser().getLogin();
+            context.setAuthentication(new TestingAuthenticationToken(login, null, "ROLE_TEACHER"));
+            profiles.uploadAvatar(login, new MockMultipartFile("file", "avatar.jpg", "image/jpeg", image.toByteArray()));
+            context.setAuthentication(studentAuth);
+            var avatar = teachers.studentAvatar(homeroom.getId(), studentAuth);
+            assertThat(avatar.getHeaders().getContentType()).isEqualTo(MediaType.IMAGE_JPEG);
+            assertThat(avatar.getHeaders().getCacheControl()).isEqualTo("no-store");
+            assertThat(avatar.getBody()).containsExactly(profiles.findAvatar(login).getImageData());
+            assertThatThrownBy(() -> teachers.studentAvatar(other.getId(), studentAuth))
+                .isInstanceOfSatisfying(ApplicationException.class, error -> assertThat(error.getCode()).isEqualTo("AVATAR_NOT_FOUND"));
+
+            context.setAuthentication(parentAuth);
+            assertThat(teachers.parent(student.getId(), parentAuth).homeroomTeacher().hasAvatar()).isTrue();
+            assertThat(teachers.parentAvatar(student.getId(), homeroom.getId(), parentAuth).getBody()).isEqualTo(avatar.getBody());
+            assertThatThrownBy(() -> teachers.parentAvatar(-1L, homeroom.getId(), parentAuth))
+                .isInstanceOfSatisfying(ApplicationException.class, error -> assertThat(error.getCode()).isEqualTo("PARENT_CHILD_NOT_FOUND"));
+        } finally {
+            SecurityContextHolder.setContext(previousContext);
+        }
     }
 
     @Test

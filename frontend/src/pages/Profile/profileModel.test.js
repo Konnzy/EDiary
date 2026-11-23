@@ -45,6 +45,6 @@ test("maps the current user's role data without example content", () => {
   });
   assert.equal(profile.fullName, "Іваненко Олена Петрівна");
   assert.equal(profile.children[0].id, "42");
-  assert.equal(profile.children[0].className, "Не призначено");
+  assert.equal(profile.children[0].className, "Клас не призначено");
   assert.equal(profile.notifications.newGrade, false);
 });

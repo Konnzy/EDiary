@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "test": "node --test",
+    "test:coverage": "node -e \"require('node:fs').mkdirSync('coverage',{recursive:true})\" && node --test --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/node.lcov && vitest run --coverage",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1"
   },
@@ -21,6 +23,10 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
-    "tailwindcss": "^4.3.0"
+    "@vitest/browser-playwright": "5.1.1",
+    "@vitest/coverage-v8": "5.1.1",
+    "playwright": "1.65.1",
+    "tailwindcss": "^4.3.0",
+    "vitest": "5.1.1"
   }
 }

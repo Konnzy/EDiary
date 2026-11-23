@@ -7,7 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-@SpringBootTest(properties = {"spring.flyway.enabled=false", "app.bootstrap-admin.enabled=false"})
+@SpringBootTest(properties = "app.bootstrap-admin.enabled=false")
 @EnabledIfEnvironmentVariable(named = "EDIARY_RUN_DB_TESTS", matches = "true")
 @Transactional(readOnly = true)
 class LessonRepositoryIntegrationTest {
