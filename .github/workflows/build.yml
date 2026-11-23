@@ -70,8 +70,8 @@ jobs:
       - name: Test frontend and generate LCOV coverage
         working-directory: frontend
         run: |
-          npm ci
-          npx playwright install --with-deps chromium
+          npm ci --ignore-scripts
+          node ./node_modules/playwright/cli.js install --with-deps chromium
           npm run test:coverage
 
       - name: Analyze backend and frontend
@@ -82,8 +82,7 @@ jobs:
           args: >
             -Dsonar.organization=konnzy
             -Dsonar.projectKey=Konnzy_EDiary
-            -Dsonar.sources=backend/src/main,frontend/src
-            -Dsonar.exclusions=frontend/src/**/*.test.*
+            -Dsonar.exclusions=backend/src/test/**,frontend/src/**/*.test.*,**/node_modules/**,**/target/**,**/dist/**,**/coverage/**
             -Dsonar.java.binaries=backend/target/classes
             -Dsonar.java.libraries=backend/target/dependency/*.jar
             -Dsonar.coverage.jacoco.xmlReportPaths=backend/target/site/jacoco/jacoco.xml
