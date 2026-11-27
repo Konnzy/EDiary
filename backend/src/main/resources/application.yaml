@@ -85,5 +85,10 @@ app:
     last-name: ${EDIARY_BOOTSTRAP_ADMIN_LAST_NAME:}
   mail:
     enabled: ${EDIARY_MAIL_ENABLED:false}
+    provider: ${EDIARY_MAIL_PROVIDER:smtp}
+    gmail:
+      client-id: ${GOOGLE_CLIENT_ID:}
+      client-secret: ${GOOGLE_CLIENT_SECRET:}
+      refresh-token: ${GOOGLE_REFRESH_TOKEN:}
     from: ${EDIARY_MAIL_FROM:no-reply@ediary.local}
     from-name: ${EDIARY_MAIL_FROM_NAME:Електронний щоденник}

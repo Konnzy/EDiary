@@ -1,3 +1,5 @@
+import { navigate } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -278,7 +280,7 @@ export function TeacherJournalPage({ initialClassId = "", initialClassName = "",
 
   const logout = async () => {
     try { await authApi.logout(); } catch { /* The session may already be expired. */ }
-    window.location.hash = "login";
+    navigate("login");
   };
 
   return (
@@ -1112,10 +1114,10 @@ function isoDateToUkrainian(value) {
 function TeacherTopBar({ onLogout }) {
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white px-4 sm:px-5 lg:px-6">
-      <a href="#teacher" className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна">
+      <Link to="/teacher" className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна">
         <GraduationCap className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" strokeWidth={2.4} aria-hidden="true" />
         <span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">Електронний щоденник</span>
-      </a>
+      </Link>
       <div className="flex items-center gap-1.5 sm:gap-4">
         <NotificationButton />
         <CurrentUserBadge />

@@ -80,7 +80,7 @@ public class PasswordResetService {
             // Send only after the token transaction has committed.
             boolean sent = email.sendText(normalized, "Відновлення пароля електронного щоденника",
                 "Для встановлення нового пароля відкрийте посилання:\n\n"
-                + frontendUrl + (link.administrator() ? "/#admin/reset-password?token=" : "/#reset-password?token=")
+                + frontendUrl + (link.administrator() ? "/admin/reset-password?token=" : "/reset-password?token=")
                 + link.token()
                 + "\n\nПосилання діє 30 хвилин і може бути використане лише один раз."
                 + "\nЯкщо ви не запитували зміну пароля, проігноруйте цей лист.");

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import {
   Check,
@@ -87,9 +88,9 @@ export function AdminRequestsPage() {
     return () => window.removeEventListener("admin-request-filter", handleFilter);
   }, []);
 
-  const handleDecisionCompleted = async (message) => {
+  const handleDecisionCompleted = async (result) => {
     setDialog(null);
-    setNotice(message);
+    setNotice(result);
     await loadRequests();
     window.dispatchEvent(new Event("registration-requests-updated"));
   };
@@ -111,13 +112,14 @@ export function AdminRequestsPage() {
         </div>
       </Card>
 
-      {notice ? <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-[0.8rem] font-medium text-emerald-700">{notice}</div> : null}
+      {notice ? <div role="status" className={cn("mb-4 rounded-lg border px-4 py-3 text-[0.8rem] font-medium",
+        notice.emailSent === false ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700")}>{notice.message}</div> : null}
 
       <Card className="overflow-hidden rounded-lg">
         {error ? (
           <div className="p-5">
             <Alert>{error}</Alert>
-            <a href="#admin" className="mt-4 inline-flex text-[0.8rem] font-bold text-slate-700 hover:text-slate-950">Увійти до панелі адміністратора</a>
+            <Link to="/admin" className="mt-4 inline-flex text-[0.8rem] font-bold text-slate-700 hover:text-slate-950">Увійти до панелі адміністратора</Link>
           </div>
         ) : null}
 
@@ -245,7 +247,7 @@ function DecisionDialog({ type, request, onClose, onCompleted }) {
       const result = isApproval
         ? await adminRegistrationApi.approve(request.id, normalizedLogin)
         : await adminRegistrationApi.reject(request.id, reason.trim());
-      await onCompleted(result.message);
+      await onCompleted(result);
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "Не вдалося обробити заявку.");
       setIsSubmitting(false);

@@ -75,7 +75,7 @@ public class NotificationEmailSender {
             default -> "Переглянути деталі";
         };
         String letter=title+"\n\n"+content
-            +"\n\n"+action+":\n"+frontendUrl.replaceAll("/+$", "")+"/#"+item.getTarget();
+            +"\n\n"+action+":\n"+frontendUrl.replaceAll("/+$", "")+"/"+item.getTarget();
         if (email.sendText(item.getRecipient().getEmail(), title, letter)) {
             if (absenceNotice) item.setLastEmailedAbsent("ABSENCE".equals(kind));
             item.setEmailKind(null);

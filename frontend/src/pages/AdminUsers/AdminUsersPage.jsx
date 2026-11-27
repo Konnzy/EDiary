@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   Ban,
@@ -300,7 +301,7 @@ export function AdminUsersPage() {
           <div className="p-5">
             <Alert>{error}</Alert>
             {error.toLowerCase().includes("автор") || error.toLowerCase().includes("доступ") ? (
-              <a href="#admin" className="mt-4 inline-flex text-[0.8rem] font-bold text-slate-700 hover:text-slate-950">Увійти до панелі адміністратора</a>
+              <Link to="/admin" className="mt-4 inline-flex text-[0.8rem] font-bold text-slate-700 hover:text-slate-950">Увійти до панелі адміністратора</Link>
             ) : null}
           </div>
         ) : null}

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, CheckCircle2, Loader2, MailPlus, RefreshCw, XCircle, X, Trash2 } from "lucide-react";
 import { adminRegistrationApi } from "@/lib/api.js";
@@ -166,8 +167,8 @@ export function AdminRequestNotifications() {
           </div>
 
           <button type="button" disabled={busy||loading||!feed.items.some(item=>item.status!=="PENDING")} onClick={() => setConfirmClear(true)} className="flex h-10 w-full items-center justify-center gap-2 border-t border-slate-200 text-[0.75rem] font-semibold text-slate-500 hover:bg-slate-50 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" aria-hidden="true" />Очистити сповіщення</button>
-          <a
-            href="#admin/requests"
+          <Link
+            to="/admin/requests"
             onClick={() => {
               navigateToRequests("");
               setOpen(false);
@@ -175,7 +176,7 @@ export function AdminRequestNotifications() {
             className="flex h-11 items-center justify-center border-t border-slate-200 text-[0.76rem] font-bold text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950"
           >
             Переглянути всі заявки
-          </a>
+          </Link>
         </section>
       ) : null}
       {confirmClear ? <NotificationClearDialog admin onConfirm={() => hide(null)} onClose={() => setConfirmClear(false)} /> : null}
@@ -190,7 +191,7 @@ function NotificationItem({ item, onNavigate, onHide, busy }) {
   const fullName = [item.lastName, item.firstName, item.patronymic].filter(Boolean).join(" ");
 
   return (
-    <div className="relative border-b border-slate-100 last:border-b-0"><a href="#admin/requests" onClick={onNavigate} className={cn("flex gap-3 px-4 py-3 transition-colors hover:bg-slate-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400",item.status!=="PENDING"&&"pr-12")}>
+    <div className="relative border-b border-slate-100 last:border-b-0"><Link to="/admin/requests" onClick={onNavigate} className={cn("flex gap-3 px-4 py-3 transition-colors hover:bg-slate-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400",item.status!=="PENDING"&&"pr-12")}>
       <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ring-1 ring-inset", content.iconClass)}>
         <Icon className="h-4 w-4" aria-hidden="true" />
       </span>
@@ -202,7 +203,7 @@ function NotificationItem({ item, onNavigate, onHide, busy }) {
         <span className="mt-1 block truncate text-[0.75rem] font-semibold text-slate-700">{fullName}</span>
         <span className="mt-0.5 block text-[0.68rem] text-slate-400">{roleLabels[item.role] || item.role}</span>
       </span>
-    </a>{item.status!=="PENDING"?<button type="button" onClick={onHide} disabled={busy} title="Приховати подію" aria-label={`Приховати подію: ${fullName}`} className="absolute right-2 top-3 flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"><X className="h-3.5 w-3.5" aria-hidden="true" /></button>:null}</div>
+    </Link>{item.status!=="PENDING"?<button type="button" onClick={onHide} disabled={busy} title="Приховати подію" aria-label={`Приховати подію: ${fullName}`} className="absolute right-2 top-3 flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"><X className="h-3.5 w-3.5" aria-hidden="true" /></button>:null}</div>
   );
 }
 

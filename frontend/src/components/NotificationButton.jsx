@@ -1,3 +1,5 @@
+import { getRoutePath } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, CheckCheck, Loader2, RefreshCw, Settings2, X, Trash2 } from "lucide-react";
 import { userNotificationApi } from "@/lib/api.js";
@@ -23,7 +25,7 @@ export function NotificationButton() {
   const [dismissing, setDismissing] = useState([]);
   const [clearing, setClearing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
-  const role = window.location.hash.slice(1).split("/")[0];
+  const role = getRoutePath().split("/")[0];
 
   const loadFeed = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -104,13 +106,13 @@ export function NotificationButton() {
         {loading ? <div className="flex min-h-40 items-center justify-center text-slate-400"><Loader2 className="h-5 w-5 animate-spin" aria-label="Завантаження" /></div> : null}
         {!loading && error ? <div className="px-5 py-8 text-center text-sm text-rose-700">{error}</div> : null}
         {!loading && !error && !feed.items.length ? <div className="px-5 py-8 text-center"><Bell className="mx-auto h-6 w-6 text-slate-300" /><p className="mt-3 text-[0.8rem] font-semibold text-slate-700">Сповіщень поки немає</p></div> : null}
-        {!loading && !error ? feed.items.map((item) => <div key={item.id} data-unread={!item.read} className={`notification-item flex items-start border-b border-slate-100 last:border-b-0 hover:bg-slate-50 ${item.read ? "" : "bg-sky-50/50"}`}><a href={`#${item.target}`} onClick={() => { if (!item.read) void userNotificationApi.markRead(item.id).catch(() => {}); setOpen(false); }} className="block min-w-0 flex-1 py-3 pl-4 pr-1">
+        {!loading && !error ? feed.items.map((item) => <div key={item.id} data-unread={!item.read} className={`notification-item flex items-start border-b border-slate-100 last:border-b-0 hover:bg-slate-50 ${item.read ? "" : "bg-sky-50/50"}`}><Link to={`/${item.target}`} onClick={() => { if (!item.read) void userNotificationApi.markRead(item.id).catch(() => {}); setOpen(false); }} className="block min-w-0 flex-1 py-3 pl-4 pr-1">
           <span className="flex items-start justify-between gap-3"><span className="notification-title text-[0.76rem] font-bold text-slate-900">{item.title}</span><time dateTime={item.createdAt} className="notification-time shrink-0 text-[0.65rem] text-slate-400">{relativeTime(item.createdAt)}</time></span>
           <span className="notification-body mt-1 block text-[0.74rem] leading-5 text-slate-600">{item.body.split("\n").slice(0,2).map((line,index)=><span key={index} className="block wrap-anywhere">{line}</span>)}</span>
-        </a><button type="button" onClick={() => void dismiss(item.id)} disabled={dismissing.includes(item.id)} aria-label={`Прибрати сповіщення: ${item.title}`} title="Прибрати сповіщення" className="mr-2 mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"><X className="h-4 w-4" aria-hidden="true" /></button></div>) : null}
+        </Link><button type="button" onClick={() => void dismiss(item.id)} disabled={dismissing.includes(item.id)} aria-label={`Прибрати сповіщення: ${item.title}`} title="Прибрати сповіщення" className="mr-2 mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"><X className="h-4 w-4" aria-hidden="true" /></button></div>) : null}
       </div>
       <button type="button" disabled={clearing||loading||!feed.items.length} onClick={() => setConfirmClear(true)} className="flex h-10 w-full items-center justify-center gap-2 border-t border-slate-200 text-[0.75rem] font-semibold text-slate-500 hover:bg-slate-50 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" aria-hidden="true" />Очистити сповіщення</button>
-      <a href={`#${role}/profile?notifications=1`} onClick={() => setOpen(false)} className="flex h-11 items-center justify-center gap-2 border-t border-slate-200 text-[0.76rem] font-bold text-slate-700 hover:bg-slate-50"><Settings2 className="h-4 w-4" />Налаштувати</a>
+      <Link to={`/${role}/profile?notifications=1`} onClick={() => setOpen(false)} className="flex h-11 items-center justify-center gap-2 border-t border-slate-200 text-[0.76rem] font-bold text-slate-700 hover:bg-slate-50"><Settings2 className="h-4 w-4" />Налаштувати</Link>
     </section> : null}
     {confirmClear ? <NotificationClearDialog onConfirm={clear} onClose={() => setConfirmClear(false)} /> : null}
   </div>;

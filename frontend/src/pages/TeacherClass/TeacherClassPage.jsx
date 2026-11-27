@@ -1,3 +1,5 @@
+import { navigate } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, BookOpen, CalendarDays, ChevronRight, GraduationCap, Loader2, LogOut, Search } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
@@ -27,15 +29,15 @@ function formatMetric(value) {
 function TeacherClassLayout({ title, subtitle, breadcrumb, children }) {
   const logout = async () => {
     try { await authApi.logout(); } catch { /* Session may already be expired. */ }
-    window.location.hash = "login";
+    navigate("login");
   };
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white px-4 sm:px-5 lg:px-6">
-        <a href="#teacher" className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна">
+        <Link to="/teacher" className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна">
           <GraduationCap className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" strokeWidth={2.4} aria-hidden="true" />
           <span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">Електронний щоденник</span>
-        </a>
+        </Link>
         <div className="flex items-center gap-1.5 sm:gap-4">
           <NotificationButton /><CurrentUserBadge />
           <button type="button" onClick={logout} className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[0.82rem] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
@@ -132,9 +134,9 @@ export function TeacherClassPage({ initialClassId = "" }) {
                 <div><dt className="text-xs text-slate-500">Класний керівник</dt><dd className="mt-2 text-sm font-semibold text-slate-800">{schoolClass.classTeacherName}</dd></div>
                 <div><dt className="text-xs text-slate-500">Кількість учнів</dt><dd className="mt-2 text-sm font-semibold text-slate-800">{schoolClass.students.length} / {schoolClass.capacity}</dd></div>
               </dl>
-              <a href={`#teacher/schedule?classId=${schoolClass.id}`} className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950">
+              <Link to={`/teacher/schedule?classId=${schoolClass.id}`} className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950">
                 <CalendarDays className="h-4 w-4" />Переглянути розклад класу<ChevronRight className="h-4 w-4" />
-              </a>
+              </Link>
             </div>
           </section>
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Статистика класу">
@@ -147,7 +149,7 @@ export function TeacherClassPage({ initialClassId = "" }) {
             <div className="border-b border-slate-100 p-5">
               <div className="relative max-w-lg"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><input type="search" aria-label="Пошук учнів за ПІБ або логіном" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Пошук за ПІБ або логіном" className="h-10 w-full rounded-md border border-slate-300 bg-white pl-10 pr-3 text-sm outline-hidden focus:border-slate-500 focus:ring-2 focus:ring-slate-200" /></div>
             </div>
-            {visibleStudents.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500"><tr><th className="px-5 py-3 font-medium">ПІБ</th><th className="px-5 py-3 font-medium">Логін</th><th className="px-5 py-3 font-medium">Пошта</th><th className="px-5 py-3 font-medium">Статус учня</th><th className="px-5 py-3 text-right font-medium">Дії</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleStudents.map((student) => <tr key={student.id} className="hover:bg-slate-50/60"><td className="px-5 py-4 font-semibold text-slate-800">{student.fullName}</td><td className="px-5 py-4 text-slate-600">{student.login}</td><td className="break-all px-5 py-4 text-slate-600">{student.email || "—"}</td><td className="px-5 py-4"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${statusStyles[student.status] || statusStyles.STUDYING}`}>{statusLabels[student.status] || student.status}</span></td><td className="px-5 py-4 text-right"><a href={`#teacher/my-class/${schoolClass.id}/students/${student.id}/learning-data`} className="inline-flex h-9 items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 text-xs font-medium text-sky-700 hover:bg-sky-100"><BookOpen className="h-4 w-4" />Навчальні дані</a></td></tr>)}</tbody></table></div> : <div className="py-12 text-center text-sm text-slate-500">{query ? "Учнів за цим запитом не знайдено." : "У класі поки немає учнів."}</div>}
+            {visibleStudents.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500"><tr><th className="px-5 py-3 font-medium">ПІБ</th><th className="px-5 py-3 font-medium">Логін</th><th className="px-5 py-3 font-medium">Пошта</th><th className="px-5 py-3 font-medium">Статус учня</th><th className="px-5 py-3 text-right font-medium">Дії</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleStudents.map((student) => <tr key={student.id} className="hover:bg-slate-50/60"><td className="px-5 py-4 font-semibold text-slate-800">{student.fullName}</td><td className="px-5 py-4 text-slate-600">{student.login}</td><td className="break-all px-5 py-4 text-slate-600">{student.email || "—"}</td><td className="px-5 py-4"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${statusStyles[student.status] || statusStyles.STUDYING}`}>{statusLabels[student.status] || student.status}</span></td><td className="px-5 py-4 text-right"><Link to={`/teacher/my-class/${schoolClass.id}/students/${student.id}/learning-data`} className="inline-flex h-9 items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 text-xs font-medium text-sky-700 hover:bg-sky-100"><BookOpen className="h-4 w-4" />Навчальні дані</Link></td></tr>)}</tbody></table></div> : <div className="py-12 text-center text-sm text-slate-500">{query ? "Учнів за цим запитом не знайдено." : "У класі поки немає учнів."}</div>}
           </section>
         </>
       ) : null}
@@ -178,9 +180,9 @@ export function TeacherStudentLearningPage({ classId, studentId }) {
   }, [classId, studentId]);
 
   const student = schoolClass?.students.find((item) => item.id === studentId);
-  const backHref = `#teacher/my-class?classId=${classId}`;
+  const backHref = `/teacher/my-class?classId=${classId}`;
   return (
-    <TeacherClassLayout title="Навчальні дані" subtitle="Оцінки, відвідування та домашні завдання учня" breadcrumb={<><a href={backHref} className="hover:text-slate-900">Мій клас</a><ChevronRight className="h-3.5 w-3.5" /><span className="font-medium text-slate-700" aria-current="page">Навчальні дані</span></>}>
+    <TeacherClassLayout title="Навчальні дані" subtitle="Оцінки, відвідування та домашні завдання учня" breadcrumb={<><Link to={backHref} className="hover:text-slate-900">Мій клас</Link><ChevronRight className="h-3.5 w-3.5" /><span className="font-medium text-slate-700" aria-current="page">Навчальні дані</span></>}>
       {loading ? <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-slate-400" aria-label="Завантаження" /></div> : error ? <Alert>{error}</Alert> : student ? <>
         <StudentLearningHeader student={student} className={schoolClass.name} parents={student.parents} />
         <SubjectProgressView role="HOMEROOM" classId={classId} adminStudentId={studentId} initialAcademicYear={schoolClass.academicYear} />

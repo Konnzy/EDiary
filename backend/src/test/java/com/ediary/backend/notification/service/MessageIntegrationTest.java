@@ -124,7 +124,7 @@ class MessageIntegrationTest {
         var ids=jdbc.queryForList("select notification_id from user_notification where recipient_id=?",Long.class,studentUser);
         assertThat(ids).hasSize(5);
         for(long id:ids){sender.deliver(id);sender.deliver(id);}
-        verify(email,times(5)).sendText(anyString(),anyString(),contains("/#student/"));
+        verify(email,times(5)).sendText(anyString(),anyString(),contains("/student/"));
         tx.executeWithoutResult(s->notifications.forStudent(students.findById(studentId).orElseThrow(),"GRADE","Тест","Друга подія",prefix+"second"));
         jdbc.update("update user_notification_settings set grade_email_enabled=false where user_id=?",studentUser);
         long queued=id("select notification_id from user_notification where recipient_id=? and event_key=?",studentUser,prefix+"second");
@@ -769,7 +769,7 @@ class MessageIntegrationTest {
             .content("{\"email\":\""+address+"\"}")).andExpect(status().isOk());
         var body=org.mockito.ArgumentCaptor.forClass(String.class);
         verify(email,timeout(5000)).sendText(eq(address),anyString(),body.capture());
-        var link=java.util.regex.Pattern.compile("/#admin/reset-password\\?token=([A-Za-z0-9_-]{43})").matcher(body.getValue());
+        var link=java.util.regex.Pattern.compile("/admin/reset-password\\?token=([A-Za-z0-9_-]{43})").matcher(body.getValue());
         assertThat(link.find()).isTrue();
         String reset="{\"token\":\""+link.group(1)+"\",\"newPassword\":\"Recovered!2026\"}";
         mvc.perform(post("/api/auth/password/reset").with(csrf()).contentType("application/json").content(reset))

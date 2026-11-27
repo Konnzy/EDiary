@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useId, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Eye, EyeOff, Info, Lock } from "lucide-react";
@@ -67,7 +68,7 @@ export function ResetPasswordPage({ token = "", administrator = false }) {
       setPassword("");
       setConfirmPassword("");
       setSubmitted(false);
-      window.history.replaceState(null, "", administrator ? "#admin/reset-password" : "#reset-password");
+      window.history.replaceState(null, "", administrator ? "/admin/reset-password" : "/reset-password");
     } catch (error) {
       setServerError(error.fieldErrors?.newPassword || error.message || "Не вдалося змінити пароль.");
     } finally {
@@ -163,13 +164,13 @@ export function ResetPasswordPage({ token = "", administrator = false }) {
           </form>
 
           <div className="mt-8 flex justify-center">
-            <a
-              href={administrator ? "#admin" : "#login"}
+            <Link
+              to={administrator ? "/admin" : "/login"}
               className="inline-flex items-center gap-5 text-[0.95rem] font-medium text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
               Повернутися до входу
-            </a>
+            </Link>
           </div>
 
           <div className="mt-8 border-t border-slate-200 pt-6">

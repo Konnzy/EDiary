@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { BookOpen, ChevronDown, Mail, Phone, Users } from "lucide-react";
 
 export function StudentLearningHeader({ student, className, parents = [], parentsError = "" }) {
@@ -25,8 +26,8 @@ export function StudentLearningHeader({ student, className, parents = [], parent
                 <div key={parent.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <p className="font-semibold text-slate-900">{parent.fullName}</p>
                   <div className="mt-2 space-y-1.5 text-sm text-slate-600">
-                    <p className="flex items-center gap-2"><Mail className="h-4 w-4 shrink-0" />{parent.email?.trim() ? <a className="break-all hover:underline" href={`mailto:${parent.email}`}>{parent.email}</a> : "Не вказано"}</p>
-                    <p className="flex items-center gap-2"><Phone className="h-4 w-4 shrink-0" />{parent.phone?.trim() ? <a className="hover:underline" href={`tel:${parent.phone}`}>{parent.phone}</a> : "Не вказано"}</p>
+                    <p className="flex items-center gap-2"><Mail className="h-4 w-4 shrink-0" />{parent.email?.trim() ? <Link className="break-all hover:underline" to={`mailto:${parent.email}`}>{parent.email}</Link> : "Не вказано"}</p>
+                    <p className="flex items-center gap-2"><Phone className="h-4 w-4 shrink-0" />{parent.phone?.trim() ? <Link className="hover:underline" to={`tel:${parent.phone}`}>{parent.phone}</Link> : "Не вказано"}</p>
                   </div>
                 </div>
               ))}

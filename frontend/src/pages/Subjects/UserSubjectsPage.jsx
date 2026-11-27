@@ -1,3 +1,5 @@
+import { navigate } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { WorkTypeBadge } from "@/components/WorkTypeBadge.jsx";
 import { gradeDisplay } from "@/lib/assessment.js";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -257,7 +259,7 @@ export function SubjectProgressView({ role, adminStudentId, classId, initialAcad
                     periodOptions={periodOptions}
                     onStudentChange={(value) => {
                       if (value === "__add_child__") {
-                        window.location.hash = "parent/profile?addChild=1";
+                        navigate("parent/profile?addChild=1");
                         return;
                       }
                       setStudentId(value);
@@ -736,11 +738,11 @@ function GradeBadge({ value }) {
 function TopBar({ config }) {
   const logout = async () => {
     try { await authApi.logout(); } catch { /* The session may already be expired. */ }
-    window.location.hash = "login";
+    navigate("login");
   };
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white px-4 sm:px-5 lg:px-6">
-      <a href={`#${config.homeRoute}`} className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна"><GraduationCap className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" strokeWidth={2.4} aria-hidden="true" /><span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">Електронний щоденник</span></a>
+      <Link to={`/${config.homeRoute}`} className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна"><GraduationCap className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" strokeWidth={2.4} aria-hidden="true" /><span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">Електронний щоденник</span></Link>
       <div className="flex items-center gap-1.5 sm:gap-4"><NotificationButton /><CurrentUserBadge /><button type="button" onClick={logout} className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[0.82rem] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900"><LogOut className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Вийти</span></button></div>
     </header>
   );
@@ -755,7 +757,7 @@ function LoadingState() {
 }
 
 function EmptyChildren() {
-  return <Card className="mt-5 rounded-lg px-5 py-12 text-center"><UserRound className="mx-auto h-8 w-8 text-slate-400" aria-hidden="true" /><h2 className="mt-4 text-[0.98rem] font-bold text-slate-900">Немає прив’язаних дітей</h2><p className="mt-2 text-[0.8rem] text-slate-500">Додайте дитину за кодом прив’язки у профілі.</p><a href="#parent/profile?addChild=1" className="mt-4 inline-flex text-[0.8rem] font-semibold text-slate-800 hover:underline">Додати дитину</a></Card>;
+  return <Card className="mt-5 rounded-lg px-5 py-12 text-center"><UserRound className="mx-auto h-8 w-8 text-slate-400" aria-hidden="true" /><h2 className="mt-4 text-[0.98rem] font-bold text-slate-900">Немає прив’язаних дітей</h2><p className="mt-2 text-[0.8rem] text-slate-500">Додайте дитину за кодом прив’язки у профілі.</p><Link to="/parent/profile?addChild=1" className="mt-4 inline-flex text-[0.8rem] font-semibold text-slate-800 hover:underline">Додати дитину</Link></Card>;
 }
 
 function formatDelta(delta) {

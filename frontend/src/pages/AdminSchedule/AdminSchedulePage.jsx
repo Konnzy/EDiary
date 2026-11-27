@@ -1,3 +1,4 @@
+import { navigate } from "@/lib/navigation.js";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeftRight,
@@ -295,7 +296,7 @@ export function AdminSchedulePage({ initialClassId = "", initialAcademicYear = "
   const continuePendingChange = (change) => {
     if (change?.route) {
       allowRouteNavigation(change.route);
-      window.location.hash = change.route;
+      navigate(change.route);
       return;
     }
     if (change?.action) void change.action();

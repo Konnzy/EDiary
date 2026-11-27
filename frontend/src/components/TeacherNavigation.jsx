@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { School } from "lucide-react";
 import { CurrentUserContext } from "@/lib/currentUser.jsx";
@@ -29,7 +30,7 @@ export function TeacherNavigation({ activeRoute, compact = false }) {
         );
         const label = <><Icon className={compact ? "h-4 w-4 shrink-0" : "h-5 w-5 shrink-0"} aria-hidden="true" />{compact ? <span className="hidden whitespace-nowrap min-[640px]:inline">{item.shortLabel || item.label}</span> : item.label}</>;
         return item.route
-          ? <a key={item.label} href={`#${item.route}`} className={classes} aria-label={item.label} aria-current={active ? "page" : undefined}>{label}</a>
+          ? <Link key={item.label} to={`/${item.route}`} className={classes} aria-label={item.label} aria-current={active ? "page" : undefined}>{label}</Link>
           : <button key={item.label} type="button" disabled className={classes} aria-label={item.label} title="Мій клас: розділ у розробці">{label}</button>;
       })}
     </div>

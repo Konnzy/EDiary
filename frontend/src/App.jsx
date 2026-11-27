@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { navigate } from "@/lib/navigation.js";
+import { useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { AdminHomePage } from "@/pages/AdminHome/AdminHomePage.jsx";
 import { AdminLoginPage } from "@/pages/AdminLogin/AdminLoginPage.jsx";
@@ -32,11 +34,9 @@ import { CurrentUserContext } from "@/lib/currentUser.jsx";
 import { ThemeToggle } from "@/components/ThemeToggle.jsx";
 import { RouteAccessToast } from "@/components/RouteAccessToast.jsx";
 import { showRouteAccessNotice } from "@/lib/routeAccessNotice.js";
-import { isRouteNavigationBlocked } from "@/lib/navigationGuard.js";
 
-function getRouteFromHash() {
-  return window.location.hash.replace("#", "") || "login";
-}
+
+
 
 const homeRoutes = {
   ADMIN: "admin/home",
@@ -47,7 +47,7 @@ const homeRoutes = {
 
 const temporaryPasswordRoute = "change-temporary-password";
 
-function ProtectedRoute({ allowedRole, loginRoute, changingPassword = false, children }) {
+export function ProtectedRoute({ allowedRole, loginRoute, changingPassword = false, children }) {
   const [checking, setChecking] = useState(true);
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -60,18 +60,18 @@ function ProtectedRoute({ allowedRole, loginRoute, changingPassword = false, chi
         if (!active) return;
 
         if (session.mustChangePassword && !changingPassword) {
-          window.location.replace(`#${temporaryPasswordRoute}`);
+          navigate(`/${temporaryPasswordRoute}`, { replace: true });
           return;
         }
         if (!session.mustChangePassword && changingPassword) {
-          window.location.replace(`#${homeRoutes[session.role] || loginRoute}`);
+          navigate(`/${homeRoutes[session.role] || loginRoute}`, { replace: true });
           return;
         }
         if (allowedRole && session.role !== allowedRole) {
           showRouteAccessNotice("ACCESS_DENIED");
-          window.location.hash = allowedRole === "ADMIN"
+          navigate(allowedRole === "ADMIN"
             ? loginRoute
-            : (homeRoutes[session.role] || loginRoute);
+            : (homeRoutes[session.role] || loginRoute));
           return;
         }
 
@@ -91,7 +91,7 @@ function ProtectedRoute({ allowedRole, loginRoute, changingPassword = false, chi
         showRouteAccessNotice(error instanceof ApiError && [401, 403].includes(error.status)
           ? "AUTH_REQUIRED"
           : "SESSION_CHECK_FAILED");
-        window.location.hash = loginRoute;
+        navigate(loginRoute);
       });
 
     return () => {
@@ -111,27 +111,8 @@ function ProtectedRoute({ allowedRole, loginRoute, changingPassword = false, chi
 }
 
 function AppContent() {
-  const [route, setRoute] = useState(getRouteFromHash);
-  const routeRef = useRef(route);
-
-  useEffect(() => {
-    const handleHashChange = () => {
-      const nextRoute = getRouteFromHash();
-      const currentRoute = routeRef.current;
-
-      if (isRouteNavigationBlocked(nextRoute, currentRoute)) {
-        window.history.replaceState(null, "", `#${currentRoute}`);
-        return;
-      }
-
-      routeRef.current = nextRoute;
-      setRoute(nextRoute);
-    };
-
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
-  }, []);
-
+  const location = useLocation();
+  const route = location.pathname.replace(/^\//, "") + location.search || "login";
   if (route === "request-registration") {
     return <RequestRegistrationPage />;
   }
@@ -157,7 +138,7 @@ function AppContent() {
   if (route === temporaryPasswordRoute) {
     return (
       <ProtectedRoute key={route} loginRoute="login" changingPassword>
-        <TemporaryPasswordPage onChanged={(role) => window.location.replace(`#${homeRoutes[role] || "login"}`)} />
+        <TemporaryPasswordPage onChanged={(role) => navigate(`/${homeRoutes[role] || "login"}`, { replace: true })} />
       </ProtectedRoute>
     );
   }

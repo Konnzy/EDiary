@@ -1,3 +1,5 @@
+import { navigate } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRightLeft, BarChart3, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, Plus, Search, Trash2, UserMinus, Users, X } from "lucide-react";
 import { Alert } from "@/components/ui/alert.jsx";
@@ -161,11 +163,11 @@ export function AdminClassDetailsPage({ classId }) {
 }
 
 function ClassBreadcrumb({ classId, className }) {
-  return <><a href="#admin/classes" className="hover:text-slate-900">Класи</a><ChevronRight className="h-3.5 w-3.5" /><a href={`#admin/classes/${classId}`} className="font-medium text-slate-700" aria-current="page">{className}</a></>;
+  return <><Link to="/admin/classes" className="hover:text-slate-900">Класи</Link><ChevronRight className="h-3.5 w-3.5" /><Link to={`/admin/classes/${classId}`} className="font-medium text-slate-700" aria-current="page">{className}</Link></>;
 }
 
 function ClassSummary({ schoolClass, studentCount }) {
-  const scheduleHref = `#admin/schedule?classId=${schoolClass.id}&academicYear=${encodeURIComponent(schoolClass.academicYear)}`;
+  const scheduleHref = `/admin/schedule?classId=${schoolClass.id}&academicYear=${encodeURIComponent(schoolClass.academicYear)}`;
   const statuses = {
     ACTIVE: { label: "Активний", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
     DRAFT: { label: "Чернетка", className: "border-amber-200 bg-amber-50 text-amber-800" },
@@ -182,9 +184,9 @@ function ClassSummary({ schoolClass, studentCount }) {
           <Info label="Статус класу" value={<span className={`inline-flex rounded-full border px-3 py-1 text-xs ${status.className}`}>{status.label}</span>} />
         </dl>
         {schoolClass.status !== "DRAFT" ? (
-          <a href={scheduleHref} className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950">
+          <Link to={scheduleHref} className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-950">
             <CalendarDays className="h-4 w-4" />Переглянути розклад класу<ChevronRight className="h-4 w-4" />
-          </a>
+          </Link>
         ) : null}
       </div>
       {schoolClass.status === "DRAFT" ? (
@@ -258,7 +260,7 @@ function StudentsSection({ classId, students, visibleStudents, query, onQueryCha
 }
 
 function StudentRow({ classId, student, onTransfer, onRemove, editable }) {
-  return <tr className="hover:bg-slate-50/60"><td className="px-5 py-4 font-semibold text-slate-800">{student.fullName}</td><td className="px-5 py-4 text-slate-600">{student.login}</td><td className="break-all px-5 py-4 text-slate-600">{student.email || "—"}</td><td className="px-5 py-4"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${statusStyles[student.status] || statusStyles.STUDYING}`}>{statusLabels[student.status] || student.status}</span></td><td className="px-5 py-4"><div className="flex flex-wrap justify-end gap-2"><a className="inline-flex h-9 items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 text-xs font-medium text-sky-700 hover:bg-sky-100" href={`#admin/classes/${classId}/students/${student.id}/learning-data`} title="Навчальні дані"><BookOpen className="h-4 w-4" /><span className="hidden 2xl:inline">Навчальні дані</span><span className="sr-only 2xl:hidden">Навчальні дані</span></a>{editable ? <><Button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-700 hover:bg-slate-100" onClick={onTransfer} title="Перевести до іншого класу"><ArrowRightLeft className="h-4 w-4" /><span className="hidden 2xl:inline">Перевести до іншого класу</span><span className="sr-only 2xl:hidden">Перевести до іншого класу</span></Button><Button className="h-9 rounded-md border border-red-300 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100" onClick={onRemove} title="Вилучити з класу"><UserMinus className="h-4 w-4" /><span className="hidden 2xl:inline">Вилучити з класу</span><span className="sr-only 2xl:hidden">Вилучити з класу</span></Button></> : null}</div></td></tr>;
+  return <tr className="hover:bg-slate-50/60"><td className="px-5 py-4 font-semibold text-slate-800">{student.fullName}</td><td className="px-5 py-4 text-slate-600">{student.login}</td><td className="break-all px-5 py-4 text-slate-600">{student.email || "—"}</td><td className="px-5 py-4"><span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${statusStyles[student.status] || statusStyles.STUDYING}`}>{statusLabels[student.status] || student.status}</span></td><td className="px-5 py-4"><div className="flex flex-wrap justify-end gap-2"><Link className="inline-flex h-9 items-center gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 text-xs font-medium text-sky-700 hover:bg-sky-100" to={`/admin/classes/${classId}/students/${student.id}/learning-data`} title="Навчальні дані"><BookOpen className="h-4 w-4" /><span className="hidden 2xl:inline">Навчальні дані</span><span className="sr-only 2xl:hidden">Навчальні дані</span></Link>{editable ? <><Button className="h-9 rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-700 hover:bg-slate-100" onClick={onTransfer} title="Перевести до іншого класу"><ArrowRightLeft className="h-4 w-4" /><span className="hidden 2xl:inline">Перевести до іншого класу</span><span className="sr-only 2xl:hidden">Перевести до іншого класу</span></Button><Button className="h-9 rounded-md border border-red-300 bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100" onClick={onRemove} title="Вилучити з класу"><UserMinus className="h-4 w-4" /><span className="hidden 2xl:inline">Вилучити з класу</span><span className="sr-only 2xl:hidden">Вилучити з класу</span></Button></> : null}</div></td></tr>;
 }
 
 function MembershipDialog({ dialog, schoolClass, classes, onClose, onConfirm }) {
@@ -348,7 +350,7 @@ function DeleteClassDialog({ schoolClass, onClose }) {
     setError("");
     try {
       await adminClassesApi.delete(schoolClass.id);
-      window.location.hash = "admin/classes";
+      navigate("admin/classes");
     } catch (requestError) {
       setError(requestMessage(requestError, "Не вдалося видалити клас."));
       setSubmitting(false);

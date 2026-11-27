@@ -16,6 +16,32 @@ import org.springframework.mock.web.MockMultipartFile;
 
 class AvatarImageTest {
     @Test
+    void rejectsMissingEmptyOversizedAndUnreadableUploads() {
+        assertThatThrownBy(() -> AvatarImage.normalize(null)).isInstanceOf(ApplicationException.class);
+        assertThatThrownBy(() -> AvatarImage.normalize(new MockMultipartFile("file",new byte[0])))
+            .isInstanceOf(ApplicationException.class);
+        assertThatThrownBy(() -> AvatarImage.normalize(new MockMultipartFile("file","large.jpg","image/jpeg",new byte[5*1024*1024+1])))
+            .isInstanceOf(ApplicationException.class).hasMessageContaining("5 МБ");
+        assertThatThrownBy(() -> AvatarImage.normalize(new MockMultipartFile("file","bad.jpg","image/jpeg",new byte[]{1,2,3})))
+            .isInstanceOf(ApplicationException.class);
+    }
+
+    @Test
+    void validatesTheActualImageFormatRatherThanTrustingTheFilename() throws Exception {
+        var image=new BufferedImage(24,40,BufferedImage.TYPE_INT_RGB);
+        var png=new ByteArrayOutputStream();ImageIO.write(image,"png",png);
+        assertThatThrownBy(() -> AvatarImage.normalize(new MockMultipartFile("file","fake.jpg","image/jpeg",png.toByteArray())))
+            .isInstanceOf(ApplicationException.class);
+        var gif=new ByteArrayOutputStream();ImageIO.write(image,"gif",gif);
+        assertThatThrownBy(() -> AvatarImage.normalize(new MockMultipartFile("file","image.gif","image/gif",gif.toByteArray())))
+            .isInstanceOf(ApplicationException.class);
+        var jpeg=new ByteArrayOutputStream();ImageIO.write(image,"JPEG",jpeg);
+        var normalized=ImageIO.read(new ByteArrayInputStream(AvatarImage.normalize(
+            new MockMultipartFile("file","portrait.jpg","image/jpeg",jpeg.toByteArray()))));
+        assertThat(normalized.getWidth()).isEqualTo(512);
+        assertThat(normalized.getHeight()).isEqualTo(512);
+    }
+    @Test
     void normalizes4kToACompactSquare() throws Exception {
         var source = new BufferedImage(3840, 2160, BufferedImage.TYPE_INT_RGB);
         var graphics = source.createGraphics();

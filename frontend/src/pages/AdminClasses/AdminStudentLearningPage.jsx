@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert.jsx";
@@ -50,9 +51,9 @@ export function AdminStudentLearningPage({ classId, studentId }) {
       title="Навчальні дані"
       subtitle="Оцінки, відвідування та домашні завдання учня."
       breadcrumb={<>
-        <a href="#admin/classes" className="hover:text-slate-900">Класи</a>
+        <Link to="/admin/classes" className="hover:text-slate-900">Класи</Link>
         <ChevronRight className="h-3.5 w-3.5" />
-        <a href={`#admin/classes/${classId}`} className="hover:text-slate-900">{className}</a>
+        <Link to={`/admin/classes/${classId}`} className="hover:text-slate-900">{className}</Link>
         <ChevronRight className="h-3.5 w-3.5" />
         <span className="font-medium text-slate-700" aria-current="page">Навчальні дані</span>
       </>}

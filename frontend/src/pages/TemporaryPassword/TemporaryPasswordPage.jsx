@@ -1,3 +1,4 @@
+import { navigate } from "@/lib/navigation.js";
 import { useContext, useState } from "react";
 import { AuthShell } from "@/components/AuthShell.jsx";
 import { Alert } from "@/components/ui/alert.jsx";
@@ -15,7 +16,7 @@ export function TemporaryPasswordPage({ onChanged }) {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
   const administrator = session.role === "ADMIN";
-  const loginRoute = administrator ? "#admin" : "#login";
+  const loginRoute = administrator ? "/admin" : "/login";
 
   async function changePassword(event) {
     event.preventDefault();
@@ -34,7 +35,7 @@ export function TemporaryPasswordPage({ onChanged }) {
       onChanged(session.role);
     } catch (error) {
       if (error.status === 401) {
-        window.location.replace(loginRoute);
+        navigate(loginRoute, { replace: true });
         return;
       }
       setError(error.fieldErrors?.currentPassword || error.fieldErrors?.newPassword ||
@@ -50,10 +51,10 @@ export function TemporaryPasswordPage({ onChanged }) {
     setError("");
     try {
       await (administrator ? adminAuthApi : authApi).logout();
-      window.location.replace(loginRoute);
+      navigate(loginRoute, { replace: true });
     } catch (error) {
       if (error.status === 401) {
-        window.location.replace(loginRoute);
+        navigate(loginRoute, { replace: true });
         return;
       }
       setError(error.message || "Не вдалося вийти із системи.");

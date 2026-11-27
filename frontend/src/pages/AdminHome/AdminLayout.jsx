@@ -1,3 +1,5 @@
+import { navigate } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { useContext, useEffect, useState } from "react";
 import {
   BookOpen,
@@ -101,7 +103,7 @@ function TopBar() {
   const saveSelf = (updated, loginChanged) => {
     setAccount(updated);
     setSelfDialogOpen(false);
-    if (loginChanged) window.location.hash = "admin";
+    if (loginChanged) navigate("admin");
   };
 
   const performLogout = async () => {
@@ -110,7 +112,7 @@ function TopBar() {
     } catch {
       // The server session may already be expired.
     } finally {
-      window.location.hash = "admin";
+      navigate("admin");
     }
   };
   const handleLogout = () => {
@@ -119,8 +121,8 @@ function TopBar() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white px-4 sm:px-5 lg:px-6">
-      <a
-        href="#admin/home"
+      <Link
+        to="/admin/home"
         className="inline-flex min-w-0 items-center gap-2 text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         aria-label="Електронний щоденник - адмін-панель"
       >
@@ -128,7 +130,7 @@ function TopBar() {
         <span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">
           Електронний щоденник
         </span>
-      </a>
+      </Link>
 
       <div className="flex items-center gap-1.5 sm:gap-4">
         <AdminRequestNotifications />
@@ -204,15 +206,15 @@ function NavigationItem({ item, activeItem, compact = false }) {
     return <button type="button" className={className} disabled title={`${item.label}: розділ у розробці`}>{content}</button>;
   }
   return (
-    <a
-      href={`#${item.route}`}
+    <Link
+      to={`/${item.route}`}
       className={className}
       aria-label={compact ? item.label : undefined}
       aria-current={activeItem === item.label ? "page" : undefined}
       title={compact ? item.label : undefined}
     >
       {content}
-    </a>
+    </Link>
   );
 }
 

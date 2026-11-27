@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   Clock3,
@@ -82,7 +83,7 @@ function CardHeading({ title, subtitle, actionLabel, actionHref }) {
         <h2 className="text-[1rem] font-bold leading-tight text-slate-950">{title}</h2>
         {subtitle ? <p className="mt-1 text-[0.78rem] leading-5 text-slate-500">{subtitle}</p> : null}
       </div>
-      {actionLabel ? <a href={actionHref} className="shrink-0 text-[0.76rem] font-bold text-[#17233a] hover:text-slate-700">{actionLabel}</a> : null}
+      {actionLabel ? <Link to={actionHref} className="shrink-0 text-[0.76rem] font-bold text-[#17233a] hover:text-slate-700">{actionLabel}</Link> : null}
     </div>
   );
 }
@@ -115,7 +116,7 @@ function StatsGrid({ stats }) {
 function RegistrationRequestsCard({ requests }) {
   return (
     <Card className="rounded-lg px-4 py-4 sm:px-5 sm:py-5">
-      <CardHeading title="Заявки на реєстрацію" subtitle="Останні заявки у системі." actionLabel="Усі заявки" actionHref="#admin/requests" />
+      <CardHeading title="Заявки на реєстрацію" subtitle="Останні заявки у системі." actionLabel="Усі заявки" actionHref="/admin/requests" />
       {requests.length ? (
         <>
           <div className="hidden overflow-x-auto md:block">

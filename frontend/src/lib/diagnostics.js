@@ -1,3 +1,4 @@
+import { getRoutePath } from "./navigation.js";
 const entries = [];
 const seenErrors = new WeakMap();
 const uuidPattern = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -40,7 +41,7 @@ export function reportRuntimeFailure(error) {
     if (seenErrors.has(error)) return seenErrors.get(error);
   }
   const id = record({ event: "ui.failed", requestId: newRequestId(),
-    route: routeOnly(typeof window === "undefined" ? "" : window.location.hash.slice(1)),
+    route: routeOnly(typeof window === "undefined" ? "" : getRoutePath()),
     errorType: errorTypes.has(error?.name) ? error.name : "Error" });
   if (error && typeof error === "object") seenErrors.set(error, id);
   return id;

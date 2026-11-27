@@ -1,3 +1,4 @@
+import { navigate } from "@/lib/navigation.js";
 import { motion } from "framer-motion";
 import {
   Bell,
@@ -117,7 +118,7 @@ export function TermsOfUsePage() {
                 type="button"
                 className="h-11 w-full rounded-md text-[0.9rem] font-bold"
                 onClick={() => {
-                  window.location.hash = "request-registration";
+                  navigate("request-registration");
                 }}
               >
                 Зрозуміло

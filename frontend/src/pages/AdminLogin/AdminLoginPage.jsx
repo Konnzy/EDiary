@@ -1,3 +1,5 @@
+import { navigate } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { useId, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -59,7 +61,7 @@ export function AdminLoginPage() {
 
     try {
       await adminAuthApi.login({ login: login.trim(), password, accessCode });
-      window.location.hash = "admin/home";
+      navigate("admin/home");
     } catch (error) {
       setAuthError(error instanceof ApiError ? error.message : "Не вдалося виконати вхід.");
     } finally {
@@ -202,16 +204,16 @@ export function AdminLoginPage() {
               </form>
 
               <div className="mt-6 flex flex-col items-center gap-4">
-                <a href="#admin/forgot-password" className="text-sm font-semibold text-slate-700 hover:underline">
+                <Link to="/admin/forgot-password" className="text-sm font-semibold text-slate-700 hover:underline">
                   Забули пароль?
-                </a>
-                <a
-                  href="#login"
+                </Link>
+                <Link
+                  to="/login"
                   className="inline-flex items-center gap-4 text-[0.9rem] font-medium text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <ArrowLeft className="h-5 w-5" aria-hidden="true" />
                   Повернутися до входу
-                </a>
+                </Link>
               </div>
             </CardContent>
           </Card>

@@ -1,3 +1,5 @@
+import { navigate } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { RecentGradesCard, HomeworkCard } from "@/components/StudentProgressCards.jsx";
 import { useStudentProgress } from "@/hooks/useStudentProgress.js";
 import {
@@ -80,13 +82,13 @@ function TopBar() {
     } catch {
       // The session may already be expired.
     }
-    window.location.hash = "login";
+    navigate("login");
   };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white px-4 sm:px-5 lg:px-6">
-      <a
-        href="#student"
+      <Link
+        to="/student"
         className="inline-flex min-w-0 items-center gap-2 text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         aria-label="Електронний щоденник - головна"
       >
@@ -94,7 +96,7 @@ function TopBar() {
         <span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">
           Електронний щоденник
         </span>
-      </a>
+      </Link>
 
       <div className="flex items-center gap-1.5 sm:gap-4">
         <NotificationButton />
@@ -148,7 +150,7 @@ function TodayScheduleCard({ schedule }) {
             <p className="mt-0.5 text-[0.72rem] leading-4 text-slate-500">{lesson.teacher} · {lesson.room ? `Кабінет ${lesson.room}` : "Кабінет не вказано"}</p>
           </article>
         )) : null}
-        <a href="#student/schedule" className="mt-3 inline-flex text-[0.76rem] font-semibold text-slate-600 hover:text-slate-900">Відкрити розклад</a>
+        <Link to="/student/schedule" className="mt-3 inline-flex text-[0.76rem] font-semibold text-slate-600 hover:text-slate-900">Відкрити розклад</Link>
       </CardContent>
     </Card>
   );

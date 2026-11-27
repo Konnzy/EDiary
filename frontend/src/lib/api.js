@@ -1,6 +1,7 @@
 import { newRequestId, validRequestId, reportApiFailure } from "@/lib/diagnostics.js";
+import { fetchApiResponse } from "./apiTransport.js";
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8081/api").replace(/\/$/, "");
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 let csrfToken = null;
 let csrfHeaderName = "X-XSRF-TOKEN";
@@ -38,24 +39,27 @@ async function request(path, { method = "GET", body, csrf = false, responseType 
   }
 
   let response;
+  let payload;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    ({ response, payload } = await fetchApiResponse(`${API_BASE_URL}${path}`, {
       method,
       credentials: "include",
       headers,
       body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
-    });
-  } catch {
-    reportApiFailure({ requestId, method, path, status: 0, code: "NETWORK_ERROR" });
-    throw new ApiError("Сервер тимчасово недоступний. Спробуйте пізніше.", { requestId, code: "NETWORK_ERROR" });
+    }, responseType));
+  } catch (error) {
+    const code = error.name === "TimeoutError" ? "REQUEST_TIMEOUT" : "NETWORK_ERROR";
+    reportApiFailure({ requestId, method, path, status: 0, code });
+    throw new ApiError(code === "REQUEST_TIMEOUT"
+      ? "Сервер не відповів вчасно. Перевірте результат дії перед повторною спробою."
+      : "Сервер тимчасово недоступний. Спробуйте пізніше.", { requestId, code });
   }
 
   if (response.status === 204) {
     return null;
   }
-  if (response.ok && responseType === "blob") return response.blob();
+  if (response.ok && responseType === "blob") return payload;
 
-  const payload = await response.json().catch(() => ({}));
   const responseId = validRequestId(response.headers.get("X-Request-ID"), validRequestId(payload.requestId, requestId));
   if (!response.ok) {
     reportApiFailure({ requestId: responseId, method, path, status: response.status, code: payload.code || "REQUEST_FAILED" });

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -271,8 +272,8 @@ function normalizeClassSearch(value) {
 function ClassCard({ schoolClass }) {
   const status = classStatus[schoolClass.status] || classStatus.ARCHIVED;
   return (
-    <a
-      href={`#admin/classes/${schoolClass.id}`}
+    <Link
+      to={`/admin/classes/${schoolClass.id}`}
       className="group min-h-[170px] rounded-lg border border-slate-200 bg-white p-5 text-left shadow-[0_10px_35px_-30px_rgba(15,23,42,0.55)] transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-[0_18px_42px_-28px_rgba(15,23,42,0.35)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
       aria-label={`Відкрити клас ${schoolClass.number}-${schoolClass.letter}`}
     >
@@ -300,7 +301,7 @@ function ClassCard({ schoolClass }) {
         </div>
         <span title="Відкрити клас"><ChevronRight className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-700" aria-hidden="true" /></span>
       </div>
-    </a>
+    </Link>
   );
 }
 

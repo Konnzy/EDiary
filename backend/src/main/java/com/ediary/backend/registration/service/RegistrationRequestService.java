@@ -205,21 +205,15 @@ public class RegistrationRequestService {
         registrationRequestRepository.saveAndFlush(request);
         audit.record("REGISTRATION_APPROVED", "REGISTRATION", requestId, of("status", RegistrationStatus.PENDING),
             of("status", request.getStatus(), "processedUserId", account.user().getId()));
-        eventPublisher.publishEvent(new RegistrationApprovedEvent(
-            request.getEmail(),
-            request.getName(),
-            account.user().getLogin(),
-            account.temporaryPassword(),
-            account.parentLinkCode()
-        ));
-
-        return new RegistrationDecisionResponse(
-            request.getId(),
-            request.getStatus(),
-            account.user().getLogin(),
-            now,
+        var response = new RegistrationDecisionResponse(
+            request.getId(), request.getStatus(), account.user().getLogin(), now,
             "Заявку схвалено, обліковий запис створено"
         );
+        eventPublisher.publishEvent(new RegistrationApprovedEvent(
+            request.getEmail(), request.getName(), account.user().getLogin(),
+            account.temporaryPassword(), account.parentLinkCode(), response::setEmailSent
+        ));
+        return response;
     }
 
     @Transactional

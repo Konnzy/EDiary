@@ -23,7 +23,7 @@ public class RegistrationNotificationListener {
                 Код прив’язки для реєстрації батьків: %s
                 Передавайте цей код лише своїм батькам або законним представникам.
                 """.formatted(event.parentLinkCode());
-        emailService.sendText(
+        boolean sent = emailService.sendText(
             event.email(),
             "Доступ до електронного щоденника схвалено",
             """
@@ -43,6 +43,7 @@ public class RegistrationNotificationListener {
                     parentCodeSection
                 )
         );
+        event.deliveryResult().accept(sent);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

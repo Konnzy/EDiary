@@ -17,11 +17,11 @@ export function RouteAccessToast() {
 
     readNotice();
     window.addEventListener(ROUTE_ACCESS_NOTICE_EVENT, readNotice);
-    window.addEventListener("hashchange", readNotice);
+    window.addEventListener("ediary:route-change", readNotice);
 
     return () => {
       window.removeEventListener(ROUTE_ACCESS_NOTICE_EVENT, readNotice);
-      window.removeEventListener("hashchange", readNotice);
+      window.removeEventListener("ediary:route-change", readNotice);
     };
   }, []);
 

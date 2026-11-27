@@ -1,3 +1,5 @@
+import { navigate } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { useId, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Eye, EyeOff, GraduationCap, Loader2, Lock, User } from "lucide-react";
@@ -27,11 +29,11 @@ export function LoginForm() {
 
     try {
       const response = await authApi.login({ login: login.trim(), password });
-      window.location.hash = {
+      navigate({
         TEACHER: "teacher",
         PARENT: "parent",
         STUDENT: "student",
-      }[response.role] || "login";
+      }[response.role] || "login");
     } catch (error) {
       setAuthError(error instanceof ApiError ? error.message : "Не вдалося виконати вхід.");
     } finally {
@@ -156,12 +158,12 @@ export function LoginForm() {
                   Запам’ятати мене
                 </label>
               </div>
-              <a
-                href="#forgot-password"
+              <Link
+                to="/forgot-password"
                 className="text-[0.82rem] font-medium text-slate-500 underline-offset-4 transition-all duration-200 hover:text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 Забули пароль?
-              </a>
+              </Link>
             </div>
 
             <Button type="submit" className="h-12 w-full rounded-md text-[0.95rem] font-bold" disabled={isLoading}>
@@ -180,12 +182,12 @@ export function LoginForm() {
           <div className="mt-6 border-t border-slate-200 pt-5">
             <p className="text-center text-[0.82rem] text-slate-500">
               Ще не маєте акаунту?{" "}
-              <a
-                href="#request-registration"
+              <Link
+                to="/request-registration"
                 className="font-semibold text-slate-700 underline-offset-4 transition-all duration-200 hover:text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 Подати заявку
-              </a>
+              </Link>
             </p>
           </div>
         </CardContent>

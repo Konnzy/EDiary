@@ -7,8 +7,8 @@ export class AppErrorBoundary extends Component {
   static getDerivedStateFromError() { return { failed: true }; }
   componentDidCatch(error) { this.setState({ requestId: reportRuntimeFailure(error) }); }
   reset = () => { if (this.state.failed) this.setState({ failed: false, requestId: null }); };
-  componentDidMount() { window.addEventListener("hashchange", this.reset); }
-  componentWillUnmount() { window.removeEventListener("hashchange", this.reset); }
+  componentDidMount() { window.addEventListener("ediary:route-change", this.reset); }
+  componentWillUnmount() { window.removeEventListener("ediary:route-change", this.reset); }
 
   render() {
     if (!this.state.failed) return this.props.children;

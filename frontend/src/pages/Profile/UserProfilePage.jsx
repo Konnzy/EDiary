@@ -1,3 +1,5 @@
+import { navigate, getRoutePath } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { useEffect, useId, useMemo, useState } from "react";
 import {
   Bell,
@@ -239,8 +241,8 @@ export function UserProfilePage({ role, openAddChild = false, focusNotifications
     setIsLinkModalOpen(false);
     setLinkCode("");
     setLinkError("");
-    if (window.location.hash.startsWith("#parent/profile?")) {
-      window.location.hash = "parent/profile";
+    if (getRoutePath().startsWith("parent/profile?")) {
+      navigate("parent/profile");
     }
   };
 
@@ -709,11 +711,11 @@ function Avatar({ avatar, initials, size = "small" }) {
 function TopBar({ config, data, avatar }) {
   const logout = async () => {
     try { await authApi.logout(); } catch { /* The session may already be expired. */ }
-    window.location.hash = "login";
+    navigate("login");
   };
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white px-4 sm:px-5 lg:px-6">
-      <a href={`#${config.homeRoute}`} className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна"><GraduationCap className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" strokeWidth={2.4} aria-hidden="true" /><span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">Електронний щоденник</span></a>
+      <Link to={`/${config.homeRoute}`} className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна"><GraduationCap className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" strokeWidth={2.4} aria-hidden="true" /><span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">Електронний щоденник</span></Link>
       <div className="flex items-center gap-1.5 sm:gap-4">
         <NotificationButton />
         <div className="hidden min-w-0 items-center gap-3 rounded-md bg-slate-50 px-3 py-1.5 sm:flex"><div className="min-w-0 text-right leading-tight"><div className="max-w-[190px] truncate text-[0.78rem] font-bold text-slate-800">{formatShortName({ firstName: data.personal.firstName, lastName: data.personal.lastName })}</div><div className="text-[0.7rem] text-slate-500">{data.roleLabel}</div></div><Avatar avatar={avatar} initials={data.initials} /></div>

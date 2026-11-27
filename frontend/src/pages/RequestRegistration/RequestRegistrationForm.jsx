@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useId, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -522,24 +523,24 @@ export function RequestRegistrationForm() {
                   >
                     Я погоджуюсь з
                   </label>
-                  <a
-                    href="#terms-of-use"
+                  <Link
+                    to="/terms-of-use"
                     className="text-[0.82rem] font-medium text-slate-800 underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     умовами користування
-                  </a>
+                  </Link>
                   <label
                     htmlFor={agreeId}
                     className="cursor-pointer select-none text-[0.82rem] text-slate-600 transition-colors hover:text-slate-900"
                   >
                     та з
                   </label>
-                  <a
-                    href="#privacy-policy"
+                  <Link
+                    to="/privacy-policy"
                     className="text-[0.82rem] font-medium text-slate-800 underline-offset-4 transition-colors hover:text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     політикою конфіденційності
-                  </a>
+                  </Link>
                 </span>
               </div>
               {showErrors && errors.agree ? (
@@ -561,12 +562,12 @@ export function RequestRegistrationForm() {
 
           <p className="mt-6 text-center text-[0.82rem] text-slate-500">
             Вже маєте акаунт?{" "}
-            <a
-              href="#login"
+            <Link
+              to="/login"
               className="font-semibold text-slate-800 underline-offset-4 transition-all duration-200 hover:text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               Увійти
-            </a>
+            </Link>
           </p>
 
           <AnimatePresence initial={false}>

@@ -1,3 +1,5 @@
+import { navigate } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   BookOpenCheck,
@@ -17,7 +19,7 @@ import { TeacherNavigation } from "@/components/TeacherNavigation.jsx";
 import { formatToday, useTodaySchedule } from "@/hooks/useTodaySchedule.js";
 
 function journalLink(item, date) {
-  if (!date) return "#teacher/journal";
+  if (!date) return "/teacher/journal";
   const params = new URLSearchParams({
     month: date.slice(0, 7),
     date,
@@ -29,7 +31,7 @@ function journalLink(item, date) {
   if (item.lessonNumber) params.set("lessonNumber", String(item.lessonNumber));
   if (item.lessonId) params.set("lessonId", String(item.lessonId));
   if (item.id && !item.lessonId) params.set("scheduleId", String(item.id));
-  return `#teacher/journal?${params}`;
+  return `/teacher/journal?${params}`;
 }
 
 function todayIsoDate() {
@@ -106,13 +108,13 @@ function TopBar() {
     } catch {
       // The session may already be expired.
     }
-    window.location.hash = "login";
+    navigate("login");
   };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white px-4 sm:px-5 lg:px-6">
-      <a
-        href="#teacher"
+      <Link
+        to="/teacher"
         className="inline-flex min-w-0 items-center gap-2 text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         aria-label="Електронний щоденник - головна"
       >
@@ -120,7 +122,7 @@ function TopBar() {
         <span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">
           Електронний щоденник
         </span>
-      </a>
+      </Link>
 
       <div className="flex items-center gap-1.5 sm:gap-4">
         <NotificationButton />
@@ -182,14 +184,14 @@ function TodayScheduleCard({ schedule }) {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => { window.location.hash = journalLink(lesson, todayIsoDate()); }}
+              onClick={() => { navigate(journalLink(lesson, todayIsoDate())); }}
               className="h-9 justify-self-start rounded-md px-3 text-[0.78rem] font-semibold text-slate-500 hover:bg-slate-100 sm:justify-self-end"
             >
               Журнал
             </Button>
           </article>
         )) : null}
-        <a href="#teacher/schedule" className="inline-flex text-[0.76rem] font-semibold text-slate-600 hover:text-slate-900">Відкрити розклад</a>
+        <Link to="/teacher/schedule" className="inline-flex text-[0.76rem] font-semibold text-slate-600 hover:text-slate-900">Відкрити розклад</Link>
       </CardContent>
     </Card>
   );
@@ -210,7 +212,7 @@ function RecentChangesCard({ dashboard }) {
           <p className="py-8 text-center text-sm text-slate-500">Записів у журналі поки немає.</p>
         ) : null}
         {(dashboard.data?.recentChanges || []).map((item) => (
-          <a key={item.lessonId} href={journalLink(item, item.lessonDate)}
+          <Link key={item.lessonId} to={journalLink(item, item.lessonDate)}
             className="block rounded-md border border-slate-200 bg-slate-50/70 px-4 py-3 transition-colors hover:border-sky-200 hover:bg-sky-50/60">
             <div className="flex items-center justify-between gap-3">
               <span className="truncate text-[0.76rem] font-semibold text-slate-700">{item.subjectName} · {item.className}</span>
@@ -218,9 +220,9 @@ function RecentChangesCard({ dashboard }) {
             </div>
             <p className="mt-1.5 line-clamp-2 text-[0.82rem] font-medium text-slate-900">{item.topic || "Оновлено запис уроку"}</p>
             <p className="mt-1 text-[0.72rem] text-slate-500">Урок {formatDate(item.lessonDate)} · {item.lessonNumber}-й урок</p>
-          </a>
+          </Link>
         ))}
-        <a href="#teacher/journal" className="inline-flex pt-1 text-[0.76rem] font-semibold text-slate-600 hover:text-slate-900">Відкрити журнал</a>
+        <Link to="/teacher/journal" className="inline-flex pt-1 text-[0.76rem] font-semibold text-slate-600 hover:text-slate-900">Відкрити журнал</Link>
       </CardContent>
     </Card>
   );
@@ -245,13 +247,13 @@ function LessonsToCompleteCard({ dashboard }) {
           <div className="flex items-center gap-2 py-3 text-[0.8rem] text-emerald-700"><BookOpenCheck className="h-4 w-4" />Уроків без теми немає</div>
         ) : null}
         {(dashboard.data?.lessonsWithoutTopic || []).map((item) => (
-          <a key={`${item.classId}-${item.subjectId}-${item.date}-${item.lessonNumber}`} href={journalLink(item, item.date)} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2.5 transition-colors hover:border-amber-200 hover:bg-amber-50/50">
+          <Link key={`${item.classId}-${item.subjectId}-${item.date}-${item.lessonNumber}`} to={journalLink(item, item.date)} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2.5 transition-colors hover:border-amber-200 hover:bg-amber-50/50">
             <div className="min-w-0">
               <h3 className="truncate text-[0.8rem] font-semibold text-slate-900">{item.subjectName} · {item.className}</h3>
               <p className="mt-0.5 text-[0.72rem] text-slate-500">{formatDate(item.date)} · {item.lessonNumber}-й урок</p>
             </div>
             <span className="shrink-0 text-[0.72rem] font-semibold text-sky-700">Журнал</span>
-          </a>
+          </Link>
         ))}
         {dashboard.data?.lessonsWithoutTopicCount > (dashboard.data?.lessonsWithoutTopic || []).length ? (
           <p className="text-[0.71rem] text-slate-500">Ще {dashboard.data.lessonsWithoutTopicCount - dashboard.data.lessonsWithoutTopic.length} уроків у журналі</p>

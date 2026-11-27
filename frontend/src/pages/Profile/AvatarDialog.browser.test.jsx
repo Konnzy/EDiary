@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
 import { useState } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
@@ -32,7 +33,7 @@ function render(component) {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  root.render(component);
+  root.render(<MemoryRouter>{component}</MemoryRouter>);
 }
 
 async function photo(width, height, type = "image/png") {
@@ -117,6 +118,25 @@ test("reports when the browser cannot encode the crop within the size limit", as
   const canvas = document.createElement("canvas");
   vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => callback(null));
   await expect(encodeAvatar(canvas, { left: 0, top: 0, side: 30 })).rejects.toThrow("500 КБ");
+});
+
+test("drags a selected photo and cancels the crop without uploading",async()=>{
+  const upload=vi.fn();renderDialog(upload);
+  await page.getByRole("button",{name:"Змінити фото"}).click();
+  choose(await photo(120,60));
+  await expect.element(saveButton()).toBeEnabled();
+  const crop=page.getByRole("group",{name:"Кадрування фото"});
+  const element=crop.element();
+  const image=element.querySelector("img");
+  const left=image.style.left;
+  // A real pointer capture is not available for synthetic events in a headless test.
+  vi.spyOn(element,"setPointerCapture").mockImplementation(()=>{});
+  element.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true,pointerId:1,isPrimary:true,button:0,clientX:100,clientY:100}));
+  element.dispatchEvent(new PointerEvent("pointermove",{bubbles:true,pointerId:1,isPrimary:true,clientX:140,clientY:100}));
+  await expect.poll(()=>image.style.left).not.toBe(left);
+  element.dispatchEvent(new PointerEvent("lostpointercapture",{bubbles:true,pointerId:1}));
+  await page.getByRole("button",{name:"Скасувати",exact:true}).click();
+  expect(upload).not.toHaveBeenCalled();
 });
 
 test("updates the teacher profile after uploading and removing its photo", async () => {

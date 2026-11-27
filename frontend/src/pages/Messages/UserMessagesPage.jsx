@@ -1,3 +1,5 @@
+import { navigate } from "@/lib/navigation.js";
+import { Link } from "react-router-dom";
 import { GraduationCap, LogOut } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter.jsx";
 import { LearnerNavigation } from "@/components/LearnerNavigation.jsx";
@@ -11,14 +13,14 @@ export function UserMessagesPage({ role, initialRecipient="", initialRecipientId
   const homeRoute = role.toLowerCase();
   const logout = async () => {
     try { await authApi.logout(); } catch { /* Session may already be expired. */ }
-    window.location.hash="login";
+    navigate("login");
   };
   const navigation = compact => role === "TEACHER"
     ? <TeacherNavigation activeRoute="teacher/messages" compact={compact} />
     : <LearnerNavigation role={role} activeRoute={`${homeRoute}/messages`} compact={compact} />;
   return <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white px-4 sm:px-5 lg:px-6">
-      <a href={`#${homeRoute}`} className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна"><GraduationCap className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" strokeWidth={2.4} /><span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">Електронний щоденник</span></a>
+      <Link to={`/${homeRoute}`} className="inline-flex min-w-0 items-center gap-2 text-slate-900" aria-label="Електронний щоденник - головна"><GraduationCap className="h-7 w-7 shrink-0 sm:h-8 sm:w-8" strokeWidth={2.4} /><span className="max-w-[150px] truncate text-[0.92rem] font-bold min-[420px]:max-w-none sm:text-[1.05rem]">Електронний щоденник</span></Link>
       <div className="flex items-center gap-1.5 sm:gap-4"><NotificationButton /><CurrentUserBadge /><button type="button" onClick={logout} className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-[0.82rem] font-semibold text-slate-500 hover:bg-slate-100"><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Вийти</span></button></div>
     </header>
     {navigation(true)}
